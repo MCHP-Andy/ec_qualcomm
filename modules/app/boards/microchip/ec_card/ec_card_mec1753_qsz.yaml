@@ -1,0 +1,26 @@
+#
+# Copyright (c) 2025, Microchip Technology Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+identifier: ec_card/mec1753_qsz
+name: Microchip EC Card with MEC1753-QSZ
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+ram: 60
+flash: 416
+supported:
+  - gpio
+  - pinctrl
+  - i2c
+  - spi
+testing:
+  binaries:
+    - spi_image.bin
+  ignore_tags:
+    - bluetooth
+    - net
+vendor: microchip

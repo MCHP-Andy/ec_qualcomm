@@ -1,0 +1,6 @@
+# Copyright (c) 2025 Microchip Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+config BOARD_EC_CARD
+	select SOC_MEC1753_QSZ if BOARD_EC_CARD_MEC1753_QSZ
+	select HAS_PM

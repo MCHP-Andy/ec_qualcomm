@@ -1,0 +1,6 @@
+board:
+  name: ec_card
+  full_name: Microchip EC Card
+  vendor: microchip
+  socs:
+  - name: mec1753_qsz

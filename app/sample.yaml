@@ -1,0 +1,5 @@
+sample:
+  name: I3C loopback sample
+tests:
+  sample.drivers.i3c.loopback:
+    tags: i3c
