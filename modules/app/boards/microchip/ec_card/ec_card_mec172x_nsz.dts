@@ -1,0 +1,92 @@
+/*
+ * Copyright (c) 2025, Microchip Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/dts-v1/;
+
+// #include <microchip/mec172xnsz.dtsi>
+// #include <microchip/mec172x/mec172xnsz-pinctrl.dtsi>
+#include <microchip/mec/mec172xnsz.dtsi>
+#include <microchip/mec/mec172x/mec172xnsz-pinctrl.dtsi>
+
+/ {
+	model = "Microchip MEC Card";
+	compatible = "microchip,ec_card-mec172x_nsz";
+
+	/delete-node/ flash@c0000;
+	/delete-node/ memory@118000;
+	flash0: flash@b0000 {
+		reg = <0x000b0000 0x68000>;
+	};
+
+	sram0: memory@118000 {
+		compatible = "mmio-sram";
+		reg = <0x00118000 0xf800>;
+	};
+
+	chosen {
+		zephyr,sram = &sram0;
+		zephyr,flash = &flash0;
+		zephyr,console = &uart1;
+		zephyr,shell-uart = &uart1;
+	};
+
+	leds {
+        compatible = "gpio-leds";
+        led2: led_2 {
+            gpios = <MCHP_GPIO_DECODE_153 GPIO_ACTIVE_HIGH>;
+        };
+
+		led3: led_3 {
+            gpios = <MCHP_GPIO_DECODE_157 GPIO_ACTIVE_HIGH>;
+        };
+    };
+
+	btns {
+		compatible = "gpio-keys";
+		s2: btn_1 {
+			gpios = <MCHP_GPIO_DECODE_141 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	// power-states {
+	// 	idle: idle {
+	// 		compatible = "zephyr,power-state";
+	// 		power-state-name = "suspend-to-idle";
+	// 		min-residency-us = <100000>;
+	// 	};
+
+	// 	suspend_to_ram: suspend_to_ram {
+	// 		compatible = "zephyr,power-state";
+	// 		power-state-name = "suspend-to-ram";
+	// 		min-residency-us = <200000>;
+	// 	};
+	// };
+};
+
+&idle {
+	min-residency-us = <100000>;
+};
+
+&suspend_to_ram {
+	min-residency-us = <200000>;
+};
+
+/* Disable ARM SysTick kernel timer driver */
+&systick {
+	status = "disabled";
+};
+
+/* Enable MCHP kernel timer driver using 32KHz RTOS timer and 1MHz basic timer */
+&rtimer {
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+	current-speed = <115200>;
+	pinctrl-0 = <&uart1_tx_gpio170 &uart1_rx_gpio171>;
+	pinctrl-names = "default";
+};
