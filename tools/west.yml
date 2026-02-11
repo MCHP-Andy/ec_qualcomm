@@ -15,12 +15,11 @@ manifest:
       repo-path: zephyr.git
       path: zephyr-rtos
       remote: zephyrproject-rtos
-      revision: main
+      revision: v3.7.1
       clone-depth: 1
       import:
         name-allowlist:
           - cmsis
-          - cmsis_6
           - hal_microchip
 
     - name: app

@@ -1,6 +1,8 @@
 board:
   name: ec_card
-  full_name: Microchip EC Card
+  # For zephyr 3.7
+  # full_name: Microchip EC Card
+  # For zephyr 3.7 end
   vendor: microchip
   socs:
   - name: mec1753_qsz

@@ -6,10 +6,13 @@
 
 /dts-v1/;
 
-// #include <microchip/mec172xnsz.dtsi>
-// #include <microchip/mec172x/mec172xnsz-pinctrl.dtsi>
-#include <microchip/mec/mec172xnsz.dtsi>
-#include <microchip/mec/mec172x/mec172xnsz-pinctrl.dtsi>
+// For zephyr 3.7
+#include <microchip/mec172xnsz.dtsi>
+#include <microchip/mec172x/mec172xnsz-pinctrl.dtsi>
+// For zephyr 3.7 end
+
+// #include <microchip/mec/mec172xnsz.dtsi>
+// #include <microchip/mec/mec172x/mec172xnsz-pinctrl.dtsi>
 
 / {
 	model = "Microchip MEC Card";

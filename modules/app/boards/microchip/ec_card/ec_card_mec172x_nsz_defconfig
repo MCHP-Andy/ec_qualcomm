@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+# For zephyr 3.7
+CONFIG_RTOS_TIMER=y
+CONFIG_PINCTRL=y
+# For zephyr 3.7 end
+
 CONFIG_CLOCK_CONTROL=y
 CONFIG_GPIO=y
 CONFIG_SERIAL=y
