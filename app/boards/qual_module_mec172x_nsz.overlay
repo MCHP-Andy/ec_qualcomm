@@ -1,0 +1,120 @@
+/*
+ * Copyright (c) 2023 Microchip Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+    chosen {
+        zephyr,shell-uart = &uart1;
+    };
+
+    aliases {
+        led0 = &led2;
+        wk-btn = &s2;
+    };
+
+    zephyr,user {
+        himax-wk-gpios = <MCHP_GPIO_DECODE_140 GPIO_ACTIVE_HIGH>;
+
+        acpi-int-gpios = <MCHP_GPIO_DECODE_226 GPIO_ACTIVE_HIGH>;
+        sen-int-gpios = <MCHP_GPIO_DECODE_157 GPIO_ACTIVE_HIGH>;
+
+        base-fan-pwm2-gpios = <MCHP_GPIO_DECODE_053 GPIO_ACTIVE_HIGH>;
+        base-fan-ta2-gpios = <MCHP_GPIO_DECODE_051 GPIO_ACTIVE_HIGH>;
+        fan-max-rpm-gpios = <MCHP_GPIO_DECODE_206 GPIO_ACTIVE_HIGH>;
+        fan-12v-enable-gpios = <MCHP_GPIO_DECODE_165 GPIO_ACTIVE_HIGH>;
+        cpu-fan-pwm1-gpios = <MCHP_GPIO_DECODE_054 GPIO_ACTIVE_HIGH>;
+        cpu-fan-ta1-gpios = <MCHP_GPIO_DECODE_050 GPIO_ACTIVE_HIGH>;
+
+        board-id0-gpios = <MCHP_GPIO_DECODE_204 GPIO_ACTIVE_HIGH>;
+        board-id1-gpios = <MCHP_GPIO_DECODE_205 GPIO_ACTIVE_HIGH>;
+
+        io-channels =  <&adc0 8>, <&adc0 9>, <&adc0 10>;
+
+        thro-mira-gpios = <MCHP_GPIO_DECODE_164 GPIO_ACTIVE_HIGH>;
+        wk-en-gpios = <MCHP_GPIO_DECODE_221 GPIO_ACTIVE_HIGH>;
+        slp-indicator-gpios = <MCHP_GPIO_DECODE_011 GPIO_ACTIVE_HIGH>;
+        soc-rev-gpios = <MCHP_GPIO_DECODE_203 GPIO_ACTIVE_HIGH>;
+        resout-3p3-gpios = <MCHP_GPIO_DECODE_244 GPIO_ACTIVE_HIGH>;
+        misc-1p8-gpios = <MCHP_GPIO_DECODE_240 GPIO_ACTIVE_HIGH>;
+        ec-psl-gpios = <MCHP_GPIO_DECODE_243 GPIO_ACTIVE_HIGH>;
+        soc-pwr-status-gpios = <MCHP_GPIO_DECODE_242 GPIO_ACTIVE_HIGH>;
+    };
+
+    tst_clk_out: tst_clk_out {
+        compatible = "vnd,pinctrl-device";
+        pinctrl-0 = <&tst_clk_out_gpio060>;
+        pinctrl-names = "default";
+        status = "okay";
+    };
+};
+
+&uart0 {
+    status = "okay";
+	pinctrl-0 = < &uart0_tx_gpio104 &uart0_rx_gpio105 >;
+	pinctrl-names = "default";
+};
+
+&uart1 {
+    status = "okay";
+	pinctrl-0 = < &uart1_tx_gpio170 &uart1_rx_gpio171 >;
+	pinctrl-names = "default";
+};
+
+&i2c_smb_0 {
+    status = "okay";
+    port_sel = <2>;
+    pinctrl-0 = < &i2c02_sda_gpio154 &i2c02_scl_gpio155 >;
+	pinctrl-names = "default";
+};
+
+&i2c_smb_1 {
+    status = "okay";
+    port_sel = <3>;
+    pinctrl-0 = < &i2c03_sda_gpio007 &i2c03_scl_gpio010 >;
+	pinctrl-names = "default";
+};
+
+&i2c_smb_2 {
+    status = "okay";
+    port_sel = <1>;
+    pinctrl-0 = < &i2c01_sda_gpio130 &i2c01_scl_gpio131 >;
+	pinctrl-names = "default";
+};
+
+&spi0 {
+    compatible = "microchip,xec-qmspi-ldma";
+    status = "okay";
+    // port_sel = <0>;
+    // chip_select = < 0x0 >;
+    pinctrl-0 = < &shd_io0_gpio223 &shd_io1_gpio224 &shd_clk_gpio056 &shd_cs0_n_gpio055 >;
+	pinctrl-names = "default";
+};
+
+&adc0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+    channel@8 {
+		reg = <8>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <0>;
+		zephyr,resolution = <12>;
+	};
+	channel@9 {
+		reg = <9>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <0>;
+		zephyr,resolution = <12>;
+	};
+	channel@a {
+		reg = <10>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <0>;
+		zephyr,resolution = <12>;
+	};
+};
