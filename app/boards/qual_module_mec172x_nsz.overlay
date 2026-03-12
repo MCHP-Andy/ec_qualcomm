@@ -20,12 +20,8 @@
         acpi-int-gpios = <MCHP_GPIO_DECODE_226 GPIO_ACTIVE_HIGH>;
         sen-int-gpios = <MCHP_GPIO_DECODE_157 GPIO_ACTIVE_HIGH>;
 
-        base-fan-pwm2-gpios = <MCHP_GPIO_DECODE_053 GPIO_ACTIVE_HIGH>;
-        base-fan-ta2-gpios = <MCHP_GPIO_DECODE_051 GPIO_ACTIVE_HIGH>;
         fan-max-rpm-gpios = <MCHP_GPIO_DECODE_206 GPIO_ACTIVE_HIGH>;
         fan-12v-enable-gpios = <MCHP_GPIO_DECODE_165 GPIO_ACTIVE_HIGH>;
-        cpu-fan-pwm1-gpios = <MCHP_GPIO_DECODE_054 GPIO_ACTIVE_HIGH>;
-        cpu-fan-ta1-gpios = <MCHP_GPIO_DECODE_050 GPIO_ACTIVE_HIGH>;
 
         board-id0-gpios = <MCHP_GPIO_DECODE_204 GPIO_ACTIVE_HIGH>;
         board-id1-gpios = <MCHP_GPIO_DECODE_205 GPIO_ACTIVE_HIGH>;
@@ -48,6 +44,7 @@
         pinctrl-names = "default";
         status = "okay";
     };
+
 };
 
 &uart0 {

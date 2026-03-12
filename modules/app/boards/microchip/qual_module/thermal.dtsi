@@ -1,0 +1,43 @@
+
+#include <dt-bindings/pwm/pwm.h>
+
+/ {
+    pwmfans {
+		compatible = "pwm-leds";
+		fan0: fan0 {
+			pwms = <&pwm0 0 PWM_USEC(40) PWM_POLARITY_INVERTED>;
+		};
+		fan1: fan1 {
+			pwms = <&pwm1 0 PWM_USEC(40) PWM_POLARITY_INVERTED>;
+		};
+	};
+};
+
+
+// Base Fan
+&pwm0 {
+    status = "okay";
+    pinctrl-0 = < &pwm0_gpio053 >;
+    pinctrl-names = "default";
+};
+
+&tach1 {
+    status = "okay";
+    pinctrl-0 = < &tach1_gpio051 >;
+    pinctrl-names = "default";
+};
+// Base Fan end
+
+// CPU Fan
+&pwm1 {
+    status = "okay";
+    pinctrl-0 = < &pwm1_gpio054 >;
+    pinctrl-names = "default";
+};
+
+&tach0 {
+    status = "okay";
+    pinctrl-0 = < &tach0_gpio050 >;
+    pinctrl-names = "default";
+};
+// CPU Fan end
