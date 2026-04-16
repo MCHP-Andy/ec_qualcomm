@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2026-04-16 15:22:05 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-16 18:35:33
+ * @Last Modified time: 2026-04-16 18:45:12
  */
 
 #include <zephyr/drivers/i2c.h>
@@ -67,7 +67,7 @@ static int acpi_target_read_cb(struct i2c_target_config *config, uint8_t *val) {
         printk("acpi target read request: 0x%02x\n", *val);
 
         // Copy/Read data to resp_buf
-        // acpi_read(resp_buf, sizeof(resp_buf));
+        acpi_read(resp_buf, sizeof(resp_buf));
 
         idx = 0;
         *val = resp_buf[idx++];
@@ -95,7 +95,7 @@ static int acpi_target_stop_cb(struct i2c_target_config *config) {
 
     if (i2c_state == I2C_STATE_WRITE) {
         // Send i2c data to ACPI if needed
-        // acpi_write(rece_cmd, idx);
+        acpi_write(rece_cmd, idx);
     }
 
     idx = 0;
