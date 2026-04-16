@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-03-12 15:17:46
+ * @Last Modified time: 2026-04-17 03:33:45
  */
 
 #include <zephyr/kernel.h>
@@ -10,11 +10,50 @@
 
 // #include <interface/system.h>
 #include <interface/thermal.h>
+#include <interface/fan.h>
 
 LOG_MODULE_REGISTER(thermal, LOG_LEVEL_INF);
 
 #define STACKSIZE 1024
 #define PRIORITY 7
+
+static thermal_ctrl_t thermal_ctrl = {
+    .fan_ctrl = {
+        [1] = {
+            .state = 0x01,
+            // .rpm = 500,
+            // .trip_low = 300,
+            // .trip_high = 700,
+        },
+        [2] = {
+            .state = 0x01,
+            // .rpm = 500,
+            // .trip_low = 300,
+            // .trip_high = 700,
+        },
+    },
+    .adc_sample_ms = 1000,
+};
+
+int thermal_ctrl_get(thermal_ctrl_t *ctrl) {
+    if (ctrl == NULL) {
+        return -ENOMEM;
+    }
+
+    memcpy(ctrl, &thermal_ctrl, sizeof(thermal_ctrl_t));
+
+    return 0;
+}
+
+int thermal_ctrl_set(const thermal_ctrl_t *ctrl) {
+    if (ctrl == NULL) {
+        return -ENOMEM;
+    }
+
+    memcpy(&thermal_ctrl, ctrl, sizeof(thermal_ctrl_t));
+
+    return 0;
+}
 
 #define APP_FAN_SET_SPEED(fan_id, speed)                                       \
     do {                                                                       \
@@ -117,6 +156,15 @@ static void service(void) {
 
     k_sleep(wait_time);
 
+    uint8_t profile = 0x06;
+    for (uint8_t fan_id = 1; fan_id < 3; fan_id++) {
+        for (uint8_t tmp_src = 1; tmp_src < 3; tmp_src++) {
+            fan_tbl_t **tbl = &thermal_ctrl.fan_ctrl[fan_id].fan_tbl[tmp_src];
+            uint8_t *psize = &thermal_ctrl.fan_ctrl[fan_id].lut[tmp_src];
+            board_lut_get(profile, fan_id, tmp_src, tbl, psize);
+        }
+    }
+
     // wait_time = K_FOREVER;
     wait_time = K_MSEC(5000);
 
@@ -160,53 +208,3 @@ static void service(void) {
 }
 
 K_THREAD_DEFINE(thermal_id, STACKSIZE, service, NULL, NULL, NULL, PRIORITY, 0, 0);
-
-#ifdef CONFIG_SHELL
-#include <zephyr/shell/shell.h>
-
-static int cmd_fan_set(const struct shell *sh, size_t argc, char **argv) {
-    uint8_t ch = 0, duty = 0;
-
-    ch = atoi(argv[1]);
-    
-    duty = atoi(argv[2]);
-    if (duty > 100) {
-        duty = 100;
-    }
-
-    int ret = app_fan_set_speed(ch, duty);
-    if (ret < 0) {
-        shell_error(sh, "Failed to set fan%d speed: %d", ch, ret);
-    } else {
-        shell_info(sh, "Fan%d speed set to %d%%", ch, duty);
-    }
-    
-    return 0;
-}
-
-static int cmd_fan_get(const struct shell *sh, size_t argc, char **argv) {
-    uint8_t ch = 0;
-    uint16_t rpm = 0;
-
-    ch = atoi(argv[1]);
-
-    int ret = app_fan_get_rpm(ch, &rpm);
-    if (ret < 0) {
-        shell_error(sh, "Failed to get fan%d RPM: %d", ch, ret);
-    } else {
-        shell_info(sh, "Fan%d RPM is %d", ch, rpm);
-    }
-
-    return ret;
-}
-
-SHELL_STATIC_SUBCMD_SET_CREATE(sub_fan,
-	SHELL_CMD_ARG(set, NULL,
-		"Set fan duty", cmd_fan_set, 2, 0),
-	SHELL_CMD_ARG(off, NULL,
-		"Get fan RPM", cmd_fan_get, 1, 0),
-	SHELL_SUBCMD_SET_END /* Array terminated. */
-);
-
-SHELL_CMD_REGISTER(fan, &sub_fan, "Fan commands", NULL);
-#endif

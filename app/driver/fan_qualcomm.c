@@ -2,7 +2,7 @@
  * @Author: andy.chang
  * @Date: 2025-06-29 17:06:01
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-03-12 14:16:19
+ * @Last Modified time: 2026-04-17 01:16:04
  */
 
 #include <errno.h>
@@ -108,3 +108,53 @@ static int init_config(void) {
 }
 
 SYS_INIT(init_config, APPLICATION, 0);
+
+#ifdef CONFIG_SHELL
+#include <zephyr/shell/shell.h>
+
+static int cmd_fan_set(const struct shell *sh, size_t argc, char **argv) {
+    uint8_t ch = 0, duty = 0;
+
+    ch = atoi(argv[1]);
+    
+    duty = atoi(argv[2]);
+    if (duty > 100) {
+        duty = 100;
+    }
+
+    int ret = app_fan_set_speed(ch, duty);
+    if (ret < 0) {
+        shell_error(sh, "Failed to set fan%d speed: %d", ch, ret);
+    } else {
+        shell_info(sh, "Fan%d speed set to %d%%", ch, duty);
+    }
+    
+    return 0;
+}
+
+static int cmd_fan_get(const struct shell *sh, size_t argc, char **argv) {
+    uint8_t ch = 0;
+    uint16_t rpm = 0;
+
+    ch = atoi(argv[1]);
+
+    int ret = app_fan_get_rpm(ch, &rpm);
+    if (ret < 0) {
+        shell_error(sh, "Failed to get fan%d RPM: %d", ch, ret);
+    } else {
+        shell_info(sh, "Fan%d RPM is %d", ch, rpm);
+    }
+
+    return ret;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_fan,
+	SHELL_CMD_ARG(set, NULL,
+		"Set fan duty", cmd_fan_set, 2, 0),
+	SHELL_CMD_ARG(off, NULL,
+		"Get fan RPM", cmd_fan_get, 1, 0),
+	SHELL_SUBCMD_SET_END /* Array terminated. */
+);
+
+SHELL_CMD_REGISTER(fan, &sub_fan, "Fan commands", NULL);
+#endif
