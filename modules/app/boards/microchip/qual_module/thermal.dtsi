@@ -2,22 +2,37 @@
 #include <dt-bindings/pwm/pwm.h>
 
 / {
+    zephyr,user {
+        fan-max-rpm-gpios = <MCHP_GPIO_DECODE_206 GPIO_ACTIVE_HIGH>;
+        fan-12v-enable-gpios = <MCHP_GPIO_DECODE_242 GPIO_ACTIVE_HIGH>;
+    };
+
     pwmfans {
 		compatible = "pwm-leds";
 		fan0: fan0 {
-			pwms = <&pwm0 0 PWM_USEC(40) PWM_POLARITY_INVERTED>;
+			pwms = <&pwm8 0 PWM_USEC(40) PWM_POLARITY_INVERTED>;
 		};
 		fan1: fan1 {
-			pwms = <&pwm1 0 PWM_USEC(40) PWM_POLARITY_INVERTED>;
+			pwms = <&pwm9 0 PWM_USEC(40) PWM_POLARITY_INVERTED>;
 		};
 	};
+
+    soc {
+        pwm9: pwm@40005890 {
+			compatible = "microchip,xec-pwm";
+			reg = < 0x40005890 0x20 >;
+			pcrs = < 0x1 0x1f >;
+			status = "disabled";
+			#pwm-cells = < 0x3 >;
+		};
+    };
 };
 
 
 // Base Fan
-&pwm0 {
+&pwm8 {
     status = "okay";
-    pinctrl-0 = < &pwm0_gpio053 >;
+    pinctrl-0 = < &pwm8_gpio035 >;
     pinctrl-names = "default";
 };
 
@@ -29,9 +44,9 @@
 // Base Fan end
 
 // CPU Fan
-&pwm1 {
+&pwm9 {
     status = "okay";
-    pinctrl-0 = < &pwm1_gpio054 >;
+    pinctrl-0 = < &pwm9_gpio133 >;
     pinctrl-names = "default";
 };
 
@@ -41,3 +56,10 @@
     pinctrl-names = "default";
 };
 // CPU Fan end
+
+&pinctrl{
+    /* PWM */
+	/omit-if-no-ref/ pwm9_gpio133: pwm9_gpio133 {
+		pinmux = < MCHP_XEC_PINMUX(0133, MCHP_AF1) >;
+	};
+};

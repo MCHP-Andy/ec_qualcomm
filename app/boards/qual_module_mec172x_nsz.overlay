@@ -20,9 +20,6 @@
         acpi-int-gpios = <MCHP_GPIO_DECODE_226 GPIO_ACTIVE_HIGH>;
         sen-int-gpios = <MCHP_GPIO_DECODE_157 GPIO_ACTIVE_HIGH>;
 
-        fan-max-rpm-gpios = <MCHP_GPIO_DECODE_206 GPIO_ACTIVE_HIGH>;
-        fan-12v-enable-gpios = <MCHP_GPIO_DECODE_165 GPIO_ACTIVE_HIGH>;
-
         board-id0-gpios = <MCHP_GPIO_DECODE_204 GPIO_ACTIVE_HIGH>;
         board-id1-gpios = <MCHP_GPIO_DECODE_205 GPIO_ACTIVE_HIGH>;
 
