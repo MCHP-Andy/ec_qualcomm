@@ -12,6 +12,12 @@
     aliases {
         led0 = &led2;
         wk-btn = &s2;
+
+        pw-limit-i2c = &i2c_smb_0;
+
+        acpi-i2c = &i2c_smb_1;
+
+        sen-i2c = &i2c_smb_2;
     };
 
     zephyr,user {
@@ -65,8 +71,8 @@
 
 &i2c_smb_1 {
     status = "okay";
-    port_sel = <3>;
-    pinctrl-0 = < &i2c03_sda_gpio007 &i2c03_scl_gpio010 >;
+    port_sel = <7>;
+    pinctrl-0 = < &i2c07_sda_gpio012 &i2c07_scl_gpio013 >;
 	pinctrl-names = "default";
 };
 
