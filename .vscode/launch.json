@@ -1,0 +1,39 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "MEC1757 RAM Debug",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "openocd",
+
+            // Openocd path
+            "serverpath": "${workspaceFolder}/tools/openocd-v0.12.0-i686-w64-mingw32/bin/openocd.exe",
+            // GDB path
+            "gdbPath": "${workspaceFolder}/../zephyr_main/zephyr-sdk-0.16.8/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb.exe",
+
+            "executable": "${workspaceFolder}/build/zephyr/zephyr.elf",
+            "configFiles": [
+                "interface/jlink.cfg",
+                // "interface/cmsis-dap.cfg",
+
+                "${workspaceFolder}/tools/mec1753_ram.cfg"
+            ],
+            "overrideLaunchCommands": [
+                "monitor reset halt",
+
+                // "monitor load_image \"${workspaceFolder}\"/build/zephyr/zephyr.elf",
+                "load",
+
+                "monitor mem2array vtable 32 0x000B0000 2",
+                "monitor reg msp $vtable(0)",
+                "monitor reg pc $vtable(1)",
+                "monitor echo \"Ready to debug from RAM\""
+            ],
+            "postStartSessionCommands": [
+                "monitor resume"
+            ],
+            // "showDevDebugOutput": "raw"
+        }
+    ]
+}
