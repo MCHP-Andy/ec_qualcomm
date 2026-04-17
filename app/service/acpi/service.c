@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-17 15:20:43
+ * @Last Modified time: 2026-04-17 17:47:29
  */
 
 #include <stdlib.h>
@@ -17,7 +17,7 @@
 #include "ec_fw_update.h"
 
 
-LOG_MODULE_REGISTER(acpi, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(acpi, LOG_LEVEL_DBG);
 
 #define STACKSIZE 1024
 #define PRIORITY 7
@@ -28,29 +28,32 @@ typedef struct acpi_cmd_t{
 } acpi_cmd_t;
 
 static acpi_cmd_t acpi_cmd_tbl[] = {
+    // clang-format off
     // EC Version and Capabilities
-    {EC_DEV_FW_VER, acpi_dev_fw_ver},
+    {EC_DEV_FW_VER,                             acpi_dev_fw_ver},
     {EC_DEV_FW_VER_AND_LOWEST_SUPPORTED_FW_VER, acpi_dev_fw_ver_and_lowest_supported},
-    // {EC_DEV_FLASHING_CAP, acpi_dev_flashing_capabilities},
-    {EC_DEV_THERMAL_CAP, acpi_dev_thermal_capabilities},
-    {EC_DEV_ACTIVE_COOLING_IF_VER_AND_CAP, acpi_dev_active_cooling_caps},
-    {EC_ACPI_WHOAMI_IF, acpi_who_am_i},
-    {EC_DEV_ID, acpi_dev_id},
+    // {EC_DEV_FLASHING_CAP,                       acpi_dev_flashing_capabilities},
+    {EC_DEV_THERMAL_CAP,                        acpi_dev_thermal_capabilities},
+    {EC_DEV_ACTIVE_COOLING_IF_VER_AND_CAP,      acpi_dev_active_cooling_caps},
+    {EC_ACPI_WHOAMI_IF,                         acpi_who_am_i},
+    {EC_DEV_ID,                                 acpi_dev_id},
 
     // EC Active Cooling Commands
-    {SOC_TO_EC_TEMP, NULL},
-    {EC_FAN_STATUS, NULL},
-    {EC_FAN_RPM, NULL},
-    {SOC_TO_EC_MODERN_STANDBY_NOTIFI, NULL},
-    {EC_FAN_PROFILE, NULL},
-    {EC_FAN_TRIP_POINT, NULL},
-    {EC_FAN_PROFILE_NUM, NULL},
-    {EC_FAN_LUT_NUM, NULL},
-    {EC_FAN_LUT, NULL},
-    {EC_THERMISTORS, NULL},
-    {EC_FAN_DEBUG_CTRL, NULL},
-    {EC_THERMISTOR_TEMP_THRE, NULL},
-    {EC_THERMISTOR_SAMPLING_RATE, NULL},
+    {SOC_TO_EC_TEMP,                            acpi_soc_to_ec_temp},
+    {EC_FAN_STATUS,                             acpi_ec_fan_status},
+    {EC_FAN_RPM,                                acpi_ec_fan_rpm},
+    // {SOC_TO_EC_MODERN_STANDBY_NOTIFI,           acpi_soc_to_ec_modern_standby_notifi},
+    {EC_FAN_PROFILE,                            acpi_ec_fan_profile},
+    {EC_FAN_TRIP_POINT,                         acpi_ec_fan_trip_point},
+    {EC_FAN_PROFILE_NUM,                        acpi_ec_fan_profile_num},
+    {EC_FAN_LUT_NUM,                            acpi_ec_fan_lut_num},
+    {EC_FAN_LUT,                                acpi_ec_fan_lut},
+    {EC_THERMISTOR1,                            acpi_ec_thermistor1},
+    {EC_THERMISTOR2,                            acpi_ec_thermistor2},
+    {EC_THERMISTOR3,                            acpi_ec_thermistor3},
+    {EC_FAN_DEBUG_CTRL,                         acpi_ec_fan_debug_ctrl},
+    {EC_THERMISTOR_TEMP_THRE,                   acpi_ec_thermistor_temp_thre},
+    {EC_THERMISTOR_SAMPLING_RATE,               acpi_ec_thermistor_sampling_rate},
     {EC_FUNC_FLAG, NULL},
     {EC_ACTIVE_COOLING_SCI_EVENT, NULL},
 
@@ -65,6 +68,7 @@ static acpi_cmd_t acpi_cmd_tbl[] = {
     {EC_READ_MEM_REGION_BUF, NULL},
     {EC_WRITE_MEM_REGION, NULL},
     {EC_WRITE_MEM_REGION_BUF, NULL}
+    // clang-format on
 };
 
 static uint8_t rece_cmd[ACPI_RECE_LEN];
@@ -120,7 +124,7 @@ static void service(void) {
         for (i = 0; i < ARRAY_SIZE(acpi_cmd_tbl); i++) {
             if (rece_cmd[0] == acpi_cmd_tbl[i].cmd) {
                 if (acpi_cmd_tbl[i].cmd_hdl != NULL) {
-                    int ret = acpi_cmd_tbl[i].cmd_hdl(rece_cmd, len, resp_buf, sizeof(resp_buf));
+                    int ret = acpi_cmd_tbl[i].cmd_hdl(&rece_cmd[1], len-1, resp_buf, sizeof(resp_buf));
                     if (ret < 0) {
                         LOG_ERR("Failed to handle ACPI cmd 0x%02x: %d", rece_cmd[0], ret);
                     } else {

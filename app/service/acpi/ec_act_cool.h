@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2026-04-16 16:43:54 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-16 16:52:30
+ * @Last Modified time: 2026-04-17 17:48:13
  */
 
 #pragma once
@@ -21,8 +21,9 @@
 #define EC_FAN_PROFILE_NUM 0x26
 #define EC_FAN_LUT_NUM 0x27
 #define EC_FAN_LUT 0x28
-#define EC_THERMISTORS 0x29
-// 0x2A and 0x2B for thermistor 2 and 3
+#define EC_THERMISTOR1 0x29
+#define EC_THERMISTOR2 0x2A
+#define EC_THERMISTOR3 0x2B
 #define EC_FAN_DEBUG_CTRL 0x30
 #define EC_THERMISTOR_TEMP_THRE 0x32
 #define EC_THERMISTOR_SAMPLING_RATE 0x34
@@ -30,3 +31,33 @@
 #define EC_ACTIVE_COOLING_SCI_EVENT 0x05
 // ACPI commands end
 
+int acpi_soc_to_ec_temp(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                        uint8_t resp_len);
+int acpi_ec_fan_status(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                       uint8_t resp_len);
+int acpi_ec_fan_rpm(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                    uint8_t resp_len);
+int acpi_soc_to_ec_modern_standby_notifi(uint8_t *cmd, uint8_t cmd_len,
+                                         uint8_t *resp, uint8_t resp_len);
+int acpi_ec_fan_profile(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                        uint8_t resp_len);
+int acpi_ec_fan_trip_point(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                           uint8_t resp_len);
+int acpi_ec_fan_profile_num(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                            uint8_t resp_len);
+int acpi_ec_fan_lut_num(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                        uint8_t resp_len);
+int acpi_ec_fan_lut(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                    uint8_t resp_len);
+int acpi_ec_thermistor1(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                        uint8_t resp_len);
+int acpi_ec_thermistor2(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                        uint8_t resp_len);
+int acpi_ec_thermistor3(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                        uint8_t resp_len);
+int acpi_ec_fan_debug_ctrl(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                           uint8_t resp_len);
+int acpi_ec_thermistor_temp_thre(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                                 uint8_t resp_len);
+int acpi_ec_thermistor_sampling_rate(uint8_t *cmd, uint8_t cmd_len,
+                                     uint8_t *resp, uint8_t resp_len);
