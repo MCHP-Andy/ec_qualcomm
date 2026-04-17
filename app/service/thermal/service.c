@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-17 03:33:45
+ * @Last Modified time: 2026-04-17 18:12:31
  */
 
 #include <zephyr/kernel.h>
@@ -17,40 +17,100 @@ LOG_MODULE_REGISTER(thermal, LOG_LEVEL_INF);
 #define STACKSIZE 1024
 #define PRIORITY 7
 
-static thermal_ctrl_t thermal_ctrl = {
-    .fan_ctrl = {
-        [1] = {
-            .state = 0x01,
-            // .rpm = 500,
-            // .trip_low = 300,
-            // .trip_high = 700,
-        },
-        [2] = {
-            .state = 0x01,
-            // .rpm = 500,
-            // .trip_low = 300,
-            // .trip_high = 700,
-        },
-    },
+static uint16_t temps[THERM_SRC_MAX] = {0};
+static fan_ctrl_t fan_blks[FAN_ID_MAX] = {0};
+static therm_dev_t therm_devs[THERM_DEV_MAX] = {0};
+
+static therm_ctrl_t therm_ctrl = {
+    .temp_num = ARRAY_SIZE(temps),
+    .temp = temps,
+
+    .fan_num = ARRAY_SIZE(fan_blks),
+    .fan_blk = fan_blks,
+
+    .therm_num = ARRAY_SIZE(therm_devs),
+    .therm_blk = therm_devs,
+
     .adc_sample_ms = 1000,
 };
 
-int thermal_ctrl_get(thermal_ctrl_t *ctrl) {
-    if (ctrl == NULL) {
-        return -ENOMEM;
+int therm_tmp_get(therm_id_t tmp_src, uint16_t *tmp) {
+
+    if (tmp_src == 0 || tmp_src >= therm_ctrl.temp_num || tmp == NULL) {
+        return -EINVAL;
     }
 
-    memcpy(ctrl, &thermal_ctrl, sizeof(thermal_ctrl_t));
+    *tmp = therm_ctrl.temp[tmp_src];
 
     return 0;
 }
 
-int thermal_ctrl_set(const thermal_ctrl_t *ctrl) {
-    if (ctrl == NULL) {
-        return -ENOMEM;
+int therm_tmp_set(therm_id_t tmp_src, uint16_t tmp) {
+
+    if (tmp_src == 0 || tmp_src >= therm_ctrl.temp_num) {
+        return -EINVAL;
     }
 
-    memcpy(&thermal_ctrl, ctrl, sizeof(thermal_ctrl_t));
+    therm_ctrl.temp[tmp_src] = tmp;
+
+    return 0;
+}
+
+int therm_fan_ctrl_get(therm_id_t fan_id, fan_ctrl_t *ctrl) {
+    if (fan_id == 0 || fan_id >= therm_ctrl.fan_num || ctrl == NULL) {
+        return -EINVAL;
+    }
+
+    memcpy(ctrl, &therm_ctrl.fan_blk[fan_id], sizeof(fan_ctrl_t));
+
+    return 0;
+}
+
+int therm_fan_ctrl_set(therm_id_t fan_id, const fan_ctrl_t *ctrl) {
+    if (fan_id == 0 || fan_id >= therm_ctrl.fan_num || ctrl == NULL) {
+        return -EINVAL;
+    }
+
+    memcpy(&therm_ctrl.fan_blk[fan_id], ctrl, sizeof(fan_ctrl_t));
+
+    return 0;
+}
+
+int therm_sensor_blk_get(therm_id_t dev_id, therm_dev_t *blk) {
+    if (dev_id == 0 || dev_id >= therm_ctrl.therm_num || blk == NULL) {
+        return -EINVAL;
+    }
+
+    memcpy(blk, &therm_ctrl.therm_blk[dev_id], sizeof(therm_dev_t));
+
+    return 0;
+}
+int therm_sensor_blk_set(therm_id_t dev_id, const therm_dev_t *blk) {
+    if (dev_id == 0 || dev_id >= therm_ctrl.therm_num || blk == NULL) {
+        return -EINVAL;
+    }
+
+    memcpy(&therm_ctrl.therm_blk[dev_id], blk, sizeof(therm_dev_t));
+
+    return 0;
+}
+
+int therm_adc_sample_rate_get(uint16_t *ms) {
+    if (ms == NULL) {
+        return -EINVAL;
+    }
+
+    *ms = therm_ctrl.adc_sample_ms;
+
+    return 0;
+}
+
+int therm_adc_sample_rate_set(uint16_t ms) {
+    if (ms < 100) {
+        ms = 100;
+    }
+
+    therm_ctrl.adc_sample_ms = ms;
 
     return 0;
 }
@@ -156,13 +216,16 @@ static void service(void) {
 
     k_sleep(wait_time);
 
-    uint8_t profile = 0x06;
-    for (uint8_t fan_id = 1; fan_id < 3; fan_id++) {
-        for (uint8_t tmp_src = 1; tmp_src < 3; tmp_src++) {
-            fan_tbl_t **tbl = &thermal_ctrl.fan_ctrl[fan_id].fan_tbl[tmp_src];
-            uint8_t *psize = &thermal_ctrl.fan_ctrl[fan_id].lut[tmp_src];
-            board_lut_get(profile, fan_id, tmp_src, tbl, psize);
+    therm_id_t profile = FAN_PROFILE_BEST_PERFORMANCE_CHG_IN;
+    for (therm_id_t fan = FAN_ID_1; fan < therm_ctrl.fan_num; fan++) {
+        for (therm_id_t src = THERM_SRC_CPU; src < THERM_SRC_MAX; src++) {
+            fan_ctrl_t *fan_blk = &therm_ctrl.fan_blk[fan];
+            fan_tbl_t **tbl = &fan_blk->fan_tbl[src];
+            uint8_t *tbl_size = &fan_blk->tbl_size;
+            therm_tbl_get(profile, fan, src, tbl, tbl_size);
+            fan_blk->profile = profile;
         }
+
     }
 
     // wait_time = K_FOREVER;
@@ -208,3 +271,31 @@ static void service(void) {
 }
 
 K_THREAD_DEFINE(thermal_id, STACKSIZE, service, NULL, NULL, NULL, PRIORITY, 0, 0);
+
+
+static void therm_service(void) {
+    while (1) {
+
+        // TODO: Wait for event (ADC sample)
+        k_sleep(K_SECONDS(1));
+
+        // TODO: check thermal cross
+
+
+    }
+}
+
+K_THREAD_DEFINE(therm_id, STACKSIZE, therm_service, NULL, NULL, NULL, PRIORITY, 0, 0);
+
+
+
+static void fan_service(void) {
+    while (1) {
+
+        // TODO: Wait for event (temp change, update rpm, etc.)
+        k_sleep(K_SECONDS(1));
+    }
+}
+
+K_THREAD_DEFINE(fan_id, STACKSIZE, fan_service, NULL, NULL, NULL, PRIORITY, 0, 0);
+
