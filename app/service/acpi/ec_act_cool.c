@@ -2,8 +2,10 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#include <interface/thermal.h>
 #include "ec_act_cool.h"
+#include <interface/thermal.h>
+#include <interface/fan.h>
+
 
 LOG_MODULE_DECLARE(acpi, LOG_LEVEL_DBG);
 
@@ -13,9 +15,9 @@ int acpi_soc_to_ec_temp(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
         return -EINVAL;
     }
 
-    therm_id_t tmp_src = cmd[0];
+    fan_id_t tmp_src = cmd[0];
     uint16_t tmp = (cmd[3] << 8) | cmd[2]; // Little Endian
-    int ret = therm_tmp_set(tmp_src, tmp);
+    int ret = fan_tmp_set(tmp_src, tmp);
     LOG_DBG("Set temp from SOC: tmp_src=%d, tmp=%d.%d, ret=%d", tmp_src,
             tmp / 10, tmp % 10, ret);
 
@@ -33,15 +35,15 @@ int acpi_ec_fan_status(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
         return -EINVAL;
     }
 
-    therm_id_t fan_id = cmd[0];
+    fan_id_t fan_id = cmd[0];
     fan_ctrl_t ctrl;
 
-    int ret = therm_fan_ctrl_get(fan_id, &ctrl);
+    int ret = fan_ctrl_get(fan_id, &ctrl);
     if (ret < 0) {
         LOG_ERR("Failed to get fan control for fan_id=%d: %d", fan_id, ret);
         return ret;
     }
-    
+
     resp[0] = ctrl.state;
     LOG_DBG("Fan %d status query: %d", fan_id, resp[0]);
 
@@ -50,15 +52,15 @@ int acpi_ec_fan_status(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 
 int acpi_ec_fan_rpm(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
                     uint8_t resp_len) {
-    therm_id_t fan_id = cmd[0];
+    fan_id_t fan_id = cmd[0];
     fan_ctrl_t ctrl;
 
-    int ret = therm_fan_ctrl_get(fan_id, &ctrl);
+    int ret = fan_ctrl_get(fan_id, &ctrl);
     if (ret < 0) {
         LOG_ERR("Failed to get fan control for fan_id=%d: %d", fan_id, ret);
         return ret;
     }
-    
+
     resp[0] = ctrl.rpm & 0xFF;
     resp[1] = (ctrl.rpm >> 8) & 0xFF;
     LOG_DBG("Fan %d status rpm: %d", fan_id, ctrl.rpm);
@@ -72,16 +74,15 @@ int acpi_ec_fan_rpm(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 int acpi_ec_fan_profile(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
                         uint8_t resp_len) {
     int ret = 0;
-    therm_id_t profile;
-    therm_id_t fan_id = FAN_ID_1;
+    fan_id_t profile;
+    fan_id_t fan_id = FAN_ID_1;
     fan_ctrl_t ctrl;
-
 
     if (cmd_len == 1) {
         profile = cmd[0] & 0x0F;
         fan_id = (cmd[0] >> 4) & 0x0F;
 
-        int ret = therm_fan_ctrl_get(fan_id, &ctrl);
+        int ret = fan_ctrl_get(fan_id, &ctrl);
         if (ret < 0) {
             LOG_ERR("Failed to get fan control for fan_id=%d: %d", fan_id, ret);
             return ret;
@@ -89,7 +90,7 @@ int acpi_ec_fan_profile(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 
         ctrl.profile = profile;
 
-        ret = therm_fan_ctrl_set(fan_id, &ctrl);
+        ret = fan_ctrl_set(fan_id, &ctrl);
         if (ret < 0) {
             LOG_ERR("Failed to set fan control for fan_id=%d: %d", fan_id, ret);
             return ret;
@@ -98,7 +99,7 @@ int acpi_ec_fan_profile(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
         LOG_DBG("Fan %d profile set to %d", fan_id, profile);
     }
 
-    ret = therm_fan_ctrl_get(fan_id, &ctrl);
+    ret = fan_ctrl_get(fan_id, &ctrl);
     if (ret < 0) {
         LOG_ERR("Failed to get fan control for fan_id=%d: %d", fan_id, ret);
         return ret;
@@ -114,16 +115,15 @@ int acpi_ec_fan_profile(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 int acpi_ec_fan_trip_point(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
                            uint8_t resp_len) {
     int ret = 0;
-    therm_id_t fan_id = cmd[0];
+    fan_id_t fan_id = cmd[0];
     uint16_t trip_low, trip_high;
     fan_ctrl_t ctrl;
-
 
     if (cmd_len == 6) {
         trip_low = (cmd[3] << 8) | cmd[2];
         trip_high = (cmd[5] << 8) | cmd[4];
 
-        int ret = therm_fan_ctrl_get(fan_id, &ctrl);
+        int ret = fan_ctrl_get(fan_id, &ctrl);
         if (ret < 0) {
             LOG_ERR("Failed to get fan control for fan_id=%d: %d", fan_id, ret);
             return ret;
@@ -132,7 +132,7 @@ int acpi_ec_fan_trip_point(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
         ctrl.trip_low = trip_low;
         ctrl.trip_high = trip_high;
 
-        ret = therm_fan_ctrl_set(fan_id, &ctrl);
+        ret = fan_ctrl_set(fan_id, &ctrl);
         if (ret < 0) {
             LOG_ERR("Failed to set fan control for fan_id=%d: %d", fan_id, ret);
             return ret;
@@ -141,7 +141,7 @@ int acpi_ec_fan_trip_point(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
         LOG_DBG("Fan %d trip points set to %d-%d", fan_id, trip_low, trip_high);
     }
 
-    ret = therm_fan_ctrl_get(fan_id, &ctrl);
+    ret = fan_ctrl_get(fan_id, &ctrl);
     if (ret < 0) {
         LOG_ERR("Failed to get fan control for fan_id=%d: %d", fan_id, ret);
         return ret;
@@ -161,16 +161,16 @@ int acpi_ec_fan_trip_point(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 }
 
 int acpi_ec_fan_profile_num(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
-                    uint8_t resp_len) {
-    therm_id_t fan_id = cmd[0];
+                            uint8_t resp_len) {
+    fan_id_t fan_id = cmd[0];
     fan_ctrl_t ctrl;
 
-    int ret = therm_fan_ctrl_get(fan_id, &ctrl);
+    int ret = fan_ctrl_get(fan_id, &ctrl);
     if (ret < 0) {
         LOG_ERR("Failed to get fan control for fan_id=%d: %d", fan_id, ret);
         return ret;
     }
-    
+
     resp[0] = ctrl.profile;
     LOG_DBG("Fan %d profile: %d", fan_id, ctrl.profile);
 
@@ -178,19 +178,20 @@ int acpi_ec_fan_profile_num(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 }
 
 int acpi_ec_fan_lut_num(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
-                    uint8_t resp_len) {
+                        uint8_t resp_len) {
     int ret = 0;
-    therm_id_t fan_id = cmd[0] & 0x0f;
-    therm_id_t profile = (cmd[0] >> 4) & 0x0f;
+    fan_id_t fan_id = cmd[0] & 0x0f;
+    fan_id_t profile = (cmd[0] >> 4) & 0x0f;
     fan_tbl_t *tbl = NULL;
     uint8_t len = 0;
 
-    ret = therm_tbl_get(profile, fan_id, THERM_SRC_CPU, &tbl, &len);
+    ret = fan_tbl_get(profile, fan_id, THERM_SRC_CPU, &tbl, &len);
     if (ret < 0) {
-        LOG_ERR("Failed to get fan lookup table for fan_id=%d: %d", fan_id, ret);
+        LOG_ERR("Failed to get fan lookup table for fan_id=%d: %d", fan_id,
+                ret);
         return ret;
     }
-    
+
     resp[0] = len;
     LOG_DBG("Fan %d lookup table length: %d", fan_id, len);
 
@@ -200,14 +201,14 @@ int acpi_ec_fan_lut_num(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 int acpi_ec_fan_lut(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
                     uint8_t resp_len) {
     int ret = 0;
-    therm_id_t fan_id = cmd[0] & 0x0f;
-    therm_id_t profile = (cmd[0] >> 4) & 0x0f;
-    therm_id_t tmp_src = cmd[1];
+    fan_id_t fan_id = cmd[0] & 0x0f;
+    fan_id_t profile = (cmd[0] >> 4) & 0x0f;
+    fan_id_t tmp_src = cmd[1];
     fan_tbl_t *tbl = NULL;
     uint8_t len = 0;
 
     if (cmd_len > 2) {
-        ret = therm_tbl_get(profile, fan_id, tmp_src, &tbl, &len);
+        ret = fan_tbl_get(profile, fan_id, tmp_src, &tbl, &len);
         if (ret < 0) {
             LOG_ERR("Failed to get fan lookup table for fan_id=%d: %d", fan_id,
                     ret);
@@ -218,7 +219,7 @@ int acpi_ec_fan_lut(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
         memcpy((uint8_t *)tbl, &cmd[3], len * sizeof(fan_tbl_t));
     }
 
-    ret = therm_tbl_get(profile, fan_id, tmp_src, &tbl, &len);
+    ret = fan_tbl_get(profile, fan_id, tmp_src, &tbl, &len);
     if (ret < 0) {
         LOG_ERR("Failed to get fan lookup table for fan_id=%d: %d", fan_id,
                 ret);
@@ -278,8 +279,8 @@ int acpi_ec_thermistor3(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 }
 
 int acpi_ec_fan_debug_ctrl(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
-                    uint8_t resp_len) {
-    therm_id_t fan_id = cmd[0];
+                           uint8_t resp_len) {
+    fan_id_t fan_id = cmd[0];
     fan_ctrl_t ctrl;
 
     if (cmd_len == 6) {
@@ -287,8 +288,7 @@ int acpi_ec_fan_debug_ctrl(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
         uint16_t dbg_rpm = (cmd[4] << 8) | cmd[3];
         uint8_t dbg_pwm = cmd[5];
 
-
-        int ret = therm_fan_ctrl_get(fan_id, &ctrl);
+        int ret = fan_ctrl_get(fan_id, &ctrl);
         if (ret < 0) {
             LOG_ERR("Failed to get fan control for fan_id=%d: %d", fan_id, ret);
             return ret;
@@ -298,7 +298,7 @@ int acpi_ec_fan_debug_ctrl(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
         ctrl.dbg_rpm = dbg_rpm;
         ctrl.dbg_pwm = dbg_pwm;
 
-        ret = therm_fan_ctrl_set(fan_id, &ctrl);
+        ret = fan_ctrl_set(fan_id, &ctrl);
         if (ret < 0) {
             LOG_ERR("Failed to set fan control for fan_id=%d: %d", fan_id, ret);
             return ret;
@@ -309,7 +309,7 @@ int acpi_ec_fan_debug_ctrl(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
         LOG_DBG("Fan %d debug PWM set to %d", fan_id, ctrl.dbg_pwm);
     }
 
-    int ret = therm_fan_ctrl_get(fan_id, &ctrl);
+    int ret = fan_ctrl_get(fan_id, &ctrl);
     if (ret < 0) {
         LOG_ERR("Failed to get fan control for fan_id=%d: %d", fan_id, ret);
         return ret;
@@ -370,8 +370,10 @@ int acpi_ec_thermistor_sampling_rate(uint8_t *cmd, uint8_t cmd_len,
     return 0;
 }
 
-// int acpi_func_flag(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp, uint8_t resp_len) {
+// int acpi_func_flag(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp, uint8_t
+// resp_len) {
 // }
 
-// int acpi_active_cooling_sci_event(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp, uint8_t resp_len) {
+// int acpi_active_cooling_sci_event(uint8_t *cmd, uint8_t cmd_len, uint8_t
+// *resp, uint8_t resp_len) {
 // }

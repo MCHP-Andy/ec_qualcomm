@@ -1,6 +1,6 @@
 
 #include <zephyr/kernel.h>
-#include <interface/thermal.h>
+#include <interface/fan.h>
 
 // Profile1: Battery saver
 static fan_tbl_t p1_fan1_cpu_lut[] = {
@@ -184,8 +184,8 @@ static fan_tbl_t p7_fan2_skin_lut[] = {
     {.rpm = 0x34, .temp_high = 0xFF, .temp_low = 0xFF},
 };
 
-int therm_tbl_get(therm_id_t profile, therm_id_t fan_id, therm_id_t tmp_src,
-                  fan_tbl_t **tbl, uint8_t *len) {
+int fan_tbl_get(fan_id_t profile, fan_id_t fan_id, fan_id_t tmp_src,
+                fan_tbl_t **tbl, uint8_t *len) {
     if (profile == 0 || profile > 7 || fan_id == 0 || fan_id > 2 ||
         tmp_src == 0 || tmp_src > 2 || tbl == NULL || len == NULL) {
         return -EINVAL;
