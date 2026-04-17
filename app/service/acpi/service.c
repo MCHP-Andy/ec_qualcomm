@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-16 18:16:14
+ * @Last Modified time: 2026-04-17 15:20:43
  */
 
 #include <stdlib.h>
@@ -30,12 +30,12 @@ typedef struct acpi_cmd_t{
 static acpi_cmd_t acpi_cmd_tbl[] = {
     // EC Version and Capabilities
     {EC_DEV_FW_VER, acpi_dev_fw_ver},
-    {EC_DEV_FW_VER_AND_LOWEST_SUPPORTED_FW_VER, NULL},
-    {EC_DEV_FLASHING_CAP, NULL},
-    {EC_DEV_THERMAL_CAP, NULL},
-    {EC_DEV_ACTIVE_COOLING_IF_VER_AND_CAP, NULL},
-    {EC_ACPI_WHOAMI_IF, NULL},
-    {EC_DEV_ID, NULL},
+    {EC_DEV_FW_VER_AND_LOWEST_SUPPORTED_FW_VER, acpi_dev_fw_ver_and_lowest_supported},
+    // {EC_DEV_FLASHING_CAP, acpi_dev_flashing_capabilities},
+    {EC_DEV_THERMAL_CAP, acpi_dev_thermal_capabilities},
+    {EC_DEV_ACTIVE_COOLING_IF_VER_AND_CAP, acpi_dev_active_cooling_caps},
+    {EC_ACPI_WHOAMI_IF, acpi_who_am_i},
+    {EC_DEV_ID, acpi_dev_id},
 
     // EC Active Cooling Commands
     {SOC_TO_EC_TEMP, NULL},
@@ -116,7 +116,8 @@ static void service(void) {
         memcpy(rece_cmd, event.pdata, len);
         
         // Parse the cmd and call corresponding handler function, then copy response to interface buffer
-        for (size_t i = 0; i < sizeof(acpi_cmd_tbl) / sizeof(acpi_cmd_t); i++) {
+        size_t i = 0;
+        for (i = 0; i < ARRAY_SIZE(acpi_cmd_tbl); i++) {
             if (rece_cmd[0] == acpi_cmd_tbl[i].cmd) {
                 if (acpi_cmd_tbl[i].cmd_hdl != NULL) {
                     int ret = acpi_cmd_tbl[i].cmd_hdl(rece_cmd, len, resp_buf, sizeof(resp_buf));
@@ -130,6 +131,10 @@ static void service(void) {
                 }
                 break;
             }
+        }
+
+        if (i == ARRAY_SIZE(acpi_cmd_tbl)) {
+            LOG_WRN("Unknown ACPI cmd 0x%02x", rece_cmd[0]);
         }
     }
 }
