@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-17 18:12:31
+ * @Last Modified time: 2026-04-17 19:55:25
  */
 
 #include <zephyr/kernel.h>
@@ -12,7 +12,7 @@
 #include <interface/thermal.h>
 #include <interface/fan.h>
 
-LOG_MODULE_REGISTER(thermal, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(thermal, LOG_LEVEL_DBG);
 
 #define STACKSIZE 1024
 #define PRIORITY 7
@@ -85,6 +85,7 @@ int therm_sensor_blk_get(therm_id_t dev_id, therm_dev_t *blk) {
 
     return 0;
 }
+
 int therm_sensor_blk_set(therm_id_t dev_id, const therm_dev_t *blk) {
     if (dev_id == 0 || dev_id >= therm_ctrl.therm_num || blk == NULL) {
         return -EINVAL;
@@ -125,96 +126,9 @@ int therm_adc_sample_rate_set(uint16_t ms) {
         }                                                                      \
     } while (0)
 
-enum {
-    THERMAL_STATE_IDLE = 0,
-    THERMAL_STATE_INITIAL,
-    THERMAL_STATE_RUNNING,
-    THERMAL_STATE_CLOSE,
-};
+static void therm_service(void) {
+    k_timeout_t adc_wait = K_MSEC(1000);
 
-typedef struct {
-    uint16_t thre;
-    uint8_t pwm;
-    uint8_t hyst;
-} fan_profile_t;
-
-static const fan_profile_t fan_profile[] = {
-    {.thre = 20, .pwm = 30, .hyst = 10},
-    {.thre = 40, .pwm = 45, .hyst = 10},
-    {.thre = 70, .pwm = 70, .hyst = 10},
-    {.thre = 85, .pwm = 100, .hyst = 0}, // No need hysteresis
-};
-
-static uint8_t fan_tbl_size = ARRAY_SIZE(fan_profile);
-static fan_profile_t *fan_tbl = (fan_profile_t *)fan_profile;
-static uint8_t pre_tmp[2];
-static uint16_t cur_tmp = 0;
-static K_SEM_DEFINE(thermal_sem, 0, 1);
-
-/**
- * @brief Read the thermal sensors and update the current temperature
- * 
- */
-static inline void read_thermal_sensor(void) {
-    // TODO: Read the current temperature from sensors
-    cur_tmp = 45;
-}
-
-/**
- * @brief Update fan speed based on the current temperature
- *
- * This function iterates through the fan profile table and sets the fan speed
- * according to the current temperature. If no profile matches, it sets the fan
- * speed to 0.
- */
-static inline void fan_update(void) {
-    for (size_t idx = 0; idx < 2; idx++) {
-        int ret;
-        uint16_t rpm = 0;
-        bool pwm_updated = false;
-
-        for (int i = fan_tbl_size - 1; i >= 0; i--) {
-            uint16_t thre = fan_tbl[i].thre;
-            uint8_t pwm = fan_tbl[i].pwm;
-            uint8_t hyst = fan_tbl[i].hyst;
-
-            if (cur_tmp >= thre) {
-                if ((pre_tmp[idx] > cur_tmp) && hyst > 0) {
-                    if ((i + 1 < fan_tbl_size) &&
-                        ((fan_tbl[i + 1].thre - cur_tmp) < hyst)) {
-                        // keep origin PWM
-                    } else {
-                        APP_FAN_SET_SPEED(idx, pwm);
-                    }
-                } else {
-                    APP_FAN_SET_SPEED(idx, pwm);
-                }
-                pwm_updated = true;
-                break;
-            }
-        }
-
-        if (pwm_updated == false) {
-            // If no PWM updated, set to 0
-            APP_FAN_SET_SPEED(idx, 0);
-        }
-
-        pre_tmp[idx] = cur_tmp;
-
-        ret = app_fan_get_rpm(idx, &rpm);
-        if (ret < 0) {
-            LOG_ERR("Failed to get fan%d RPM: %d", idx, ret);
-        } else {
-            LOG_INF("Fan%d RPM is %d", idx, rpm);
-        }
-    }
-}
-
-static void service(void) {
-    uint8_t state = THERMAL_STATE_RUNNING; // THERMAL_STATE_IDLE;
-    k_timeout_t wait_time = K_MSEC(100);
-
-    k_sleep(wait_time);
 
     therm_id_t profile = FAN_PROFILE_BEST_PERFORMANCE_CHG_IN;
     for (therm_id_t fan = FAN_ID_1; fan < therm_ctrl.fan_num; fan++) {
@@ -225,63 +139,45 @@ static void service(void) {
             therm_tbl_get(profile, fan, src, tbl, tbl_size);
             fan_blk->profile = profile;
         }
-
     }
-
-    // wait_time = K_FOREVER;
-    wait_time = K_MSEC(5000);
 
     while (1) {
 
-        switch (state) {
-        case THERMAL_STATE_IDLE: // idle
-            LOG_INF("Thermal service is idle, waiting for initialization");
-            k_sem_take(&thermal_sem, wait_time);
-        case THERMAL_STATE_INITIAL: // initial
-            LOG_INF("Thermal service is initializing");
-            // TODO: Initialize thermal sensors and fans
+        // Wait for event (ADC sample)
+        k_sleep(adc_wait);
 
-            // Reset previous temperature
-            memset(pre_tmp, 0xff, sizeof(pre_tmp));
+        // Check thermal cross
+        for (therm_id_t i = THERM_DEV_1; i < therm_ctrl.therm_num; i++) {
+            uint16_t temp = 0;
+            therm_dev_t *therm_dev = &therm_ctrl.therm_blk[i];
 
-            state = THERMAL_STATE_RUNNING; // Change state to running
-            LOG_INF("Thermal service is running");
-        case THERMAL_STATE_RUNNING: // running
-            // Read the current temperature from TMP451 sensors
-            read_thermal_sensor();
+            // TODO: Get temp from sensor
+            // board_therm_get(i, &temp);
 
-            // Update the fan speed based on the temperature
-            fan_update();
+            // Update temp
+            therm_dev->temp = temp;
 
-            k_sem_take(&thermal_sem, wait_time);
-            break;
+            // Check 
+            if (temp > therm_dev->psv) {
+                LOG_WRN("PSV");
+            }
 
-        case THERMAL_STATE_CLOSE: // close
-            LOG_INF("Thermal service is closing");
-            state = THERMAL_STATE_IDLE; // Change state to idle
-            break;
+            if (temp > therm_dev->cr3) {
+                LOG_WRN("CR3");
+            }
 
-        default:
-            state = THERMAL_STATE_IDLE; // Change state to idle
-            break;
+            if (temp > therm_dev->hot) {
+                LOG_WRN("HOT");
+            }
+
+            if (temp > therm_dev->crt) {
+                LOG_WRN("CRT");
+            }
+            
         }
 
-        // TODO: check state change request, e.g. from system event or shell command
-    }
-}
 
-K_THREAD_DEFINE(thermal_id, STACKSIZE, service, NULL, NULL, NULL, PRIORITY, 0, 0);
-
-
-static void therm_service(void) {
-    while (1) {
-
-        // TODO: Wait for event (ADC sample)
-        k_sleep(K_SECONDS(1));
-
-        // TODO: check thermal cross
-
-
+        adc_wait = K_MSEC(therm_ctrl.adc_sample_ms);
     }
 }
 
@@ -294,6 +190,30 @@ static void fan_service(void) {
 
         // TODO: Wait for event (temp change, update rpm, etc.)
         k_sleep(K_SECONDS(1));
+
+        // Get pwm from table
+        for (therm_id_t fan = FAN_ID_1; fan < therm_ctrl.fan_num; fan++) {
+            fan_ctrl_t *fan_blk = &therm_ctrl.fan_blk[fan];
+            uint16_t rpm = 0;
+
+            for (therm_id_t src = THERM_SRC_CPU; src < THERM_SRC_MAX; src++) {
+                fan_tbl_t *tbl = fan_blk->fan_tbl[src];
+                int8_t size = fan_blk->tbl_size - 1;
+                uint8_t temp = therm_ctrl.temp[src];
+
+                for (; size >= 0; size--) {
+                    if (temp > tbl[size].temp_low &&
+                        temp <= tbl[size].temp_high) {
+                        rpm = (tbl[size].temp_low > rpm) ? tbl[size].temp_low
+                                                         : rpm;
+                    }
+                }
+            }
+
+            LOG_DBG("Fan: %d, rpm: %d", fan, rpm);
+            // TODO: Set RPM to Fan controller
+
+        }
     }
 }
 
