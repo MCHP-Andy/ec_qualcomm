@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2026-04-16 16:43:54 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-16 16:46:58
+ * @Last Modified time: 2026-04-16 18:53:25
  */
 
 #pragma once
@@ -25,4 +25,22 @@
 /*
  * @brief Handler for EC_DEV_FW_VER command
  */
-int acpi_dev_fw_ver(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp, uint8_t resp_len);
+int acpi_dev_fw_ver(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                    uint8_t resp_len);
+
+int acpi_dev_fw_ver_and_lowest_supported(uint8_t *cmd, uint8_t cmd_len,
+                                         uint8_t *resp, uint8_t resp_len);
+
+int acpi_dev_flashing_capabilities(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                                   uint8_t resp_len);
+
+int acpi_dev_thermal_capabilities(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                                  uint8_t resp_len);
+
+int acpi_dev_active_cooling_caps(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                                 uint8_t resp_len);
+
+int acpi_who_am_i(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                  uint8_t resp_len);
+
+int acpi_dev_id(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp, uint8_t resp_len);
