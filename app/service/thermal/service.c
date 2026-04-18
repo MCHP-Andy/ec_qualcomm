@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-17 21:34:52
+ * @Last Modified time: 2026-04-18 16:43:41
  */
 
 #include <zephyr/kernel.h>
@@ -16,13 +16,38 @@ LOG_MODULE_REGISTER(thermal, LOG_LEVEL_DBG);
 #define STACKSIZE 1024
 #define PRIORITY 7
 
-static therm_dev_t therm_devs[THERM_DEV_MAX] = {0};
+static therm_dev_t therm_devs[THERM_DEV_MAX] = {
+    [THERM_DEV_1] =
+        {
+            .id = THERM_DEV_1,
+            .psv = 80,
+            .cr3 = 80,
+            .hot = 80,
+            .crt = 80,
+        },
+    [THERM_DEV_2] =
+        {
+            .id = THERM_DEV_1,
+            .psv = 80,
+            .cr3 = 80,
+            .hot = 80,
+            .crt = 80,
+        },
+    [THERM_DEV_3] =
+        {
+            .id = THERM_DEV_1,
+            .psv = 80,
+            .cr3 = 80,
+            .hot = 80,
+            .crt = 80,
+        },
+};
 
 static therm_ctrl_t therm_ctrl = {
     .therm_num = ARRAY_SIZE(therm_devs),
     .therm_blk = therm_devs,
 
-    .adc_sample_ms = 1000,
+    .sample_ms = 1000,
 };
 
 int therm_sensor_blk_get(therm_id_t dev_id, therm_dev_t *blk) {
@@ -50,7 +75,7 @@ int therm_adc_sample_rate_get(uint16_t *ms) {
         return -EINVAL;
     }
 
-    *ms = therm_ctrl.adc_sample_ms;
+    *ms = therm_ctrl.sample_ms;
 
     return 0;
 }
@@ -60,12 +85,12 @@ int therm_adc_sample_rate_set(uint16_t ms) {
         ms = 100;
     }
 
-    therm_ctrl.adc_sample_ms = ms;
+    therm_ctrl.sample_ms = ms;
 
     return 0;
 }
 
-static void therm_service(void) {
+static void service(void) {
     k_timeout_t adc_wait = K_MSEC(1000);
 
     while (1) {
@@ -78,33 +103,38 @@ static void therm_service(void) {
             uint16_t temp = 0;
             therm_dev_t *therm_dev = &therm_ctrl.therm_blk[i];
 
-            // TODO: Get temp from sensor
-            // board_therm_get(i, &temp);
+            // Get temp from sensor
+            int ret = therm_sample_get(i, &temp);
+            if (ret < 0) {
+                LOG_ERR("Failed to get therm%d : %d", i, ret);
+                continue;
+            }
 
             // Update temp
             therm_dev->temp = temp;
+            LOG_DBG("Thermal %d: temp: %d C", i, temp);
 
             // Check 
             if (temp > therm_dev->psv) {
-                LOG_WRN("PSV");
+                LOG_WRN("Thermal %d: PSV", i);
             }
 
             if (temp > therm_dev->cr3) {
-                LOG_WRN("CR3");
+                LOG_WRN("Thermal %d: CR3", i);
             }
 
             if (temp > therm_dev->hot) {
-                LOG_WRN("HOT");
+                LOG_WRN("Thermal %d: HOT", i);
             }
 
             if (temp > therm_dev->crt) {
-                LOG_WRN("CRT");
+                LOG_WRN("Thermal %d: CRT", i);
             }
             
         }
 
-        adc_wait = K_MSEC(therm_ctrl.adc_sample_ms);
+        adc_wait = K_MSEC(therm_ctrl.sample_ms);
     }
 }
 
-K_THREAD_DEFINE(therm_id, STACKSIZE, therm_service, NULL, NULL, NULL, PRIORITY, 0, 0);
+K_THREAD_DEFINE(therm_id, STACKSIZE, service, NULL, NULL, NULL, PRIORITY, 0, 0);

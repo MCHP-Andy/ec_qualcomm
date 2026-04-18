@@ -8,6 +8,22 @@
     chosen {
     };
 
+    adc0: adc@40001000 {
+        compatible = "zephyr,adc-emul";
+        reg = <0x40001000 0x1000>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+        #io-channel-cells = <1>;
+        status = "";
+        nchannels = <3>;
+
+        status = "disabled";
+    };
+
+    zephyr,user {
+        io-channels = <&adc0 0>, <&adc0 1>, <&adc0 2>;
+    };
+
     dummy_i2c: dummy_i2c {
         /* 使用虛擬設備兼容字串，這會讓 Zephyr 生成一個空的設備實例 */
         compatible = "vnd,device"; 
