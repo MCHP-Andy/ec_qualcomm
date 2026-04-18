@@ -2,13 +2,13 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-17 21:34:52
+ * @Last Modified time: 2026-04-18 18:12:10
  */
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-// #include <interface/system.h>
+#include <interface/system.h>
 #include <interface/fan.h>
 
 LOG_MODULE_REGISTER(fan, LOG_LEVEL_DBG);
@@ -16,9 +16,6 @@ LOG_MODULE_REGISTER(fan, LOG_LEVEL_DBG);
 #define FAN_TEMP_CHG BIT(0)
 #define FAN_CFG_UPDATE BIT(1)
 #define FAN_RPM_UPDATE BIT(2)
-
-#define STACKSIZE 1024
-#define PRIORITY 7
 
 static K_EVENT_DEFINE(fan_event);
 
@@ -196,8 +193,8 @@ static void service(void) {
     }
 }
 
-K_THREAD_DEFINE(fan_id, STACKSIZE, service, NULL, NULL, NULL, PRIORITY, 0, 0);
-
+K_THREAD_DEFINE(fan_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M, 0,
+                0);
 
 #ifdef CONFIG_SHELL
 #include <zephyr/shell/shell.h>

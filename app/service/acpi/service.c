@@ -2,25 +2,21 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-17 17:47:29
+ * @Last Modified time: 2026-04-18 18:10:17
  */
 
 #include <stdlib.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-// #include <interface/system.h>
+#include <interface/system.h>
 #include <interface/acpi.h>
 
 #include "ec_ver_and_cap.h"
 #include "ec_act_cool.h"
 #include "ec_fw_update.h"
 
-
 LOG_MODULE_REGISTER(acpi, LOG_LEVEL_DBG);
-
-#define STACKSIZE 1024
-#define PRIORITY 7
 
 typedef struct acpi_cmd_t{
     uint8_t cmd;
@@ -143,7 +139,8 @@ static void service(void) {
     }
 }
 
-K_THREAD_DEFINE(acpi_id, STACKSIZE, service, NULL, NULL, NULL, PRIORITY, 0, 0);
+K_THREAD_DEFINE(acpi_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M,
+                0, 0);
 
 #ifdef CONFIG_SHELL
 #include <zephyr/shell/shell.h>

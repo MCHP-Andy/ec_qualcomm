@@ -2,19 +2,16 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-18 16:43:41
+ * @Last Modified time: 2026-04-18 18:11:29
  */
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-// #include <interface/system.h>
+#include <interface/system.h>
 #include <interface/thermal.h>
 
 LOG_MODULE_REGISTER(thermal, LOG_LEVEL_DBG);
-
-#define STACKSIZE 1024
-#define PRIORITY 7
 
 static therm_dev_t therm_devs[THERM_DEV_MAX] = {
     [THERM_DEV_1] =
@@ -137,4 +134,5 @@ static void service(void) {
     }
 }
 
-K_THREAD_DEFINE(therm_id, STACKSIZE, service, NULL, NULL, NULL, PRIORITY, 0, 0);
+K_THREAD_DEFINE(therm_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M,
+                0, 0);

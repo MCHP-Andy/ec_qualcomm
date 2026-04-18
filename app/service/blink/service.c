@@ -9,6 +9,8 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
 
+#include <interface/system.h>
+
 LOG_MODULE_REGISTER(blinkly, LOG_LEVEL_INF);
 
 /* 1000 msec = 1 sec */
@@ -49,8 +51,5 @@ static void blinkly(void)
 	}
 }
 
-#define STACKSIZE 1024
-#define PRIORITY 7
-
-K_THREAD_DEFINE(blink_id, STACKSIZE, blinkly, NULL, NULL, NULL,
-		PRIORITY, 0, 0);
+K_THREAD_DEFINE(blink_id, APP_STACK_MIN, blinkly, NULL, NULL, NULL, APP_PRIO_M,
+                0, 0);
