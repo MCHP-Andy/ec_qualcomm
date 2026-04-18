@@ -20,17 +20,6 @@ LOG_MODULE_REGISTER(fan, LOG_LEVEL_DBG);
 #define STACKSIZE 1024
 #define PRIORITY 7
 
-#define APP_FAN_SET_SPEED(fan_id, speed)                                       \
-    do {                                                                       \
-        int ret = app_fan_set_speed(fan_id, speed);                            \
-        if (ret < 0) {                                                         \
-            LOG_ERR("Failed to set fan%d speed: %d", fan_id, ret);             \
-        } else {                                                               \
-            LOG_INF("Fan%d speed set to %d%%", fan_id, speed);                 \
-        }                                                                      \
-    } while (0)
-
-
 static K_EVENT_DEFINE(fan_event);
 
 static uint16_t temps[THERM_SRC_MAX] = {0};
@@ -83,15 +72,20 @@ int fan_ctrl_set(fan_id_t fan_id, const fan_ctrl_t *ctrl) {
 
 static k_timeout_t rpm_update = K_MSEC(1000);
 
-static int fan_rpm_update(fan_ctrl_t *fan_blk, uint8_t rpm) {
+static int fan_rpm_update(fan_ctrl_t *fan_blk, uint16_t rpm) {
 
     if (rpm == 0) {
-        // TODO: Fan off by PWM
+        // Fan off by PWM
         fan_blk->rpm = 0;
         rpm_update = K_FOREVER;
+        fan_pwm_set(fan_blk->id, 0);
     } else {
-        // TODO: mapping PWM to RPM
-        // TODO: Get RPM from driver
+        // Mapping PWM to RPM
+        fan_rpm_set(fan_blk->id, rpm);
+
+        // Get RPM from driver
+        fan_rpm_get(fan_blk->id, &rpm);
+        fan_blk->rpm = rpm;
 
         // TODO: RPM PID via PWM
     }
@@ -106,9 +100,10 @@ static inline bool check_fan_debug(fan_ctrl_t *fan_blk) {
     if (fan_blk->dbg_mode & BIT(0)) {
         if (fan_blk->dbg_mode & BIT(1)) {
             if (fan_blk->dbg_mode & BIT(2)) {
-                // TODO: Set fan via pwm
-                // fan_blk->dbg_pwm
+                // Set fan via pwm
+                fan_pwm_set(fan_blk->id, fan_blk->dbg_pwm);
             } else {
+                // Set fan via RPM
                 fan_rpm_update(fan_blk, fan_blk->dbg_rpm);
             }
         } else {
@@ -189,7 +184,7 @@ static void service(void) {
             uint16_t rpm = 0;
             ret = check_fan_rpm(fan_blk, &rpm);
             if (ret < 0) {
-                // TODO: LOG
+                LOG_WRN("Fan%d RPM can't found in LUT", fan);
             } else {
                 LOG_DBG("Fan: %d, rpm: %d", fan, rpm);
                 fan_rpm_update(fan_blk, rpm);

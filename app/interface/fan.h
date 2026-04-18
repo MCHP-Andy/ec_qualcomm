@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:43:05 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-17 00:05:40
+ * @Last Modified time: 2026-04-18 11:30:11
  */
 
 #pragma once
@@ -82,20 +82,7 @@ int fan_tbl_get(fan_id_t profile, fan_id_t fan_id, fan_id_t tmp_src,
                 fan_tbl_t **tbl, uint8_t *len);
 
 
-/**
- * @brief Set the speed of a fan.
- * 
- * @param fan_id The ID of the fan to set the speed for.
- * @param speed The speed percentage (0-100).
- * @return int 0 on success, negative error code on failure.
- */
-int app_fan_set_speed(int fan_id, uint8_t speed);
+int fan_pwm_set(fan_id_t id, uint16_t pwm);
 
-/**
- * @brief Get the RPM of a fan.
- * 
- * @param fan_id The ID of the fan to get the RPM for.
- * @param rpm Pointer to store the RPM value.
- * @return int 0 on success, negative error code on failure.
- */
-int app_fan_get_rpm(int fan_id, uint16_t *rpm);
+int fan_rpm_set(fan_id_t id, uint16_t rpm);
+int fan_rpm_get(fan_id_t id, uint16_t *prpm);
