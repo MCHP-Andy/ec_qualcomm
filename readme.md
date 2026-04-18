@@ -19,6 +19,11 @@ tools\script\setup.bat
 ## Build
 ```
 west build -p -b qual_module/mec172x_nsz app
+
+west build -p -b qual_module/mec172x_nsz app -- -DOVERLAY_CONFIG=release.conf
+
+west build -p -b qual_module/mec172x_nsz --sysbuild app -- -DOVERLAY_CONFIG=release.conf
+source tools/script/release.sh
 ```
 
 ## QEMU test
@@ -28,10 +33,13 @@ export PATH=$PATH:/c/Program\ Files/qemu
 
 qemu-system-arm --version
 
-west build -p -b qemu_cortex_m3 app -- -DOVERLAY_CONFIG=qemu.conf
-west build -t run -- -DOVERLAY_CONFIG=qemu.conf
+west build -p -b qemu_cortex_m3 app
+west build -t run
 
-west build -b qemu_cortex_m3 app -t run -- -DOVERLAY_CONFIG=qemu.conf
+west build -p -b qemu_cortex_m3 app -t run
+
+west build -p -b qemu_cortex_m3 --sysbuild app -- -DOVERLAY_CONFIG=release.conf
+source tools/script/release.sh
 ```
 
 ## Flash

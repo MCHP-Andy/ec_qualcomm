@@ -6,6 +6,7 @@
 
 / {
     chosen {
+        zephyr,code-partition = &app2_partition;
     };
 
     adc0: adc@40001000 {
@@ -55,4 +56,21 @@
 		};
 	};
 
+};
+
+&flash0 {
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        app1_partition: partition@0 {
+            label = "app1";
+            reg = <0x00000000 0x20000>;
+        };
+        app2_partition: partition@20000 {
+            label = "app2";
+            reg = <0x20000 0x20000>;
+        };
+    };
 };
