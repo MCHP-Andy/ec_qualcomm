@@ -31,7 +31,7 @@ LOG_MODULE_REGISTER(fan, LOG_LEVEL_DBG);
     } while (0)
 
 
-K_EVENT_DEFINE(fan_event);
+static K_EVENT_DEFINE(fan_event);
 
 static uint16_t temps[THERM_SRC_MAX] = {0};
 static fan_ctrl_t fan_blks[FAN_ID_MAX] = {0};
@@ -54,6 +54,7 @@ int fan_tmp_set(fan_id_t tmp_src, uint16_t tmp) {
     }
 
     temps[tmp_src] = tmp;
+    k_event_post(&fan_event, FAN_TEMP_CHG);
 
     return 0;
 }
@@ -75,6 +76,8 @@ int fan_ctrl_set(fan_id_t fan_id, const fan_ctrl_t *ctrl) {
 
     memcpy(&fan_blks[fan_id], ctrl, sizeof(fan_ctrl_t));
 
+    k_event_post(&fan_event, FAN_CFG_UPDATE);
+
     return 0;
 }
 
@@ -89,7 +92,6 @@ static int fan_rpm_update(fan_ctrl_t *fan_blk, uint8_t rpm) {
     } else {
         // TODO: mapping PWM to RPM
         // TODO: Get RPM from driver
-        rpm_update = K_MSEC(1000);
 
         // TODO: RPM PID via PWM
     }
@@ -129,7 +131,7 @@ static inline int check_fan_rpm(fan_ctrl_t *fan_blk, uint16_t *rpm) {
 
         for (; size >= 0; size--) {
             if (temp > tbl[size].temp_low && temp <= tbl[size].temp_high) {
-                *rpm = (tbl[size].temp_low > *rpm) ? tbl[size].temp_low : *rpm;
+                *rpm = (tbl[size].rpm > *rpm) ? tbl[size].rpm : *rpm;
             }
         }
     }
@@ -137,8 +139,9 @@ static inline int check_fan_rpm(fan_ctrl_t *fan_blk, uint16_t *rpm) {
     return 0;
 }
 
-static void fan_service(void) {
+static void service(void) {
     int ret = 0;
+    uint32_t evt = 0;
     fan_ctrl_t *fan_blk = NULL;
 
     fan_id_t profile = FAN_PROFILE_BEST_PERFORMANCE_CHG_IN;
@@ -151,13 +154,16 @@ static void fan_service(void) {
             uint8_t *tbl_size = &fan_blk->tbl_size[src];
             fan_tbl_get(profile, fan, src, tbl, tbl_size);
             fan_blk->profile = profile;
+            fan_blk->state = FAN_STA_ON;
         }
     }
 
     while (1) {
 
-        // TODO: Wait for event (temp change, update rpm, etc.)
-        k_sleep(rpm_update);
+        // TODO: Wait for event (temp change, update rpm, pwr, etc.)
+        evt = k_event_wait(&fan_event,
+                           (FAN_TEMP_CHG | FAN_CFG_UPDATE | FAN_RPM_UPDATE),
+                           true, rpm_update);
 
         for (fan_id_t fan = FAN_ID_1; fan < ARRAY_SIZE(fan_blks); fan++) {
             fan_blk = &fan_blks[fan];
@@ -195,5 +201,68 @@ static void fan_service(void) {
     }
 }
 
-K_THREAD_DEFINE(fan_id, STACKSIZE, fan_service, NULL, NULL, NULL, PRIORITY, 0, 0);
+K_THREAD_DEFINE(fan_id, STACKSIZE, service, NULL, NULL, NULL, PRIORITY, 0, 0);
 
+
+#ifdef CONFIG_SHELL
+#include <zephyr/shell/shell.h>
+
+static int cmd_temp_set(const struct shell *sh, size_t argc, char **argv) {
+    int ret = 0;
+
+    fan_id_t id = strtoul(argv[1], NULL, 16);
+    uint8_t tmp = strtoul(argv[2], NULL, 16);
+
+    shell_info(sh, "Fan ID: %d, tmp: %d", id, tmp);
+    fan_tmp_set(id, tmp);
+
+    return ret;
+}
+
+static int cmd_dump(const struct shell *sh, size_t argc, char **argv) {
+    int ret = 0;
+    fan_ctrl_t *fan_blk = NULL;
+
+    for (fan_id_t fan = FAN_ID_1; fan < ARRAY_SIZE(fan_blks); fan++) {
+        fan_blk = &fan_blks[fan];
+
+        shell_info(sh, "Fan ID: %d", fan_blk->id);
+        shell_info(sh, "Fan state: %d", fan_blk->state);
+        shell_info(sh, "Fan rpm: %d", fan_blk->rpm);
+
+        shell_info(sh, "Fan trip_low: %d", fan_blk->trip_low);
+        shell_info(sh, "Fan trip_low: %d", fan_blk->trip_low);
+
+        shell_info(sh, "Fan profile: %d", fan_blk->profile);
+
+        for (size_t i = THERM_SRC_CPU; i < THERM_SRC_MAX; i++) {
+            uint8_t size = fan_blk->tbl_size[i];
+            fan_tbl_t *tbl = fan_blk->fan_tbl[i];
+
+            shell_info(sh, "Fan tbl_size[%d]: %d", i, size);
+
+            for (size_t j = 0; j < size; j++) {
+                shell_info(sh, "\ttbl[%d]: rpm: %d, high: %d, low: %d", j,
+                           tbl[j].rpm, tbl[j].temp_high, tbl[j].temp_low);
+            }
+        }
+
+        shell_info(sh, "Fan dbg_mode: %d", fan_blk->dbg_mode);
+        shell_info(sh, "Fan dbg_rpm: %d", fan_blk->dbg_rpm);
+        shell_info(sh, "Fan dbg_pwm: %d", fan_blk->dbg_pwm);
+        shell_info(sh, "");
+    }
+    
+    return ret;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_fan,
+	SHELL_CMD_ARG(temp, NULL,
+		"Set temp", cmd_temp_set, 3, 0),
+	SHELL_CMD_ARG(dump, NULL,
+		"Dump fan info", cmd_dump, 0, 0),
+	SHELL_SUBCMD_SET_END /* Array terminated. */
+);
+
+SHELL_CMD_REGISTER(fan, &sub_fan, "Fan commands", NULL);
+#endif
