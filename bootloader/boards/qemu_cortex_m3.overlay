@@ -1,0 +1,28 @@
+
+#include <zephyr/dt-bindings/gpio/gpio.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+#include <dt-bindings/pwm/pwm.h>
+
+/ {
+    chosen {
+        zephyr,code-partition = &app1_partition;
+    };
+};
+
+&flash0 {
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        app1_partition: partition@0 {
+            label = "app1";
+            reg = <0x00000000 0x20000>;
+        };
+        app2_partition: partition@20000 {
+            label = "app2";
+            reg = <0x20000 0x20000>;
+        };
+    };
+};
