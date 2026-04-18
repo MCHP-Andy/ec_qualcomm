@@ -10,7 +10,7 @@
 #include <zephyr/sys/printk.h>
 
 
-static const struct device *bus = DEVICE_DT_GET(DT_ALIAS(pw_limit_i2c));
+static const struct device *bus = DEVICE_DT_GET_OR_NULL(DT_ALIAS(pw_limit_i2c));
 static char last_byte;
 
 /*
@@ -85,12 +85,13 @@ static struct i2c_target_config target_cfg = {
 #include <zephyr/init.h>
 
 static int init_config(void) {
-    printk("i2c custom target sample\n");
 
+#if DT_NODE_HAS_STATUS(DT_ALIAS(pw_limit_i2c), okay)
     if (i2c_target_register(bus, &target_cfg) < 0) {
         printk("Failed to register target\n");
         return -1;
     }
+#endif
 
     return 0;
 }

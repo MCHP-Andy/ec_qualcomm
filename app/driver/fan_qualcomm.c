@@ -18,12 +18,20 @@ static const struct fan_dev_t {
     const struct device *tach;
 } fan_dev_list[] = {
     {
-        PWM_DT_SPEC_GET(DT_ALIAS(cpu_fan)),
-        DEVICE_DT_GET(DT_ALIAS(cpu_tach)),
+    #if DT_NODE_HAS_STATUS(DT_ALIAS(cpu_fan), okay)
+        .fan = PWM_DT_SPEC_GET(DT_ALIAS(cpu_fan)),
+    #endif
+    #if DT_NODE_HAS_STATUS(DT_ALIAS(cpu_tach), okay)
+        .tach = DEVICE_DT_GET(DT_ALIAS(cpu_tach)),
+    #endif
     },
     {
-        PWM_DT_SPEC_GET(DT_ALIAS(base_fan)),
-        DEVICE_DT_GET(DT_ALIAS(base_tach)),
+    #if DT_NODE_HAS_STATUS(DT_ALIAS(base_fan), okay)
+        .fan = PWM_DT_SPEC_GET(DT_ALIAS(base_fan)),
+    #endif
+    #if DT_NODE_HAS_STATUS(DT_ALIAS(base_tach), okay)
+        .tach = DEVICE_DT_GET(DT_ALIAS(base_tach)),
+    #endif
     },
 };
 

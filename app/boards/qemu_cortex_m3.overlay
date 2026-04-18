@@ -1,0 +1,42 @@
+
+#include <zephyr/dt-bindings/gpio/gpio.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+#include <dt-bindings/pwm/pwm.h>
+
+/ {
+    chosen {
+    };
+
+    dummy_i2c: dummy_i2c {
+        /* 使用虛擬設備兼容字串，這會讓 Zephyr 生成一個空的設備實例 */
+        compatible = "vnd,device"; 
+        status = "disabled"; // 必須是 okay，DEVICE_DT_GET 才抓得到
+    };
+
+    aliases {
+        led0 = &led0;
+        wk-btn = &button0;
+
+        pw-limit-i2c = &dummy_i2c;
+        acpi-i2c = &dummy_i2c;
+        sen-i2c = &dummy_i2c;
+    };
+
+    leds {
+		compatible = "gpio-leds";
+		led0: led_0 {
+			gpios = <&gpio0 0 GPIO_ACTIVE_HIGH>;
+			label = "User LED";
+		};
+	};
+
+	buttons {
+		compatible = "gpio-keys";
+		button0: button_0 {
+			gpios = <&gpio0 1 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "User Button";
+		};
+	};
+
+};
