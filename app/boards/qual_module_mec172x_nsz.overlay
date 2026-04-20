@@ -29,7 +29,7 @@
         board-id0-gpios = <MCHP_GPIO_DECODE_204 GPIO_ACTIVE_HIGH>;
         board-id1-gpios = <MCHP_GPIO_DECODE_205 GPIO_ACTIVE_HIGH>;
 
-        io-channels =  <&adc0 8>, <&adc0 9>, <&adc0 10>;
+        io-channels =  <&adc0 0>, <&adc0 1>, <&adc0 2>;
 
         thro-mira-gpios = <MCHP_GPIO_DECODE_164 GPIO_ACTIVE_HIGH>;
         wk-en-gpios = <MCHP_GPIO_DECODE_221 GPIO_ACTIVE_HIGH>;
@@ -96,22 +96,40 @@
 	#address-cells = <1>;
 	#size-cells = <0>;
 
-    channel@8 {
-		reg = <8>;
+    status = "okay";
+    pinctrl-0 = < &adc00_gpio200 &adc01_gpio201 &adc02_gpio202 &adc04_gpio204 &adc05_gpio205 >;
+	pinctrl-names = "default";
+
+    channel@0 {
+		reg = <0>;
 		zephyr,gain = "ADC_GAIN_1";
 		zephyr,reference = "ADC_REF_INTERNAL";
 		zephyr,acquisition-time = <0>;
 		zephyr,resolution = <12>;
 	};
-	channel@9 {
-		reg = <9>;
+	channel@1 {
+		reg = <1>;
 		zephyr,gain = "ADC_GAIN_1";
 		zephyr,reference = "ADC_REF_INTERNAL";
 		zephyr,acquisition-time = <0>;
 		zephyr,resolution = <12>;
 	};
-	channel@a {
-		reg = <10>;
+	channel@2 {
+		reg = <2>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <0>;
+		zephyr,resolution = <12>;
+	};
+    channel@4 {
+		reg = <4>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <0>;
+		zephyr,resolution = <12>;
+	};
+    channel@5 {
+		reg = <5>;
 		zephyr,gain = "ADC_GAIN_1";
 		zephyr,reference = "ADC_REF_INTERNAL";
 		zephyr,acquisition-time = <0>;

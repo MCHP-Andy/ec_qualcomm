@@ -12,7 +12,7 @@
 
 #include <interface/thermal.h>
 
-LOG_MODULE_REGISTER(therm_dev, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(therm_dev, LOG_LEVEL_INF);
 
 static const struct adc_dt_spec dev_list[THERM_DEV_MAX] = {
 #if DT_NODE_HAS_STATUS(DT_NODELABEL(adc0), okay)
@@ -57,14 +57,17 @@ int therm_sample_get(therm_id_t id, uint16_t *temp) {
     int32_t val_mv = (int32_t)raw_buf;
     ret = adc_raw_to_millivolts_dt(&dev_list[id], &val_mv);
     if (ret < 0) {
-		LOG_ERR(" (value in mV not available)\n");
+		LOG_ERR(" (value in mV not available)");
 	}
-    LOG_INF(" = %"PRId32" mV\n", val_mv);
+    LOG_DBG(" = %"PRId32" mV", val_mv);
+
+    // TODO: Convert to deg C
+    *temp = 55;
 #else
     *temp = 55;
 #endif
-    
-    // TODO: Convert to deg C
+
+    LOG_INF("Therm%d, %d C", id, *temp);
 
     return 0;
 }

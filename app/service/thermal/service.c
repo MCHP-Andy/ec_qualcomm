@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-18 18:11:29
+ * @Last Modified time: 2026-04-20 14:09:44
  */
 
 #include <zephyr/kernel.h>
@@ -11,7 +11,7 @@
 #include <interface/system.h>
 #include <interface/thermal.h>
 
-LOG_MODULE_REGISTER(thermal, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(thermal, LOG_LEVEL_INF);
 
 static therm_dev_t therm_devs[THERM_DEV_MAX] = {
     [THERM_DEV_1] =

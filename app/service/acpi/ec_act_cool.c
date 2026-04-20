@@ -338,16 +338,24 @@ int acpi_ec_thermistor_temp_thre(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
         return ret;
     }
 
-    therm_dev.psv = cmd[2];
-    therm_dev.cr3 = cmd[3];
-    therm_dev.hot = cmd[4];
-    therm_dev.crt = cmd[5];
+    if (cmd_len == 6) {
+        therm_dev.psv = cmd[2];
+        therm_dev.cr3 = cmd[3];
+        therm_dev.hot = cmd[4];
+        therm_dev.crt = cmd[5];
 
-    ret = therm_sensor_blk_set(idx, &therm_dev);
-    if (ret < 0) {
-        LOG_ERR("Failed to set thermistor data for idx=%d: %d", idx, ret);
-        return ret;
+        ret = therm_sensor_blk_set(idx, &therm_dev);
+        if (ret < 0) {
+            LOG_ERR("Failed to set thermistor data for idx=%d: %d", idx, ret);
+            return ret;
+        }
     }
+
+    resp[0] = 0x04;
+    resp[1] = therm_dev.psv;
+    resp[2] = therm_dev.cr3;
+    resp[3] = therm_dev.hot;
+    resp[4] = therm_dev.crt;
 
     LOG_DBG("Thermistor %d set psv: %d", idx, therm_dev.psv);
     LOG_DBG("Thermistor %d set cr3: %d", idx, therm_dev.cr3);
@@ -359,14 +367,30 @@ int acpi_ec_thermistor_temp_thre(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 
 int acpi_ec_thermistor_sampling_rate(uint8_t *cmd, uint8_t cmd_len,
                                      uint8_t *resp, uint8_t resp_len) {
-    uint16_t sample_rate_ms = (cmd[1] << 8) | cmd[0];
+    int ret = 0;
+    uint16_t sample_rate_ms = 0;
 
-    int ret = therm_adc_sample_rate_set(sample_rate_ms);
+    if (cmd_len == 2) {
+        sample_rate_ms = (cmd[1] << 8) | cmd[0];
+
+        ret = therm_adc_sample_rate_set(sample_rate_ms);
+        if (ret < 0) {
+            LOG_ERR("Failed to set ADC sample rate: %d", ret);
+            return ret;
+        }
+
+        LOG_DBG("Set ADC sample rate to %d ms", sample_rate_ms);
+    }
+
+    ret = therm_adc_sample_rate_get(&sample_rate_ms);
     if (ret < 0) {
-        LOG_ERR("Failed to set ADC sample rate: %d", ret);
+        LOG_ERR("Failed to get ADC sample rate: %d", ret);
         return ret;
     }
-    LOG_DBG("Set ADC sample rate to %d ms", sample_rate_ms);
+    resp[0] = sample_rate_ms & 0xff;
+    resp[1] = (sample_rate_ms >> 8) & 0xff;
+
+    LOG_DBG("Get ADC sample rate %d ms", sample_rate_ms);
     return 0;
 }
 
