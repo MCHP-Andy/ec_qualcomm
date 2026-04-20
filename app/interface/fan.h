@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:43:05 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-18 11:30:11
+ * @Last Modified time: 2026-04-20 23:36:56
  */
 
 #pragma once
@@ -74,6 +74,8 @@ typedef struct fan_ctrl_t{
 
 int fan_tmp_get(fan_id_t tmp_src, uint16_t *tmp);
 int fan_tmp_set(fan_id_t tmp_src, uint16_t tmp);
+
+int fan_rpm_write(fan_id_t fan_id, uint16_t rpm);
 
 int fan_ctrl_get(fan_id_t fan_id, fan_ctrl_t *ctrl);
 int fan_ctrl_set(fan_id_t fan_id, const fan_ctrl_t *ctrl);

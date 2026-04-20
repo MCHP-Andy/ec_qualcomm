@@ -2,6 +2,8 @@
 target_sources(app PRIVATE btn.c)
 
 target_sources(app PRIVATE fan.c)
+target_sources(app PRIVATE fan_profile_tbl.c)
+
 target_sources(app PRIVATE thermal.c)
 
 target_sources(app PRIVATE power_limit.c)

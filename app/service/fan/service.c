@@ -2,8 +2,10 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-18 18:12:10
+ * @Last Modified time: 2026-04-20 23:35:16
  */
+
+#include <stdlib.h>
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -41,6 +43,17 @@ int fan_tmp_set(fan_id_t tmp_src, uint16_t tmp) {
 
     temps[tmp_src] = tmp;
     k_event_post(&fan_event, FAN_TEMP_CHG);
+
+    return 0;
+}
+
+int fan_rpm_write(fan_id_t fan_id, uint16_t rpm) {
+
+    if (fan_id == 0 || fan_id >= ARRAY_SIZE(fan_blks)) {
+        return -EINVAL;
+    }
+
+    fan_blks[fan_id].rpm = rpm;
 
     return 0;
 }
@@ -199,11 +212,112 @@ K_THREAD_DEFINE(fan_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M, 0,
 #ifdef CONFIG_SHELL
 #include <zephyr/shell/shell.h>
 
+static void dump_fan_info(const struct shell *sh, fan_ctrl_t *fan_blk) {
+    shell_info(sh, "Fan ID: %d", fan_blk->id);
+    shell_info(sh, "Fan state: %d", fan_blk->state);
+    shell_info(sh, "Fan rpm: %d", fan_blk->rpm);
+    shell_info(sh, "Fan trip_low: %d", fan_blk->trip_low);
+    shell_info(sh, "Fan trip_high: %d", fan_blk->trip_high);
+    shell_info(sh, "Fan profile: %d", fan_blk->profile);
+
+    for (size_t i = THERM_SRC_CPU; i < THERM_SRC_MAX; i++) {
+        uint8_t size = fan_blk->tbl_size[i];
+        fan_tbl_t *tbl = fan_blk->fan_tbl[i];
+        shell_info(sh, "Fan tbl_size[%d]: %d", (int)i, size);
+        for (size_t j = 0; j < size; j++) {
+            shell_info(sh, "\ttbl[%d]: rpm: %d, high: %d, low: %d", (int)j,
+                       tbl[j].rpm, tbl[j].temp_high, tbl[j].temp_low);
+        }
+    }
+
+    shell_info(sh, "Fan dbg_mode: 0x%02x", fan_blk->dbg_mode);
+    shell_info(sh, "Fan dbg_rpm: %d", fan_blk->dbg_rpm);
+    shell_info(sh, "Fan dbg_pwm: %d", fan_blk->dbg_pwm);
+}
+
+static int cmd_fan_get(const struct shell *sh, size_t argc, char **argv) {
+    fan_id_t id = (fan_id_t)strtoul(argv[1], NULL, 0);
+    if (id == 0 || id >= ARRAY_SIZE(fan_blks)) {
+        shell_error(sh, "Invalid fan ID");
+        return -EINVAL;
+    }
+    dump_fan_info(sh, &fan_blks[id]);
+    return 0;
+}
+
+static int cmd_fan_state(const struct shell *sh, size_t argc, char **argv) {
+    fan_id_t id = (fan_id_t)strtoul(argv[1], NULL, 0);
+    if (id == 0 || id >= ARRAY_SIZE(fan_blks)) {
+        shell_error(sh, "Invalid fan ID");
+        return -EINVAL;
+    }
+    uint8_t state = (uint8_t)strtoul(argv[2], NULL, 0);
+    fan_blks[id].state = state;
+    k_event_post(&fan_event, FAN_CFG_UPDATE);
+    shell_info(sh, "Fan %d state set to %d", id, state);
+    return 0;
+}
+
+static int cmd_fan_trip(const struct shell *sh, size_t argc, char **argv) {
+    fan_id_t id = (fan_id_t)strtoul(argv[1], NULL, 0);
+    if (id == 0 || id >= ARRAY_SIZE(fan_blks)) {
+        shell_error(sh, "Invalid fan ID");
+        return -EINVAL;
+    }
+    fan_blks[id].trip_low = (uint16_t)strtoul(argv[2], NULL, 0);
+    fan_blks[id].trip_high = (uint16_t)strtoul(argv[3], NULL, 0);
+    k_event_post(&fan_event, FAN_CFG_UPDATE);
+    shell_info(sh, "Fan %d trip points: low=%d, high=%d", id, fan_blks[id].trip_low, fan_blks[id].trip_high);
+    return 0;
+}
+
+static int cmd_fan_profile(const struct shell *sh, size_t argc, char **argv) {
+    fan_id_t id = (fan_id_t)strtoul(argv[1], NULL, 0);
+    if (id == 0 || id >= ARRAY_SIZE(fan_blks)) {
+        shell_error(sh, "Invalid fan ID");
+        return -EINVAL;
+    }
+    fan_id_t profile = (fan_id_t)strtoul(argv[2], NULL, 0);
+    if (profile == 0 || profile >= FAN_PROFILE_MAX) {
+        shell_error(sh, "Invalid profile ID");
+        return -EINVAL;
+    }
+
+    fan_ctrl_t *fan_blk = &fan_blks[id];
+    fan_blk->profile = (uint8_t)profile;
+    for (fan_id_t src = THERM_SRC_CPU; src < THERM_SRC_MAX; src++) {
+        fan_tbl_get(profile, id, src, &fan_blk->fan_tbl[src], &fan_blk->tbl_size[src]);
+    }
+    k_event_post(&fan_event, FAN_CFG_UPDATE);
+    shell_info(sh, "Fan %d profile updated to %d", id, profile);
+    return 0;
+}
+
+static int cmd_fan_debug(const struct shell *sh, size_t argc, char **argv) {
+    fan_id_t id = (fan_id_t)strtoul(argv[1], NULL, 0);
+    if (id == 0 || id >= ARRAY_SIZE(fan_blks)) {
+        shell_error(sh, "Invalid fan ID");
+        return -EINVAL;
+    }
+    fan_blks[id].dbg_mode = (uint8_t)strtoul(argv[2], NULL, 0);
+    if (argc >= 4) {
+        uint32_t val = strtoul(argv[3], NULL, 0);
+        if (fan_blks[id].dbg_mode & BIT(2)) {
+            fan_blks[id].dbg_pwm = (uint8_t)val;
+        } else {
+            fan_blks[id].dbg_rpm = (uint16_t)val;
+        }
+    }
+    k_event_post(&fan_event, FAN_CFG_UPDATE);
+    shell_info(sh, "Fan %d debug mode: 0x%02x updated", id, fan_blks[id].dbg_mode);
+    return 0;
+}
+
 static int cmd_temp_set(const struct shell *sh, size_t argc, char **argv) {
     int ret = 0;
 
-    fan_id_t id = strtoul(argv[1], NULL, 16);
-    uint8_t tmp = strtoul(argv[2], NULL, 16);
+    fan_id_t id = strtoul(argv[1], NULL, 0);
+    uint8_t tmp = strtoul(argv[2], NULL, 0);
 
     shell_info(sh, "Fan ID: %d, tmp: %d", id, tmp);
     fan_tmp_set(id, tmp);
@@ -213,36 +327,10 @@ static int cmd_temp_set(const struct shell *sh, size_t argc, char **argv) {
 
 static int cmd_dump(const struct shell *sh, size_t argc, char **argv) {
     int ret = 0;
-    fan_ctrl_t *fan_blk = NULL;
 
     for (fan_id_t fan = FAN_ID_1; fan < ARRAY_SIZE(fan_blks); fan++) {
-        fan_blk = &fan_blks[fan];
-
-        shell_info(sh, "Fan ID: %d", fan_blk->id);
-        shell_info(sh, "Fan state: %d", fan_blk->state);
-        shell_info(sh, "Fan rpm: %d", fan_blk->rpm);
-
-        shell_info(sh, "Fan trip_low: %d", fan_blk->trip_low);
-        shell_info(sh, "Fan trip_low: %d", fan_blk->trip_low);
-
-        shell_info(sh, "Fan profile: %d", fan_blk->profile);
-
-        for (size_t i = THERM_SRC_CPU; i < THERM_SRC_MAX; i++) {
-            uint8_t size = fan_blk->tbl_size[i];
-            fan_tbl_t *tbl = fan_blk->fan_tbl[i];
-
-            shell_info(sh, "Fan tbl_size[%d]: %d", i, size);
-
-            for (size_t j = 0; j < size; j++) {
-                shell_info(sh, "\ttbl[%d]: rpm: %d, high: %d, low: %d", j,
-                           tbl[j].rpm, tbl[j].temp_high, tbl[j].temp_low);
-            }
-        }
-
-        shell_info(sh, "Fan dbg_mode: %d", fan_blk->dbg_mode);
-        shell_info(sh, "Fan dbg_rpm: %d", fan_blk->dbg_rpm);
-        shell_info(sh, "Fan dbg_pwm: %d", fan_blk->dbg_pwm);
-        shell_info(sh, "");
+        dump_fan_info(sh, &fan_blks[fan]);
+        shell_info(sh, "-------------------");
     }
     
     return ret;
@@ -250,9 +338,25 @@ static int cmd_dump(const struct shell *sh, size_t argc, char **argv) {
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_fan,
 	SHELL_CMD_ARG(temp, NULL,
-		"Set temp", cmd_temp_set, 3, 0),
+		"Set temp <id> <temp>", cmd_temp_set, 3, 0),
 	SHELL_CMD_ARG(dump, NULL,
 		"Dump fan info", cmd_dump, 0, 0),
+	SHELL_CMD_ARG(get, NULL,
+		"Get fan info <id>", cmd_fan_get, 2, 0),
+	SHELL_CMD_ARG(state, NULL,
+		"Set fan state <id> <state>", cmd_fan_state, 3, 0),
+	SHELL_CMD_ARG(trip, NULL,
+		"Set fan trip points <id> <low> <high>", cmd_fan_trip, 4, 0),
+	SHELL_CMD_ARG(profile, NULL,
+		"Set fan profile <id> <profile_id>", cmd_fan_profile, 3, 0),
+	SHELL_CMD_ARG(debug, NULL,
+		"Set debug settings <id> <mode_hex> [val]\n"
+        "Usage:\n"
+        "\t<mode_hex>\n"
+        "\t\tBit 0 : Debug Mode ON/OFF (OFF: 0, ON: 1)\n"
+        "\t\tBit 1 : Fan ON/OFF (OFF: 0, ON: 1)\n"
+        "\t\tBit 2 : Debug Type (RPM: 0, PWM: 1)",
+        cmd_fan_debug, 3, 1),
 	SHELL_SUBCMD_SET_END /* Array terminated. */
 );
 

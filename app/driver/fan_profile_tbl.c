@@ -1,5 +1,9 @@
 
-#include <zephyr/kernel.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <errno.h>
+
+#include <zephyr/sys/util.h>
 #include <interface/fan.h>
 
 // Profile1: Battery saver
