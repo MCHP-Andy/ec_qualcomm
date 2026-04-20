@@ -2,10 +2,11 @@
  * @Author: andy.chang 
  * @Date: 2026-04-18 11:29:06 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-18 17:50:47
+ * @Last Modified time: 2026-04-21 00:36:53
  */
 
 #include <errno.h>
+#include <stdlib.h>
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/adc.h>
 #include <zephyr/logging/log.h>
@@ -67,7 +68,7 @@ int therm_sample_get(therm_id_t id, uint16_t *temp) {
     *temp = 55;
 #endif
 
-    LOG_INF("Therm%d, %d C", id, *temp);
+    LOG_DBG("Therm%d, %d C", id, *temp);
 
     return 0;
 }
@@ -103,7 +104,7 @@ static int cmd_therm_get(const struct shell *sh, size_t argc, char **argv) {
     therm_id_t id = 0;
     uint16_t temp = 0;
 
-    id = atoi(argv[1]);
+    id = (therm_id_t)strtoul(argv[1], NULL, 0);
 
     int ret = therm_sample_get(id, &temp);
     if (ret < 0) {
