@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2026-04-18 18:01:20 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-21 01:41:34
+ * @Last Modified time: 2026-04-21 15:23:32
  */
 
 #pragma once
@@ -20,7 +20,6 @@ typedef enum {
 
     PWR_STA_MAX,
 } pwr_sta_t;
-
 
 int pwr_state_get(pwr_sta_t *state);
 

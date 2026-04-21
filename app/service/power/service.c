@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-21 01:48:52
+ * @Last Modified time: 2026-04-21 15:54:44
  */
 
 #include <stdlib.h>
@@ -15,6 +15,8 @@
 
 LOG_MODULE_REGISTER(power, LOG_LEVEL_DBG);
 
+static K_EVENT_DEFINE(event);
+SYS_EVENT_SUBSCRIBE(power, event);
 static pwr_sta_t pwr_state = PWR_STA_G3;
 
 static const char *pwr_state_str[] = {
@@ -62,23 +64,29 @@ int pwr_state_set(pwr_sta_t state) {
 
     LOG_INF("Changed power state: %s", pwr_state_to_str(state));
 
-    // TODO: Notify other modules of power state change
+    // Notify other modules of power state change
+    SYS_EVENT_SUBMIT(SYS_PWR_STA_CHG);
 
     return 0;
 }
 
-#if 0 // No need in Qualcomm
 static void service(void) {
-    int ret = 0;
+    uint32_t evt = 0;
 
     while (1) {
-        k_sleep(K_SECONDS(5));
+        // Get event
+        evt = k_event_wait(&event, (SYS_PWR_STA_CHG), true, K_FOREVER);
+
+        if (evt & SYS_PWR_STA_CHG) {
+            pwr_sta_t state = 0;
+            pwr_state_get(&state);
+            LOG_INF("Power state: %s", pwr_state_to_str(state));
+        }
     }
 }
 
 K_THREAD_DEFINE(pwr_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M, 0,
                 0);
-#endif
 
 #ifdef CONFIG_SHELL
 #include <zephyr/shell/shell.h>

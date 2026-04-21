@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-20 23:56:04
+ * @Last Modified time: 2026-04-21 17:02:33
  */
 
 #include <stdlib.h>
@@ -11,9 +11,13 @@
 #include <zephyr/logging/log.h>
 
 #include <interface/system.h>
+#include <interface/power.h>
 #include <interface/thermal.h>
 
 LOG_MODULE_REGISTER(thermal, LOG_LEVEL_INF);
+
+static K_EVENT_DEFINE(event);
+SYS_EVENT_SUBSCRIBE(thermal, event);
 
 static therm_dev_t therm_devs[THERM_DEV_MAX] = {
     [THERM_DEV_1] =
@@ -90,12 +94,23 @@ int therm_adc_sample_rate_set(uint16_t ms) {
 }
 
 static void service(void) {
+    uint32_t evt = 0;
     k_timeout_t adc_wait = K_MSEC(1000);
 
     while (1) {
 
         // Wait for event (ADC sample)
-        k_sleep(adc_wait);
+        evt = k_event_wait(&event, (SYS_EVT_MASK), true, adc_wait);
+
+        // Check power state
+        {
+            pwr_sta_t state;
+            pwr_state_get(&state);
+            if (state != PWR_STA_S0) {
+                adc_wait = K_FOREVER;
+                continue;
+            }
+        }
 
         // Check thermal cross
         for (therm_id_t i = THERM_DEV_1; i < therm_ctrl.therm_num; i++) {

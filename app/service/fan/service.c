@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-20 23:35:16
+ * @Last Modified time: 2026-04-21 16:26:29
  */
 
 #include <stdlib.h>
@@ -11,15 +11,23 @@
 #include <zephyr/logging/log.h>
 
 #include <interface/system.h>
+#include <interface/power.h>
 #include <interface/fan.h>
 
 LOG_MODULE_REGISTER(fan, LOG_LEVEL_DBG);
 
-#define FAN_TEMP_CHG BIT(0)
-#define FAN_CFG_UPDATE BIT(1)
-#define FAN_RPM_UPDATE BIT(2)
+enum {
+    FAN_EVT_TEMP_CHG = LOCAL_EVT_START,
+    FAN_EVT_CFG_UPDATE,
+    FAN_EVT_RPM_UPDATE,
+};
 
-static K_EVENT_DEFINE(fan_event);
+#define FAN_TEMP_CHG BIT(FAN_EVT_TEMP_CHG)
+#define FAN_CFG_UPDATE BIT(FAN_EVT_CFG_UPDATE)
+#define FAN_RPM_UPDATE BIT(FAN_EVT_RPM_UPDATE)
+
+static K_EVENT_DEFINE(event);
+SYS_EVENT_SUBSCRIBE(fan, event);
 
 static uint16_t temps[THERM_SRC_MAX] = {0};
 static fan_ctrl_t fan_blks[FAN_ID_MAX] = {0};
@@ -42,7 +50,7 @@ int fan_tmp_set(fan_id_t tmp_src, uint16_t tmp) {
     }
 
     temps[tmp_src] = tmp;
-    k_event_post(&fan_event, FAN_TEMP_CHG);
+    k_event_post(&event, FAN_TEMP_CHG);
 
     return 0;
 }
@@ -75,7 +83,7 @@ int fan_ctrl_set(fan_id_t fan_id, const fan_ctrl_t *ctrl) {
 
     memcpy(&fan_blks[fan_id], ctrl, sizeof(fan_ctrl_t));
 
-    k_event_post(&fan_event, FAN_CFG_UPDATE);
+    k_event_post(&event, FAN_CFG_UPDATE);
 
     return 0;
 }
@@ -166,9 +174,13 @@ static void service(void) {
     while (1) {
 
         // TODO: Wait for event (temp change, update rpm, pwr, etc.)
-        evt = k_event_wait(&fan_event,
-                           (FAN_TEMP_CHG | FAN_CFG_UPDATE | FAN_RPM_UPDATE),
-                           true, rpm_update);
+        evt = k_event_wait(
+            &event,
+            (SYS_EVT_MASK | FAN_TEMP_CHG | FAN_CFG_UPDATE | FAN_RPM_UPDATE),
+            true, rpm_update);
+
+        pwr_sta_t state;
+        pwr_state_get(&state);
 
         for (fan_id_t fan = FAN_ID_1; fan < ARRAY_SIZE(fan_blks); fan++) {
             fan_blk = &fan_blks[fan];
@@ -178,11 +190,11 @@ static void service(void) {
                 continue;
             }
 
-            // TODO: check power state
-            // if (pwr_state != s0) {
-            //     fan_rpm_update(fan_blk, 0);
-            //     continue;
-            // }
+            // Check power state
+            if (state != PWR_STA_S0) {
+                fan_rpm_update(fan_blk, 0);
+                continue;
+            }
 
             // Check fan on
             if (fan_blk->state != FAN_STA_ON) {
@@ -253,7 +265,7 @@ static int cmd_fan_state(const struct shell *sh, size_t argc, char **argv) {
     }
     uint8_t state = (uint8_t)strtoul(argv[2], NULL, 0);
     fan_blks[id].state = state;
-    k_event_post(&fan_event, FAN_CFG_UPDATE);
+    k_event_post(&event, FAN_CFG_UPDATE);
     shell_info(sh, "Fan %d state set to %d", id, state);
     return 0;
 }
@@ -266,7 +278,7 @@ static int cmd_fan_trip(const struct shell *sh, size_t argc, char **argv) {
     }
     fan_blks[id].trip_low = (uint16_t)strtoul(argv[2], NULL, 0);
     fan_blks[id].trip_high = (uint16_t)strtoul(argv[3], NULL, 0);
-    k_event_post(&fan_event, FAN_CFG_UPDATE);
+    k_event_post(&event, FAN_CFG_UPDATE);
     shell_info(sh, "Fan %d trip points: low=%d, high=%d", id, fan_blks[id].trip_low, fan_blks[id].trip_high);
     return 0;
 }
@@ -288,7 +300,7 @@ static int cmd_fan_profile(const struct shell *sh, size_t argc, char **argv) {
     for (fan_id_t src = THERM_SRC_CPU; src < THERM_SRC_MAX; src++) {
         fan_tbl_get(profile, id, src, &fan_blk->fan_tbl[src], &fan_blk->tbl_size[src]);
     }
-    k_event_post(&fan_event, FAN_CFG_UPDATE);
+    k_event_post(&event, FAN_CFG_UPDATE);
     shell_info(sh, "Fan %d profile updated to %d", id, profile);
     return 0;
 }
@@ -308,7 +320,7 @@ static int cmd_fan_debug(const struct shell *sh, size_t argc, char **argv) {
             fan_blks[id].dbg_rpm = (uint16_t)val;
         }
     }
-    k_event_post(&fan_event, FAN_CFG_UPDATE);
+    k_event_post(&event, FAN_CFG_UPDATE);
     shell_info(sh, "Fan %d debug mode: 0x%02x updated", id, fan_blks[id].dbg_mode);
     return 0;
 }
