@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2026-04-16 16:43:54 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-17 19:16:53
+ * @Last Modified time: 2026-04-21 17:59:42
  */
 
 #pragma once
@@ -61,3 +61,7 @@ int acpi_ec_thermistor_temp_thre(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
                                  uint8_t resp_len);
 int acpi_ec_thermistor_sampling_rate(uint8_t *cmd, uint8_t cmd_len,
                                      uint8_t *resp, uint8_t resp_len);
+int acpi_func_flag(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                   uint8_t resp_len);
+int acpi_active_cooling_sci_event(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                                  uint8_t resp_len);

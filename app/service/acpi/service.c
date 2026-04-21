@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-18 18:10:17
+ * @Last Modified time: 2026-04-21 17:59:20
  */
 
 #include <stdlib.h>
@@ -18,12 +18,23 @@
 
 LOG_MODULE_REGISTER(acpi, LOG_LEVEL_DBG);
 
+enum {
+    ACPI_EVT_CMD = LOCAL_EVT_START,
+    ACPI_EVT_SCI,
+};
+
+#define ACPI_CMD BIT(ACPI_EVT_CMD)
+#define ACPI_SCI BIT(ACPI_EVT_SCI)
+
+static K_EVENT_DEFINE(event);
+SYS_EVENT_SUBSCRIBE(acpi, event);
+
 typedef struct acpi_cmd_t{
     uint8_t cmd;
     int (*cmd_hdl)(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp, uint8_t resp_len);
 } acpi_cmd_t;
 
-static acpi_cmd_t acpi_cmd_tbl[] = {
+static const acpi_cmd_t acpi_cmd_tbl[] = {
     // clang-format off
     // EC Version and Capabilities
     {EC_DEV_FW_VER,                             acpi_dev_fw_ver},
@@ -50,8 +61,8 @@ static acpi_cmd_t acpi_cmd_tbl[] = {
     {EC_FAN_DEBUG_CTRL,                         acpi_ec_fan_debug_ctrl},
     {EC_THERMISTOR_TEMP_THRE,                   acpi_ec_thermistor_temp_thre},
     {EC_THERMISTOR_SAMPLING_RATE,               acpi_ec_thermistor_sampling_rate},
-    {EC_FUNC_FLAG, NULL},
-    {EC_ACTIVE_COOLING_SCI_EVENT, NULL},
+    {EC_FUNC_FLAG,                              acpi_func_flag},
+    {EC_ACTIVE_COOLING_SCI_EVENT,               acpi_active_cooling_sci_event},
 
     // EC Firmware Update Commands
     {EC_DEV_FW_CORRUPTION_STATUS, NULL},
@@ -69,8 +80,11 @@ static acpi_cmd_t acpi_cmd_tbl[] = {
 
 static uint8_t rece_cmd[ACPI_RECE_LEN];
 static uint8_t resp_buf[ACPI_RESP_LEN];
+static sci_t sci_buf;
+static bool sci_en = true;
 
 #define ACPI_EVT_LEN 2
+#define SCI_LEN 16
 
 typedef struct acpi_evt_t {
     uint8_t *pdata;
@@ -78,16 +92,26 @@ typedef struct acpi_evt_t {
 } acpi_evt_t ;
 
 K_MSGQ_DEFINE(acpi_evt_queue, sizeof(acpi_evt_t), ACPI_EVT_LEN, 4);
+K_MSGQ_DEFINE(sci_queue, sizeof(sci_t), SCI_LEN, 4);
 
 int acpi_write(uint8_t *data, uint16_t len) {
-    acpi_evt_t event;
+    int ret = 0;
+    acpi_evt_t cmd;
 
     LOG_DBG("Put ACPI CMD");
 
-    event.pdata = data;
-    event.len = len;
+    cmd.pdata = data;
+    cmd.len = len;
 
-    return k_msgq_put(&acpi_evt_queue, &event, K_NO_WAIT);
+    ret = k_msgq_put(&acpi_evt_queue, &cmd, K_NO_WAIT);
+    if (ret < 0) {
+        LOG_ERR("Put ACPI CMD fail: %d", ret);
+        return ret;
+    }
+
+    k_event_post(&event, ACPI_CMD);
+
+    return ret;
 }
 
 int acpi_read(uint8_t *data, uint16_t len) {
@@ -101,40 +125,140 @@ int acpi_read(uint8_t *data, uint16_t len) {
     return 0;
 }
 
-static void service(void) {
+int acpi_sci_enable_set(bool en) {
+    sci_en = en;
+    return 0;
+}
 
+int acpi_sci_enable_get(bool *en) {
+    if (en == NULL) {
+        return -EINVAL;
+    }
+
+    *en = sci_en;
+
+    return 0;
+}
+
+int acpi_sci_put(sci_t sci) {
+    int ret;
+
+    if (sci_en == false) {
+        // Drop data
+        return 0;
+    }
+
+    ret = k_msgq_put(&sci_queue, &sci, K_NO_WAIT);
+    if (ret < 0) {
+        LOG_ERR("Put SCI fail: %d", ret);
+        return ret;
+    }
+
+    k_event_post(&event, ACPI_SCI);
+
+    return ret;
+}
+
+int acpi_sci_get(sci_t * psci) {
+    if (psci == NULL) {
+        return -EINVAL;
+    }
+
+    *psci = sci_buf;
+    sci_buf = SCI_NONE;
+    k_event_post(&event, ACPI_SCI);
+
+    return 0;
+}
+
+static int acpi_cmd_hdl(void) {
+    int ret = 0;
+    uint8_t len = 0;
+    acpi_evt_t event;
+
+    ret = k_msgq_get(&acpi_evt_queue, &event, K_NO_WAIT);
+    if (ret < 0)
+        return 0;
+
+    // Copy ACPI CMD from interface buffer to local variable
+    len = event.len;
+    memcpy(rece_cmd, event.pdata, len);
+
+    // Parse the cmd and call corresponding handler function, then copy response
+    // to interface buffer
+    size_t i = 0;
+    for (i = 0; i < ARRAY_SIZE(acpi_cmd_tbl); i++) {
+        if (rece_cmd[0] == acpi_cmd_tbl[i].cmd) {
+            if (acpi_cmd_tbl[i].cmd_hdl != NULL) {
+                ret = acpi_cmd_tbl[i].cmd_hdl(&rece_cmd[1], len - 1, resp_buf,
+                                              sizeof(resp_buf));
+                if (ret < 0) {
+                    LOG_ERR("Failed to handle ACPI cmd 0x%02x: %d", rece_cmd[0],
+                            ret);
+                } else {
+                    LOG_INF("Handled ACPI cmd 0x%02x successfully",
+                            rece_cmd[0]);
+                }
+            } else {
+                LOG_WRN("No handler for ACPI cmd 0x%02x", rece_cmd[0]);
+            }
+            break;
+        }
+    }
+
+    if (i == ARRAY_SIZE(acpi_cmd_tbl)) {
+        LOG_WRN("Unknown ACPI cmd 0x%02x", rece_cmd[0]);
+    }
+
+    return ret;
+}
+
+static int acpi_sci_hdl(void) {
+    int ret = 0;
+    sci_t sci;
+
+    // TODO: Check sci_en status for drop data
+    if (sci_en == false) {
+        // TODO: Drop all data in queue
+        return 0;
+    }
+
+    // TODO: Check power status for drop data
+
+    // TODO: Check exist/timeout for data retry/drop
+    if (sci_buf != SCI_NONE) {
+        // TODO: Retry or Drop
+    }
+
+    // Get SCI from queue
+    ret = k_msgq_get(&sci_queue, &sci, K_NO_WAIT);
+    if (ret < 0)
+        return 0;
+
+    // Put SCI data to buffer
+    sci_buf = sci;
+
+    // TODO: Raise ACPI alert pin (Pulse?? Level??)
+    
+    // TODO: Set up timeout
+
+    return 0;
+}
+
+static void service(void) {
+    uint32_t evt = 0;
 
     while (1) {
-        uint8_t len = 0;
-        acpi_evt_t event;
 
-        // Wait for acpi event
-        k_msgq_get(&acpi_evt_queue, &event, K_FOREVER);
+        // Wait for event (ACPI cmd or SCI)
+        evt = k_event_wait(&event, (ACPI_CMD | ACPI_SCI), true, K_FOREVER);
 
-        // Copy ACPI CMD from interface buffer to local variable
-        len = event.len;
-        memcpy(rece_cmd, event.pdata, len);
-        
-        // Parse the cmd and call corresponding handler function, then copy response to interface buffer
-        size_t i = 0;
-        for (i = 0; i < ARRAY_SIZE(acpi_cmd_tbl); i++) {
-            if (rece_cmd[0] == acpi_cmd_tbl[i].cmd) {
-                if (acpi_cmd_tbl[i].cmd_hdl != NULL) {
-                    int ret = acpi_cmd_tbl[i].cmd_hdl(&rece_cmd[1], len-1, resp_buf, sizeof(resp_buf));
-                    if (ret < 0) {
-                        LOG_ERR("Failed to handle ACPI cmd 0x%02x: %d", rece_cmd[0], ret);
-                    } else {
-                        LOG_INF("Handled ACPI cmd 0x%02x successfully", rece_cmd[0]);
-                    }
-                } else {
-                    LOG_WRN("No handler for ACPI cmd 0x%02x", rece_cmd[0]);
-                }
-                break;
-            }
+        if (evt & ACPI_CMD) {
+            acpi_cmd_hdl();
         }
 
-        if (i == ARRAY_SIZE(acpi_cmd_tbl)) {
-            LOG_WRN("Unknown ACPI cmd 0x%02x", rece_cmd[0]);
+        if (evt & ACPI_SCI) {
+            acpi_sci_hdl();
         }
     }
 }

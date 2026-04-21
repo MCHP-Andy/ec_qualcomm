@@ -5,7 +5,7 @@
 #include "ec_act_cool.h"
 #include <interface/thermal.h>
 #include <interface/fan.h>
-
+#include <interface/acpi.h>
 
 LOG_MODULE_DECLARE(acpi, LOG_LEVEL_DBG);
 
@@ -255,7 +255,7 @@ static int acpi_ec_thermistors(therm_id_t idx, uint8_t *resp,
     }
 
     resp[0] = 2;
-    resp[1] = (therm_dev.temp >> 8) & 0xFF;
+    resp[1] = therm_dev.temp & 0xFF;
     resp[2] = (therm_dev.temp >> 8) & 0xFF;
 
     LOG_DBG("Thermistor %d temp: %d.%d deg C", idx, therm_dev.temp / 10,
@@ -394,10 +394,34 @@ int acpi_ec_thermistor_sampling_rate(uint8_t *cmd, uint8_t cmd_len,
     return 0;
 }
 
-// int acpi_func_flag(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp, uint8_t
-// resp_len) {
-// }
+int acpi_func_flag(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                   uint8_t resp_len) {
+    uint64_t flags = 0;
+    bool sci_en;
 
-// int acpi_active_cooling_sci_event(uint8_t *cmd, uint8_t cmd_len, uint8_t
-// *resp, uint8_t resp_len) {
-// }
+    if (cmd_len == 9) {
+        memcpy(&flags, &cmd[1], sizeof(flags));
+
+        sci_en = flags & 0x01;
+        acpi_sci_enable_set(sci_en);
+
+        LOG_DBG("Set EC function flags: 0x%016llx", flags);
+    }
+
+    acpi_sci_enable_get(&sci_en);
+    flags = sci_en;
+
+    resp[0] = 0x08;
+    memcpy(&resp[1], &flags, sizeof(flags));
+
+    LOG_DBG("Get EC function flags: 0x%016llx", flags);
+    return 0;
+}
+
+int acpi_active_cooling_sci_event(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
+                                  uint8_t resp_len) {
+    sci_t sci;
+    acpi_sci_get(&sci);
+    resp[0] = sci;
+    return 0;
+}
