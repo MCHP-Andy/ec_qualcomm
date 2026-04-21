@@ -2,18 +2,19 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#include "ec_act_cool.h"
 #include <interface/thermal.h>
 #include <interface/fan.h>
 #include <interface/acpi.h>
 
+#include "acpi_tbl.h"
+#include "ec_act_cool.h"
+
 LOG_MODULE_DECLARE(acpi, LOG_LEVEL_DBG);
+
 
 int acpi_soc_to_ec_temp(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
                         uint8_t resp_len) {
-    if (cmd == NULL || cmd_len < 4) {
-        return -EINVAL;
-    }
+    ACPI_CHECK_IN(cmd, cmd_len, 4);
 
     fan_id_t tmp_src = cmd[0];
     uint16_t tmp = (cmd[3] << 8) | cmd[2]; // Little Endian
@@ -26,14 +27,8 @@ int acpi_soc_to_ec_temp(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 
 int acpi_ec_fan_status(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
                        uint8_t resp_len) {
-    if (cmd == NULL || cmd_len < 1) {
-        LOG_ERR("Invalid command buffer");
-        return -EINVAL;
-    }
-    if (resp == NULL || resp_len < 1) {
-        LOG_ERR("Response buffer is too small");
-        return -EINVAL;
-    }
+    ACPI_CHECK_IN(cmd, cmd_len, 1);
+    ACPI_CHECK_OUT(resp, resp_len, 1);
 
     fan_id_t fan_id = cmd[0];
     fan_ctrl_t ctrl;
@@ -52,6 +47,9 @@ int acpi_ec_fan_status(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 
 int acpi_ec_fan_rpm(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
                     uint8_t resp_len) {
+    ACPI_CHECK_IN(cmd, cmd_len, 1);
+    ACPI_CHECK_OUT(resp, resp_len, 2);
+
     fan_id_t fan_id = cmd[0];
     fan_ctrl_t ctrl;
 
@@ -78,7 +76,11 @@ int acpi_ec_fan_profile(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
     fan_id_t fan_id = FAN_ID_1;
     fan_ctrl_t ctrl;
 
+    ACPI_CHECK_OUT(resp, resp_len, 1);
+
     if (cmd_len == 1) {
+        ACPI_CHECK_IN(cmd, cmd_len, 1);
+        
         profile = cmd[0] & 0x0F;
         fan_id = (cmd[0] >> 4) & 0x0F;
 
@@ -114,6 +116,9 @@ int acpi_ec_fan_profile(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 
 int acpi_ec_fan_trip_point(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
                            uint8_t resp_len) {
+    ACPI_CHECK_IN(cmd, cmd_len, 1);
+    ACPI_CHECK_OUT(resp, resp_len, 5);
+
     int ret = 0;
     fan_id_t fan_id = cmd[0];
     uint16_t trip_low, trip_high;
@@ -162,6 +167,9 @@ int acpi_ec_fan_trip_point(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 
 int acpi_ec_fan_profile_num(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
                             uint8_t resp_len) {
+    ACPI_CHECK_IN(cmd, cmd_len, 1);
+    ACPI_CHECK_OUT(resp, resp_len, 1);
+
     fan_id_t fan_id = cmd[0];
     fan_ctrl_t ctrl;
 
@@ -179,6 +187,9 @@ int acpi_ec_fan_profile_num(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 
 int acpi_ec_fan_lut_num(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
                         uint8_t resp_len) {
+    ACPI_CHECK_IN(cmd, cmd_len, 1);
+    ACPI_CHECK_OUT(resp, resp_len, 1);
+
     int ret = 0;
     fan_id_t fan_id = cmd[0] & 0x0f;
     fan_id_t profile = (cmd[0] >> 4) & 0x0f;
@@ -200,12 +211,14 @@ int acpi_ec_fan_lut_num(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 
 int acpi_ec_fan_lut(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
                     uint8_t resp_len) {
+    ACPI_CHECK_IN(cmd, cmd_len, 2);
     int ret = 0;
     fan_id_t fan_id = cmd[0] & 0x0f;
     fan_id_t profile = (cmd[0] >> 4) & 0x0f;
     fan_id_t tmp_src = cmd[1];
     fan_tbl_t *tbl = NULL;
     uint8_t len = 0;
+    uint8_t req_len = 0;
 
     if (cmd_len > 2) {
         ret = fan_tbl_get(profile, fan_id, tmp_src, &tbl, &len);
@@ -225,6 +238,9 @@ int acpi_ec_fan_lut(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
                 ret);
         return ret;
     }
+
+    req_len = (len * sizeof(fan_tbl_t)) + 1;
+    ACPI_CHECK_OUT(resp, resp_len, req_len);
 
     resp[0] = len * 3;
     memcpy(&resp[1], (uint8_t *)tbl, len * sizeof(fan_tbl_t));
@@ -247,6 +263,7 @@ int acpi_ec_fan_lut(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 static int acpi_ec_thermistors(therm_id_t idx, uint8_t *resp,
                                uint8_t resp_len) {
     therm_dev_t therm_dev;
+    ACPI_CHECK_OUT(resp, resp_len, 3);
 
     int ret = therm_sensor_blk_get(idx, &therm_dev);
     if (ret < 0) {
@@ -280,6 +297,9 @@ int acpi_ec_thermistor3(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 
 int acpi_ec_fan_debug_ctrl(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
                            uint8_t resp_len) {
+    ACPI_CHECK_IN(cmd, cmd_len, 1);
+    ACPI_CHECK_OUT(resp, resp_len, 5);
+
     fan_id_t fan_id = cmd[0];
     fan_ctrl_t ctrl;
 
@@ -329,6 +349,9 @@ int acpi_ec_fan_debug_ctrl(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 
 int acpi_ec_thermistor_temp_thre(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
                                  uint8_t resp_len) {
+    ACPI_CHECK_IN(cmd, cmd_len, 1);
+    ACPI_CHECK_OUT(resp, resp_len, 5);
+
     therm_id_t idx = cmd[0] & 0x0f;
     therm_dev_t therm_dev;
 
@@ -370,7 +393,10 @@ int acpi_ec_thermistor_sampling_rate(uint8_t *cmd, uint8_t cmd_len,
     int ret = 0;
     uint16_t sample_rate_ms = 0;
 
+    ACPI_CHECK_OUT(resp, resp_len, 2);
+
     if (cmd_len == 2) {
+        ACPI_CHECK_IN(cmd, cmd_len, 2);
         sample_rate_ms = (cmd[1] << 8) | cmd[0];
 
         ret = therm_adc_sample_rate_set(sample_rate_ms);
@@ -399,7 +425,10 @@ int acpi_func_flag(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
     uint64_t flags = 0;
     bool sci_en;
 
+    ACPI_CHECK_OUT(resp, resp_len, 9);
+
     if (cmd_len == 9) {
+        ACPI_CHECK_IN(cmd, cmd_len, 9);
         memcpy(&flags, &cmd[1], sizeof(flags));
 
         sci_en = flags & 0x01;
@@ -421,6 +450,8 @@ int acpi_func_flag(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 int acpi_active_cooling_sci_event(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
                                   uint8_t resp_len) {
     sci_t sci;
+    ACPI_CHECK_OUT(resp, resp_len, 1);
+
     acpi_sci_get(&sci);
     resp[0] = sci;
     return 0;

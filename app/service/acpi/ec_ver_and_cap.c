@@ -1,6 +1,8 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+
+#include "acpi_tbl.h"
 #include "ec_ver_and_cap.h"
 
 LOG_MODULE_DECLARE(acpi);
@@ -9,15 +11,7 @@ int acpi_dev_fw_ver(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp, uint8_t resp_l
     (void) cmd;
     (void) cmd_len;
 
-    if (resp == NULL) {
-        LOG_ERR("Response buffer is NULL");
-        return -ENOMEM;
-    }
-
-    if (resp_len < 4) {
-        LOG_ERR("Response buffer length is too small: %d", resp_len);
-        return -EINVAL;
-    }
+    ACPI_CHECK_OUT(resp, resp_len, 4);
 
     resp[0] = 3; // Number of bytes following
     resp[1] = 1; // Test Version
@@ -31,16 +25,7 @@ int acpi_dev_fw_ver_and_lowest_supported(uint8_t *cmd, uint8_t cmd_len, uint8_t 
     (void) cmd;
     (void) cmd_len;
 
-    if (resp == NULL) {
-        LOG_ERR("Response buffer is NULL");
-        return -ENOMEM;
-    }
-
-    // Byte count = 7，所以 resp 至少需要 8 bytes (1 byte 儲存長度 + 7 bytes 資料)
-    if (resp_len < 8) {
-        LOG_ERR("Response buffer length is too small: %d", resp_len);
-        return -EINVAL;
-    }
+    ACPI_CHECK_OUT(resp, resp_len, 8);
 
     resp[0] = 7;   // Byte count (Offset 0x01)
     resp[1] = 1;   // Test Version (Offset 0x02)
@@ -87,25 +72,12 @@ int acpi_dev_flashing_capabilities(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
 #endif
 
 int acpi_dev_thermal_capabilities(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp, uint8_t resp_len) {
-    if (cmd == NULL || cmd_len < 1) {
-        LOG_ERR("Command buffer is invalid");
-        return -EINVAL;
-    }
+    ACPI_CHECK_IN(cmd, cmd_len, 1);
+    ACPI_CHECK_OUT(resp, resp_len, 3);
 
     // 檢查 Sub Command 是否為 0x02
     if (cmd[0] != 0x02) {
         LOG_ERR("Invalid sub command: 0x%02X", cmd[0]);
-        return -EINVAL;
-    }
-
-    if (resp == NULL) {
-        LOG_ERR("Response buffer is NULL");
-        return -ENOMEM;
-    }
-
-    // Byte count = 2，所以 resp 至少需要 3 bytes
-    if (resp_len < 3) {
-        LOG_ERR("Response buffer length is too small: %d", resp_len);
         return -EINVAL;
     }
 
@@ -127,16 +99,7 @@ int acpi_dev_active_cooling_caps(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp, u
     (void) cmd;
     (void) cmd_len;
 
-    if (resp == NULL) {
-        LOG_ERR("Response buffer is NULL");
-        return -ENOMEM;
-    }
-
-    // Byte count = 5，所以 resp 至少需要 6 bytes
-    if (resp_len < 6) {
-        LOG_ERR("Response buffer length is too small: %d", resp_len);
-        return -EINVAL;
-    }
+    ACPI_CHECK_OUT(resp, resp_len, 6);
 
     resp[0] = 5; // Byte count (Offset 0x01)
     
@@ -158,15 +121,7 @@ int acpi_who_am_i(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp, uint8_t resp_len
     (void) cmd;
     (void) cmd_len;
 
-    if (resp == NULL) {
-        LOG_ERR("Response buffer is NULL");
-        return -ENOMEM;
-    }
-
-    if (resp_len < 1) {
-        LOG_ERR("Response buffer length is too small: %d", resp_len);
-        return -EINVAL;
-    }
+    ACPI_CHECK_OUT(resp, resp_len, 1);
 
     // ACPI who-am-i 值固定為 0x01 (Offset 0x01 處直接是 Data，無 Byte Count)
     resp[0] = 0x01; 
@@ -178,16 +133,7 @@ int acpi_dev_id(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp, uint8_t resp_len) 
     (void) cmd;
     (void) cmd_len;
 
-    if (resp == NULL) {
-        LOG_ERR("Response buffer is NULL");
-        return -ENOMEM;
-    }
-
-    // Byte count = 2，所以 resp 至少需要 3 bytes
-    if (resp_len < 3) {
-        LOG_ERR("Response buffer length is too small: %d", resp_len);
-        return -EINVAL;
-    }
+    ACPI_CHECK_OUT(resp, resp_len, 3);
 
     resp[0] = 2;    // Byte count (Offset 0x01)
     
