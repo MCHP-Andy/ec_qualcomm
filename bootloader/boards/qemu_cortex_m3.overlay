@@ -6,7 +6,7 @@
 
 / {
     chosen {
-        zephyr,code-partition = &app1_partition;
+        zephyr,code-partition = &boot_partition;
     };
 };
 
@@ -16,12 +16,12 @@
         #address-cells = <1>;
         #size-cells = <1>;
 
-        app1_partition: partition@0 {
-            label = "app1";
+        boot_partition: partition@0 {
+            label = "bootloader";
             reg = <0x00000000 0x20000>;
         };
-        app2_partition: partition@20000 {
-            label = "app2";
+        app_partition: partition@20000 {
+            label = "app";
             reg = <0x20000 0x20000>;
         };
     };

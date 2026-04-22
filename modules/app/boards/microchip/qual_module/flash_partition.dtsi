@@ -1,0 +1,41 @@
+
+&flash0 {
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        boot_partition: partition@0 {
+            label = "bootloader";
+            reg = <0x00000 DT_SIZE_K(64)>;
+        };
+        app_partition: partition@10000 {
+            label = "app";
+            reg = <0x10000 0x58000>;
+        };
+    };
+};
+
+&spi0 {
+    compatible = "microchip,xec-qmspi-ldma";
+    status = "okay";
+    // port-sel = <1>;
+    chip-select = < 0x0 >;
+    clock-frequency = <DT_FREQ_M(8)>;
+    pinctrl-0 = < &shd_io0_gpio223 &shd_io1_gpio224 &shd_clk_gpio056 &shd_cs0_n_gpio055 >;
+	pinctrl-names = "default";
+
+    gd25lb256: gd25lb256@0 {
+		compatible = "jedec,spi-nor";
+		size = <DT_SIZE_M(32)>;
+		reg = <0>;
+		spi-max-frequency = <DT_FREQ_M(8)>;
+		jedec-id = [c8 67 19];
+		status = "okay";
+	};
+};
+
+// &shd_cs0_n_gpio055 {
+// 	drive-open-drain;
+// 	output-high;
+// };

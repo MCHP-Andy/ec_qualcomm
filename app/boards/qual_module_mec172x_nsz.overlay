@@ -7,6 +7,7 @@
 / {
     chosen {
         zephyr,shell-uart = &uart1;
+        zephyr,code-partition = &app_partition;
     };
 
     aliases {
@@ -80,15 +81,6 @@
     status = "okay";
     port_sel = <1>;
     pinctrl-0 = < &i2c01_sda_gpio130 &i2c01_scl_gpio131 >;
-	pinctrl-names = "default";
-};
-
-&spi0 {
-    compatible = "microchip,xec-qmspi-ldma";
-    status = "okay";
-    // port_sel = <0>;
-    // chip_select = < 0x0 >;
-    pinctrl-0 = < &shd_io0_gpio223 &shd_io1_gpio224 &shd_clk_gpio056 &shd_cs0_n_gpio055 >;
 	pinctrl-names = "default";
 };
 

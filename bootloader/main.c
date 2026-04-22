@@ -8,8 +8,8 @@
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
-// TODO: Get from DTS
-#define APP_START_ADDR 0x20000
+// Get from DTS
+#define APP_START_ADDR (DT_REG_ADDR(DT_NODELABEL(flash0))+DT_REG_ADDR(DT_NODELABEL(app_partition)))
 
 typedef void (*app_entry_t)(void);
 
@@ -37,17 +37,34 @@ void jump_to_app(uint32_t address) {
     app_entry();
 }
 
-
-
-int main(void)
-{
+int main(void) {
     printk("Hello from bootloader\n");
 
-    k_msleep(2000);
-
-	printk("Jump to APP\n");
-    k_msleep(10);
-    jump_to_app(APP_START_ADDR);
+    printk("App address in: 0x%08x\n", APP_START_ADDR);
 
     return 0;
 }
+
+
+#ifdef CONFIG_SHELL
+#include <stdlib.h>
+#include <zephyr/shell/shell.h>
+
+static int cmd_jump(const struct shell *sh, size_t argc, char **argv) {
+    uint32_t addr = APP_START_ADDR;
+
+    if (argc >= 2) {
+        addr = (uint32_t)strtoul(argv[1], NULL, 0);
+    }
+
+
+    shell_info(sh, "Jump to APP: 0x%08x", addr);
+    k_msleep(1000);
+    jump_to_app(addr);
+
+    return 0;
+}
+
+SHELL_CMD_REGISTER(jump, NULL, "jump to app_addr: <app_addr>", cmd_jump);
+
+#endif
