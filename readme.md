@@ -43,10 +43,9 @@ source tools/script/release.sh
 ```
 
 ## Flash
-TDB
 ```
-cd tools\KF_JLINK_Flash_Utility_L0100
-python kf_flsh_util.py -w -f ..\..\build\zephyr\spi_image.bin
+cd tools/KF_JLINK_Flash_Utility_L0100
+python kf_flsh_util.py -w -f ../../build/zephyr/spi_image.bin
 ```
 
 

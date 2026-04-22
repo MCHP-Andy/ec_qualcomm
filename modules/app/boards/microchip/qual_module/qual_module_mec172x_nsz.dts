@@ -15,21 +15,11 @@
 // #include <microchip/mec/mec172x/mec172xnsz-pinctrl.dtsi>
 
 #include "thermal.dtsi"
+#include "flash_partition.dtsi"
 
 / {
 	model = "Microchip Qualcomm Module";
 	compatible = "microchip,qual_module-mec172x_nsz";
-
-	/delete-node/ flash@c0000;
-	/delete-node/ memory@118000;
-	flash0: flash@b0000 {
-		reg = <0x000b0000 0x68000>;
-	};
-
-	sram0: memory@118000 {
-		compatible = "mmio-sram";
-		reg = <0x00118000 0xf800>;
-	};
 
 	chosen {
 		zephyr,sram = &sram0;
@@ -102,5 +92,3 @@
 	pinctrl-0 = <&uart1_tx_gpio170 &uart1_rx_gpio171>;
 	pinctrl-names = "default";
 };
-
-#include "flash_partition.dtsi"

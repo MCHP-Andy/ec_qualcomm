@@ -6,8 +6,10 @@ export ZEPHYR_TOOLCHAIN_VARIANT=zephyr
 
 export WORKSPACE=$(pwd)
 export ZEPHYR_SDK_INSTALL_DIR=${WORKSPACE}/../zephyr_main/zephyr-sdk-0.16.8
-export MEC5_SPI_GEN=${WORKSPACE}/tools/mec175x_spi_gen.exe
-export MEC5_SPI_CFG=${WORKSPACE}/app/boards/support/mec175x_spi_cfg.txt
+# export MEC5_SPI_GEN=${WORKSPACE}/tools/mec175x_spi_gen.exe
+# export MEC5_SPI_CFG=${WORKSPACE}/app/boards/support/mec175x_spi_cfg.txt
+export MEC5_SPI_GEN=${WORKSPACE}/tools/kf_spi_gen_revb/Kenai_Fjords_spi_gen.exe
+export MEC5_SPI_CFG=${WORKSPACE}/tools/kf_spi_gen_revb/spi_cfg.ini
 export EC_IMG_GEN=${WORKSPACE}/tools/spi_image_trim_out/generating_binaries.py
 
 echo ================ Zephyr ENV =======================

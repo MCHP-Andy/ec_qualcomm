@@ -9,6 +9,9 @@
 #include <microchip/mec/mec5_mec1753qsz.dtsi>
 #include <microchip/mec/mec5/mec175x-pinctrl.dtsi>
 
+#include "thermal.dtsi"
+#include "flash_partition.dtsi"
+
 / {
 	model = "Microchip Qualcomm Module";
 	compatible = "microchip,qual_module-mec1753_qsz";
@@ -18,6 +21,13 @@
 		zephyr,flash = &flash0;
 		zephyr,console = &uart1;
 		zephyr,shell-uart = &uart1;
+	};
+
+	aliases {
+		cpu-fan = &fan0;
+		cpu-tach = &tach1;
+		base-fan = &fan1;
+		base-tach = &tach0;
 	};
 
 	leds {

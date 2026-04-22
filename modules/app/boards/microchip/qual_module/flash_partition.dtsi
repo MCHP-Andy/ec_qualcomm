@@ -1,4 +1,17 @@
 
+/ {
+	/delete-node/ flash@c0000;
+	/delete-node/ memory@118000;
+	flash0: flash@b0000 {
+		reg = <0x000b0000 0x68000>;
+	};
+
+	sram0: memory@118000 {
+		compatible = "mmio-sram";
+		reg = <0x00118000 0xf800>;
+	};
+};
+
 &flash0 {
     partitions {
         compatible = "fixed-partitions";
@@ -20,22 +33,66 @@
     compatible = "microchip,xec-qmspi-ldma";
     status = "okay";
     // port-sel = <1>;
-    chip-select = < 0x0 >;
     clock-frequency = <DT_FREQ_M(8)>;
-    pinctrl-0 = < &shd_io0_gpio223 &shd_io1_gpio224 &shd_clk_gpio056 &shd_cs0_n_gpio055 >;
-	pinctrl-names = "default";
 
-    gd25lb256: gd25lb256@0 {
-		compatible = "jedec,spi-nor";
-		size = <DT_SIZE_M(32)>;
-		reg = <0>;
-		spi-max-frequency = <DT_FREQ_M(8)>;
-		jedec-id = [c8 67 19];
-		status = "okay";
-	};
+    // For external flash
+    // chip-select = < 0x0 >;
+    // pinctrl-0 = < &shd_io0_gpio223 
+    //               &shd_io1_gpio224
+    //               &shd_clk_gpio056
+    //               &shd_cs0_n_gpio055 >;
+    // gd25lb256: gd25lb256@0 {
+	// 	compatible = "jedec,spi-nor";
+	// 	size = <DT_SIZE_M(32)>;
+	// 	reg = <0>;
+	// 	spi-max-frequency = <DT_FREQ_M(8)>;
+	// 	jedec-id = [c8 67 19];
+	// 	status = "okay";
+	// };
+
+    // For internal flash
+    pinctrl-0 = < &int_spi_io0_gpio251 
+                  &int_spi_io1_gpio252
+                  &int_spi_clk_gpio257
+                  &int_spi_cs_n_gpio256
+                  &int_spi_wp_gpio260 >;
+    int_flash: sst25pf040@0 {
+        compatible ="jedec,spi-nor";
+        size = <DT_SIZE_K(512)>; // 512K Bytes
+        label = "SST25PF040";
+        reg = <0>;
+        spi-max-frequency = <DT_FREQ_M(8)>; // DT_FREQ_M(40)
+        status = "okay";
+        jedec-id = [62 06 13];
+    };
+
+    pinctrl-names = "default";
 };
 
 // &shd_cs0_n_gpio055 {
 // 	drive-open-drain;
 // 	output-high;
 // };
+
+&pinctrl{
+    /* Internal flash */
+    /omit-if-no-ref/ int_spi_cs_n_gpio256: int_spi_cs_n_gpio256 {
+        pinmux = < MCHP_XEC_PINMUX(0256, MCHP_AF1) >;
+    };
+
+    /omit-if-no-ref/ int_spi_clk_gpio257: int_spi_clk_gpio257 {
+        pinmux = < MCHP_XEC_PINMUX(0257, MCHP_AF1) >;
+    };
+
+    /omit-if-no-ref/ int_spi_io0_gpio251: int_spi_io0_gpio251 {
+        pinmux = < MCHP_XEC_PINMUX(0251, MCHP_AF1) >;
+    };
+
+    /omit-if-no-ref/ int_spi_io1_gpio252: int_spi_io1_gpio252 {
+        pinmux = < MCHP_XEC_PINMUX(0252, MCHP_AF1) >;
+    };
+
+    /omit-if-no-ref/ int_spi_wp_gpio260: int_spi_wp_gpio260 {
+        pinmux = < MCHP_XEC_PINMUX(0260, MCHP_AF0) >;
+    };
+};
