@@ -1,0 +1,18 @@
+menuconfig POWER_SERVICE
+	bool "Power Service"
+	default y
+	help
+	  Enable the Power service for system power state management.
+
+if POWER_SERVICE
+module = POWER
+module-str = power
+source "subsys/logging/Kconfig.template.log_config"
+
+config POWER_SHELL
+	bool "Power Shell commands"
+	depends on SHELL
+	default y
+	help
+	  Enable shell commands for the Power service.
+endif

@@ -1,8 +1,8 @@
 /*
  * @Author: andy.chang 
  * @Date: 2026-04-18 11:29:06 
- * @Last Modified by:   andy.chang 
- * @Last Modified time: 2026-04-18 11:29:06 
+ * @Last Modified by: andy.chang
+ * @Last Modified time: 2026-04-23 00:36:37
  */
 
 #include <errno.h>
@@ -21,21 +21,13 @@ static const struct fan_dev_t {
 } dev_list[] = {
     [FAN_ID_1] =
         {
-#if DT_NODE_HAS_STATUS(DT_ALIAS(cpu_fan), okay)
             .fan = PWM_DT_SPEC_GET(DT_ALIAS(cpu_fan)),
-#endif
-#if DT_NODE_HAS_STATUS(DT_ALIAS(cpu_tach), okay)
             .tach = DEVICE_DT_GET(DT_ALIAS(cpu_tach)),
-#endif
         },
     [FAN_ID_2] =
         {
-#if DT_NODE_HAS_STATUS(DT_ALIAS(base_fan), okay)
             .fan = PWM_DT_SPEC_GET(DT_ALIAS(base_fan)),
-#endif
-#if DT_NODE_HAS_STATUS(DT_ALIAS(base_tach), okay)
             .tach = DEVICE_DT_GET(DT_ALIAS(base_tach)),
-#endif
         },
 };
 

@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-21 16:26:29
+ * @Last Modified time: 2026-04-23 00:11:26
  */
 
 #include <stdlib.h>
@@ -14,7 +14,7 @@
 #include <interface/power.h>
 #include <interface/fan.h>
 
-LOG_MODULE_REGISTER(fan, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(fan, CONFIG_FAN_LOG_LEVEL);
 
 enum {
     FAN_EVT_TEMP_CHG = LOCAL_EVT_START,
@@ -221,7 +221,7 @@ static void service(void) {
 K_THREAD_DEFINE(fan_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M, 0,
                 0);
 
-#ifdef CONFIG_SHELL
+#ifdef CONFIG_FAN_SHELL
 #include <zephyr/shell/shell.h>
 
 static void dump_fan_info(const struct shell *sh, fan_ctrl_t *fan_blk) {

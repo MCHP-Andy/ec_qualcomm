@@ -1,8 +1,8 @@
 /*
  * @Author: andy.chang 
  * @Date: 2026-04-21 22:35:31 
- * @Last Modified by:   andy.chang 
- * @Last Modified time: 2026-04-21 22:35:31 
+ * @Last Modified by: andy.chang
+ * @Last Modified time: 2026-04-23 00:11:53
  */
 
 #include <stdlib.h>
@@ -12,7 +12,7 @@
 #include "soccp_handler.h"
 #include <interface/soccp.h>
 
-LOG_MODULE_REGISTER(soccp, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(soccp, CONFIG_SOCCP_LOG_LEVEL);
 
 typedef struct {
     uint8_t cmd;
@@ -120,7 +120,7 @@ static void service(void *p1, void *p2, void *p3) {
 K_THREAD_DEFINE(soccp_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M,
                 0, 0);
 
-#ifdef CONFIG_SHELL
+#ifdef CONFIG_SOCCP_SHELL
 #include <zephyr/shell/shell.h>
 
 static int cmd_soccp_write(const struct shell *sh, size_t argc, char **argv) {

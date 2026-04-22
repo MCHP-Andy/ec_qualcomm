@@ -1,0 +1,18 @@
+menuconfig THERMAL_SERVICE
+	bool "Thermal Service"
+	default y
+	help
+	  Enable the Thermal service for sensor monitoring and threshold management.
+
+if THERMAL_SERVICE
+module = THERMAL
+module-str = thermal
+source "subsys/logging/Kconfig.template.log_config"
+
+config THERMAL_SHELL
+	bool "Thermal Shell commands"
+	depends on SHELL
+	default y
+	help
+	  Enable shell commands for the Thermal service.
+endif

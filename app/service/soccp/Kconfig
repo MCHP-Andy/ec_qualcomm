@@ -1,0 +1,18 @@
+menuconfig SOCCP_SERVICE
+	bool "SoCCP Service"
+	default y
+	help
+	  Enable the SoCCP (System on Chip Control Protocol) service.
+
+if SOCCP_SERVICE
+module = SOCCP
+module-str = soccp
+source "subsys/logging/Kconfig.template.log_config"
+
+config SOCCP_SHELL
+	bool "SoCCP Shell commands"
+	depends on SHELL
+	default y
+	help
+	  Enable shell commands for the SoCCP service.
+endif

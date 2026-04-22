@@ -1,0 +1,6 @@
+
+orsource "acpi/Kconfig"
+orsource "fan/Kconfig"
+orsource "power/Kconfig"
+orsource "soccp/Kconfig"
+orsource "thermal/Kconfig"

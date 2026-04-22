@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-21 21:49:05
+ * @Last Modified time: 2026-04-23 00:13:50
  */
 
 #include <stdlib.h>
@@ -16,7 +16,7 @@
 #include "ec_act_cool.h"
 #include "ec_fw_update.h"
 
-LOG_MODULE_REGISTER(acpi, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(acpi, CONFIG_ACPI_LOG_LEVEL);
 
 enum {
     ACPI_EVT_CMD = LOCAL_EVT_START,
@@ -266,7 +266,7 @@ static void service(void) {
 K_THREAD_DEFINE(acpi_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M,
                 0, 0);
 
-#ifdef CONFIG_SHELL
+#ifdef CONFIG_ACPI_SHELL
 #include <zephyr/shell/shell.h>
 
 static int cmd_acpi_write(const struct shell *sh, size_t argc, char **argv) {

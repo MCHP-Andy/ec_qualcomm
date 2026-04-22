@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2026-04-18 11:29:06 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-21 00:36:53
+ * @Last Modified time: 2026-04-23 00:37:00
  */
 
 #include <errno.h>
@@ -16,11 +16,9 @@
 LOG_MODULE_REGISTER(therm_dev, LOG_LEVEL_INF);
 
 static const struct adc_dt_spec dev_list[THERM_DEV_MAX] = {
-#if DT_NODE_HAS_STATUS(DT_NODELABEL(adc0), okay)
     [THERM_DEV_1] = ADC_DT_SPEC_GET_BY_IDX(DT_PATH(zephyr_user), 0),
     [THERM_DEV_2] = ADC_DT_SPEC_GET_BY_IDX(DT_PATH(zephyr_user), 1),
     [THERM_DEV_3] = ADC_DT_SPEC_GET_BY_IDX(DT_PATH(zephyr_user), 2),
-#endif
 };
 
 int therm_sample_get(therm_id_t id, uint16_t *temp) {
@@ -36,7 +34,6 @@ int therm_sample_get(therm_id_t id, uint16_t *temp) {
         return -EINVAL;
     }
 
-#if DT_NODE_HAS_STATUS(DT_NODELABEL(adc0), okay)
     if (dev_list[id].dev == NULL) {
         LOG_WRN("Invalid therm device");
         return -EINVAL;
@@ -64,9 +61,6 @@ int therm_sample_get(therm_id_t id, uint16_t *temp) {
 
     // TODO: Convert to deg C
     *temp = 55;
-#else
-    *temp = 55;
-#endif
 
     LOG_DBG("Therm%d, %d C", id, *temp);
 

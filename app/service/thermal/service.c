@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-21 17:02:33
+ * @Last Modified time: 2026-04-23 00:12:52
  */
 
 #include <stdlib.h>
@@ -14,7 +14,7 @@
 #include <interface/power.h>
 #include <interface/thermal.h>
 
-LOG_MODULE_REGISTER(thermal, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(thermal, CONFIG_THERMAL_LOG_LEVEL);
 
 static K_EVENT_DEFINE(event);
 SYS_EVENT_SUBSCRIBE(thermal, event);
@@ -154,7 +154,7 @@ static void service(void) {
 K_THREAD_DEFINE(therm_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M,
                 0, 0);
 
-#ifdef CONFIG_SHELL
+#ifdef CONFIG_THERMAL_SHELL
 #include <zephyr/shell/shell.h>
 
 static void dump_therm_info(const struct shell *sh, therm_dev_t *therm_blk) {

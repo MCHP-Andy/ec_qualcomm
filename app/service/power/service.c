@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2025-07-01 02:46:45 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-21 15:54:44
+ * @Last Modified time: 2026-04-23 00:13:18
  */
 
 #include <stdlib.h>
@@ -13,7 +13,7 @@
 #include <interface/system.h>
 #include <interface/power.h>
 
-LOG_MODULE_REGISTER(power, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(power, CONFIG_POWER_LOG_LEVEL);
 
 static K_EVENT_DEFINE(event);
 SYS_EVENT_SUBSCRIBE(power, event);
@@ -88,7 +88,7 @@ static void service(void) {
 K_THREAD_DEFINE(pwr_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M, 0,
                 0);
 
-#ifdef CONFIG_SHELL
+#ifdef CONFIG_POWER_SHELL
 #include <zephyr/shell/shell.h>
 
 static int cmd_pwr_get(const struct shell *sh, size_t argc, char **argv) {

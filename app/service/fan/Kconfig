@@ -1,0 +1,18 @@
+menuconfig FAN_SERVICE
+	bool "Fan Service"
+	default y
+	help
+	  Enable the Fan service for thermal management and fan control.
+
+if FAN_SERVICE
+module = FAN
+module-str = fan
+source "subsys/logging/Kconfig.template.log_config"
+
+config FAN_SHELL
+	bool "Fan Shell commands"
+	depends on SHELL
+	default y
+	help
+	  Enable shell commands for the Fan service.
+endif

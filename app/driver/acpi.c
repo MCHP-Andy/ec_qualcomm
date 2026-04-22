@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2026-04-16 15:22:05 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-17 15:23:40
+ * @Last Modified time: 2026-04-23 00:36:18
  */
 
 #include <zephyr/drivers/i2c.h>
@@ -127,12 +127,10 @@ static struct i2c_target_config target_cfg = {
 
 static int init_config(void) {
 
-#if DT_NODE_HAS_STATUS(DT_ALIAS(acpi_i2c), okay)
     if (i2c_target_register(bus, &target_cfg) < 0) {
         printk("Failed to register target\n");
         return -1;
     }
-#endif
 
     return 0;
 }

@@ -1,0 +1,18 @@
+menuconfig ACPI_SERVICE
+	bool "ACPI Service"
+	default y
+	help
+	  Enable the ACPI service to handle Host ACPI commands and SCI events.
+
+if ACPI_SERVICE
+module = ACPI
+module-str = acpi
+source "subsys/logging/Kconfig.template.log_config"
+
+config ACPI_SHELL
+	bool "ACPI Shell commands"
+	depends on SHELL
+	default y
+	help
+	  Enable shell commands for the ACPI service.
+endif
