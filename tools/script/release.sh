@@ -1,33 +1,29 @@
 
-west build -p -b qemu_cortex_m3 --sysbuild app -- -DOVERLAY_CONFIG=release.conf
 
-${ZEPHYR_SDK_INSTALL_DIR}/arm-zephyr-eabi/bin/arm-zephyr-eabi-objcopy.exe -O ihex build/app/zephyr/zephyr.elf app.hex
-${ZEPHYR_SDK_INSTALL_DIR}/arm-zephyr-eabi/bin/arm-zephyr-eabi-objcopy.exe -O ihex build/bootloader/zephyr/zephyr.elf boot.hex
+export OBJ_COPY=${ZEPHYR_SDK_INSTALL_DIR}/arm-zephyr-eabi/bin/arm-zephyr-eabi-objcopy.exe
+export BOOT_PATH=build/bootloader/zephyr
+export APP_PATH=build/app/zephyr
+export MERGE_PATH=build/zephyr
 
-python zephyr-rtos/scripts/build/mergehex.py --output merged.hex boot.hex app.hex
+# export BOARD_NAME=qemu_cortex_m3
+export BOARD_NAME=qual_module/mec172x_nsz
 
-# qemu-system-arm -nographic -machine lm3s6965evb -device loader,file=merged.hex
+# Build project
+echo "Board: ${BOARD_NAME}"
+west build -p -b ${BOARD_NAME} --sysbuild app -- -DOVERLAY_CONFIG=release.conf
 
+# Merge hex
+${ZEPHYR_SDK_INSTALL_DIR}/arm-zephyr-eabi/bin/arm-zephyr-eabi-objcopy.exe -O ihex ${BOOT_PATH}/zephyr.elf ${MERGE_PATH}/boot.hex
+${ZEPHYR_SDK_INSTALL_DIR}/arm-zephyr-eabi/bin/arm-zephyr-eabi-objcopy.exe -O ihex ${APP_PATH}/zephyr.elf ${MERGE_PATH}/app.hex
 
+python zephyr-rtos/scripts/build/mergehex.py --output ${MERGE_PATH}/merged.hex ${MERGE_PATH}/boot.hex ${MERGE_PATH}/app.hex
 
-# For MEC175x
-
-# west build -p -b qual_module/mec172x_nsz --sysbuild app -- -DOVERLAY_CONFIG=release.conf
-
-# export OBJ_COPY=${ZEPHYR_SDK_INSTALL_DIR}/arm-zephyr-eabi/bin/arm-zephyr-eabi-objcopy.exe
-
-# # 處理 a.elf：從 0xb0000 變成 0x00000
-# ${OBJ_COPY} -O binary --change-addresses -0xb0000 build/bootloader/zephyr/zephyr.elf a_zero.bin
-
-# # 處理 b.elf：從 0xc0000 變成 0x00000
-# ${OBJ_COPY} -O binary --change-addresses -0xc0000 build/app/zephyr/zephyr.elf b_zero.bin
-
-# # 1. 先將 a_zero.bin 墊到 0x10000 長度 (不足處補 0xff)
-# ${OBJ_COPY} -I binary -O binary --pad-to 0x10000 --gap-fill 0xff a_zero.bin a_padded.bin
-
-# # 2. 合併檔案 (Windows 指令)
-# # copy /b a_padded.bin + b_zero.bin c.bin
-# cat a_padded.bin b_zero.bin > zephyr.bin
-
-# # SPI gen
-# ${MEC5_SPI_GEN} -i ${MEC5_SPI_CFG} -o merge.bin
+if [ "$BOARD_NAME" = "qemu_cortex_m3" ]; then
+    echo "qemu-system-arm -nographic -machine lm3s6965evb -device loader,file=${MERGE_PATH}/merged.hex"
+else
+    echo "Board: ${BOARD_NAME}"
+    # Gen zephyr.bin and spi_image.bin
+    ${OBJ_COPY} -I ihex -O binary --gap-fill 0xff ${MERGE_PATH}/merged.hex ${MERGE_PATH}/zephyr.bin
+    ${OBJ_COPY} -I ihex -O binary --gap-fill 0xff ${MERGE_PATH}/merged.hex zephyr.bin
+    ${MEC5_SPI_GEN} -i ${MEC5_SPI_CFG} -o ${MERGE_PATH}/spi_image.bin
+fi

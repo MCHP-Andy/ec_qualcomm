@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "MEC1757 RAM Debug",
+            "name": "MEC1757 APP Debug",
             "type": "cortex-debug",
             "request": "launch",
             "servertype": "openocd",
@@ -12,7 +12,9 @@
             // GDB path
             "gdbPath": "${workspaceFolder}/../zephyr_main/zephyr-sdk-0.16.8/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb.exe",
 
+            // For single debug
             "executable": "${workspaceFolder}/build/zephyr/zephyr.elf",
+
             "configFiles": [
                 "interface/jlink.cfg",
                 // "interface/cmsis-dap.cfg",
@@ -22,8 +24,45 @@
             "overrideLaunchCommands": [
                 "monitor reset halt",
 
-                // "monitor load_image \"${workspaceFolder}\"/build/zephyr/zephyr.elf",
+                // For single debug
                 "load",
+
+                "monitor mem2array vtable 32 0x000B0000 2",
+                "monitor reg msp $vtable(0)",
+                "monitor reg pc $vtable(1)",
+                "monitor echo \"Ready to debug from RAM\""
+            ],
+            "postStartSessionCommands": [
+                "monitor resume"
+            ],
+            // "showDevDebugOutput": "raw"
+        },
+        {
+            "name": "MEC1757 SYS Debug",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "openocd",
+
+            // Openocd path
+            "serverpath": "${workspaceFolder}/tools/openocd-v0.12.0-i686-w64-mingw32/bin/openocd.exe",
+            // GDB path
+            "gdbPath": "${workspaceFolder}/../zephyr_main/zephyr-sdk-0.16.8/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb.exe",
+
+            // For whole system(bootloader+app)
+            "executable": "${workspaceFolder}/build/app/zephyr/zephyr.elf",
+
+            "configFiles": [
+                "interface/jlink.cfg",
+                // "interface/cmsis-dap.cfg",
+
+                "${workspaceFolder}/tools/mec1753_ram.cfg"
+            ],
+            "overrideLaunchCommands": [
+                "monitor reset halt",
+
+                // For whole system(bootloader+app)
+                "monitor load_image build/bootloader/zephyr/zephyr.elf",
+                "monitor load_image build/app/zephyr/zephyr.elf",
 
                 "monitor mem2array vtable 32 0x000B0000 2",
                 "monitor reg msp $vtable(0)",
