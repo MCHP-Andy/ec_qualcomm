@@ -21,7 +21,7 @@ static const struct adc_dt_spec dev_list[THERM_DEV_MAX] = {
     [THERM_DEV_3] = ADC_DT_SPEC_GET_BY_IDX(DT_PATH(zephyr_user), 2),
 };
 
-int therm_sample_get(therm_id_t id, uint16_t *temp) {
+int therm_sample_get(therm_id_t id, int16_t *temp) {
     int ret;
 
     if (id >= ARRAY_SIZE(dev_list)) {
@@ -59,10 +59,10 @@ int therm_sample_get(therm_id_t id, uint16_t *temp) {
 	}
     LOG_DBG(" = %"PRId32" mV", val_mv);
 
-    // TODO: Convert to deg C
-    *temp = 55;
+    // TODO: Convert to 0.1 deg C
+    *temp = 550;
 
-    LOG_DBG("Therm%d, %d C", id, *temp);
+    LOG_DBG("Therm%d, %d.%d C", id, *temp / 10, abs(*temp % 10));
 
     return 0;
 }
@@ -96,7 +96,7 @@ SYS_INIT(init_config, APPLICATION, 0);
 
 static int cmd_therm_get(const struct shell *sh, size_t argc, char **argv) {
     therm_id_t id = 0;
-    uint16_t temp = 0;
+    int16_t temp = 0;
 
     id = (therm_id_t)strtoul(argv[1], NULL, 0);
 
@@ -104,7 +104,7 @@ static int cmd_therm_get(const struct shell *sh, size_t argc, char **argv) {
     if (ret < 0) {
         shell_error(sh, "Failed to get therm%d : %d", id, ret);
     } else {
-        shell_info(sh, "Therm%d temp is %d C", id, temp);
+        shell_info(sh, "Therm%d temp is %d.%d C", id, temp / 10, abs(temp % 10));
     }
 
     return ret;

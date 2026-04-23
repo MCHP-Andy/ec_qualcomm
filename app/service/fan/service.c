@@ -140,7 +140,8 @@ static inline int check_fan_rpm(fan_ctrl_t *fan_blk, uint16_t *rpm) {
     for (fan_id_t src = THERM_SRC_CPU; src < THERM_SRC_MAX; src++) {
         fan_tbl_t *tbl = fan_blk->fan_tbl[src];
         int8_t size = fan_blk->tbl_size[src] - 1;
-        uint8_t temp = temps[src];
+        /* temps stores in 0.1C, LUT uses 1C. Convert to 1C for comparison */
+        uint8_t temp = (uint8_t)(temps[src] / 10);
 
         for (; size >= 0; size--) {
             if (temp > tbl[size].temp_low && temp <= tbl[size].temp_high) {
@@ -148,6 +149,8 @@ static inline int check_fan_rpm(fan_ctrl_t *fan_blk, uint16_t *rpm) {
             }
         }
     }
+
+    *rpm *= 100; // Convert to actual RPM
 
     return 0;
 }
@@ -214,6 +217,8 @@ static void service(void) {
             }
 
             // TODO: RPM control for Fan
+
+            // TODO: check RPM with trip point
         }
     }
 }
@@ -228,8 +233,8 @@ static void dump_fan_info(const struct shell *sh, fan_ctrl_t *fan_blk) {
     shell_info(sh, "Fan ID: %d", fan_blk->id);
     shell_info(sh, "Fan state: %d", fan_blk->state);
     shell_info(sh, "Fan rpm: %d", fan_blk->rpm);
-    shell_info(sh, "Fan trip_low: %d", fan_blk->trip_low);
-    shell_info(sh, "Fan trip_high: %d", fan_blk->trip_high);
+    shell_info(sh, "Fan trip_low: %d rpm", fan_blk->trip_low);
+    shell_info(sh, "Fan trip_high: %d rpm", fan_blk->trip_high);
     shell_info(sh, "Fan profile: %d", fan_blk->profile);
 
     for (size_t i = THERM_SRC_CPU; i < THERM_SRC_MAX; i++) {
@@ -238,7 +243,7 @@ static void dump_fan_info(const struct shell *sh, fan_ctrl_t *fan_blk) {
         shell_info(sh, "Fan tbl_size[%d]: %d", (int)i, size);
         for (size_t j = 0; j < size; j++) {
             shell_info(sh, "\ttbl[%d]: rpm: %d, high: %d, low: %d", (int)j,
-                       tbl[j].rpm, tbl[j].temp_high, tbl[j].temp_low);
+                       tbl[j].rpm * 100, tbl[j].temp_high, tbl[j].temp_low);
         }
     }
 
@@ -329,9 +334,10 @@ static int cmd_temp_set(const struct shell *sh, size_t argc, char **argv) {
     int ret = 0;
 
     fan_id_t id = strtoul(argv[1], NULL, 0);
-    uint8_t tmp = strtoul(argv[2], NULL, 0);
+    uint16_t tmp = strtoul(argv[2], NULL, 0);
 
-    shell_info(sh, "Fan ID: %d, tmp: %d", id, tmp);
+    /* Shell input is in 0.1C (e.g. 350 = 35.0C) */
+    shell_info(sh, "Fan ID: %d, tmp set to: %d.%d C", id, tmp / 10, abs(tmp % 10));
     fan_tmp_set(id, tmp);
 
     return ret;

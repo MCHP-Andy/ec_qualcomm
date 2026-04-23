@@ -20,7 +20,7 @@ typedef enum {
 
 typedef struct therm_dev_t {
     therm_id_t id; // ID for interface
-    uint16_t temp; // Temperature value in the unit of 0.1 deg C.(Eg:251 => 25.1 deg C)
+    int16_t temp;  // Temperature value in the unit of 0.1 deg C.(Eg:251 => 25.1 deg C)
                    // Range : -40 to +125 deg C
                    // Note : If the MSB bit is set, then the temperature value is negative.
     
@@ -44,4 +44,4 @@ int therm_sensor_blk_set(therm_id_t dev_id, const therm_dev_t *blk);
 int therm_adc_sample_rate_get(uint16_t *ms);
 int therm_adc_sample_rate_set(uint16_t ms);
 
-int therm_sample_get(therm_id_t id, uint16_t *temp);
+int therm_sample_get(therm_id_t id, int16_t *temp);

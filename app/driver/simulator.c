@@ -53,7 +53,7 @@ int fan_rpm_get(fan_id_t id, uint16_t *prpm) {
 
 /* --- Thermal Simulator APIs --- */
 
-int therm_sample_get(therm_id_t id, uint16_t *temp) {
+int therm_sample_get(therm_id_t id, int16_t *temp) {
     if (id >= THERM_DEV_MAX || temp == NULL) return -EINVAL;
     *temp = sim_therm_temp[id];
     return 0;
@@ -77,7 +77,7 @@ static int cmd_sim_fan_set(const struct shell *sh, size_t argc, char **argv) {
 
 static int cmd_sim_temp_set(const struct shell *sh, size_t argc, char **argv) {
     therm_id_t id = (therm_id_t)strtoul(argv[1], NULL, 0);
-    uint16_t temp = (uint16_t)strtoul(argv[2], NULL, 0);
+    int16_t temp = (int16_t)strtoul(argv[2], NULL, 0);
 
     if (id >= THERM_DEV_MAX) {
         shell_error(sh, "Invalid Thermistor ID (0-%d)", THERM_DEV_MAX - 1);
@@ -85,7 +85,7 @@ static int cmd_sim_temp_set(const struct shell *sh, size_t argc, char **argv) {
     }
 
     sim_therm_temp[id] = temp;
-    shell_info(sh, "Simulator: Thermistor %d Temp fixed to %d", id, temp);
+    shell_info(sh, "Simulator: Thermistor %d Temp fixed to %d.%d", id, temp / 10, abs(temp % 10));
     return 0;
 }
 

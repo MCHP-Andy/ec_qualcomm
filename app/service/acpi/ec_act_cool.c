@@ -311,12 +311,23 @@ static int acpi_ec_thermistors(therm_id_t idx, uint8_t *resp, uint16_t resp_len,
         return ret;
     }
 
-    resp[0] = 2; // Byte count
-    resp[1] = therm_dev.temp & 0xFF;
-    resp[2] = (therm_dev.temp >> 8) & 0xFF;
+    uint16_t report_val;
 
-    LOG_DBG("Thermistor %d temp: %d.%d deg C", idx, therm_dev.temp / 10,
-            therm_dev.temp % 10);
+    /* Format: Bit 15 is sign bit, Bits 0-14 is magnitude in 0.1C */
+    if (therm_dev.temp < 0) {
+        /* Negative: Set MSB (Bit 15) and store absolute value */
+        report_val = (uint16_t)((-therm_dev.temp) & 0x7FFF) | 0x8000;
+    } else {
+        /* Positive: Clear MSB and store value */
+        report_val = (uint16_t)(therm_dev.temp & 0x7FFF);
+    }
+
+    resp[0] = 2; // Byte count
+    resp[1] = report_val & 0xFF;        // Little Endian Low Byte
+    resp[2] = (report_val >> 8) & 0xFF; // Little Endian High Byte
+
+    LOG_DBG("Thermistor %d temp: %d.%d deg C (Report: 0x%04x)", idx, 
+            therm_dev.temp / 10, abs(therm_dev.temp % 10), report_val);
     return 0;
 }
 

@@ -114,7 +114,7 @@ static void service(void) {
 
         // Check thermal cross
         for (therm_id_t i = THERM_DEV_1; i < therm_ctrl.therm_num; i++) {
-            uint16_t temp = 0;
+            int16_t temp = 0;
             therm_dev_t *therm_dev = &therm_ctrl.therm_blk[i];
 
             // Get temp from sensor
@@ -126,22 +126,23 @@ static void service(void) {
 
             // Update temp
             therm_dev->temp = temp;
-            LOG_DBG("Thermal %d: temp: %d C", i, temp);
+            LOG_DBG("Thermal %d: temp: %d.%d C", i, temp / 10, abs(temp % 10));
 
-            // Check 
-            if (temp > therm_dev->psv) {
+            /* temp is in 0.1C, thresholds (psv, cr3, hot, crt) are in 1C. 
+             * Convert thresholds to 0.1C for correct comparison. */
+            if (temp > (uint16_t)therm_dev->psv * 10) {
                 LOG_WRN("Thermal %d: PSV", i);
             }
 
-            if (temp > therm_dev->cr3) {
+            if (temp > (uint16_t)therm_dev->cr3 * 10) {
                 LOG_WRN("Thermal %d: CR3", i);
             }
 
-            if (temp > therm_dev->hot) {
+            if (temp > (uint16_t)therm_dev->hot * 10) {
                 LOG_WRN("Thermal %d: HOT", i);
             }
 
-            if (temp > therm_dev->crt) {
+            if (temp > (uint16_t)therm_dev->crt * 10) {
                 LOG_WRN("Thermal %d: CRT", i);
             }
             
@@ -160,7 +161,7 @@ K_THREAD_DEFINE(therm_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M,
 static void dump_therm_info(const struct shell *sh, therm_dev_t *therm_blk) {
     shell_info(sh, "Therm ID: %d", therm_blk->id);
     shell_info(sh, "  Temp: %d.%d deg C", therm_blk->temp / 10,
-               therm_blk->temp % 10);
+               abs(therm_blk->temp % 10));
     shell_info(sh, "  PSV : %d deg C", therm_blk->psv);
     shell_info(sh, "  CR3 : %d deg C", therm_blk->cr3);
     shell_info(sh, "  HOT : %d deg C", therm_blk->hot);
