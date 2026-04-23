@@ -7,6 +7,33 @@
 #include <stdio.h>
 #include <stdint.h>
 
+// ACPI command
+
+struct acpi_cmd_t; 
+typedef struct acpi_cmd_t acpi_cmd_t;
+
+typedef int (*acpi_cmd_hdl_t)(const acpi_cmd_t *cmd_info, uint8_t *cmd,
+                              uint16_t cmd_len, uint8_t *resp,
+                              uint16_t resp_len); // cmd now includes opcode
+
+typedef struct acpi_cmd_t {
+    uint8_t cmd;
+    acpi_cmd_hdl_t cmd_hdl;
+    uint16_t mand; // Number of mandatory arguments including the command opcode.
+    uint16_t opt;  // Number of optional arguments *after* the command opcode.
+    uint16_t
+        resp_len; // Expected response length (including byte count if present).
+} acpi_cmd_t;
+
+int acpi_cmd_info_get(uint8_t cmd, const acpi_cmd_t *cmd_info);
+
+int acpi_write(uint8_t *data, uint16_t len);
+
+int acpi_read(uint8_t *data, uint16_t len);
+
+
+// SCI event
+
 typedef enum {
     SCI_NONE = 0x00,
 
@@ -26,15 +53,10 @@ typedef enum {
     SCI_EC_RST = 0x3D,
 } sci_t;
 
-int acpi_write(uint8_t *data, uint16_t len);
-
-int acpi_read(uint8_t *data, uint16_t len);
-
 int acpi_sci_enable_set(bool en);
 int acpi_sci_enable_get(bool *en);
 
 int acpi_sci_put(sci_t sci);
 int acpi_sci_get(sci_t * psci);
 
-// TODO: Enqueue SCI event
 

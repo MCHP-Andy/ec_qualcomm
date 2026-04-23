@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2026-04-16 15:22:05 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-23 00:36:18
+ * @Last Modified time: 2026-04-23 23:44:13
  */
 
 #include <zephyr/drivers/i2c.h>
@@ -22,9 +22,11 @@ static const struct device *bus = DEVICE_DT_GET_OR_NULL(DT_ALIAS(acpi_i2c));
 
 static uint8_t i2c_state = I2C_STATE_IDLE;
 
-static uint8_t idx = 0;
 static uint8_t rece_cmd[ACPI_RECE_LEN] = {0};
 static uint8_t resp_buf[ACPI_RESP_LEN] = {0};
+
+static uint16_t idx = 0;
+static acpi_cmd_t cmd_info;
 
 /*
  * @brief Callback which is called when a write request is received from the
@@ -35,7 +37,9 @@ static int acpi_target_write_requested_cb(struct i2c_target_config *config) {
     printk("acpi target write requested\n");
 
     i2c_state = I2C_STATE_START_WRITE;
+
     memset(rece_cmd, 0, sizeof(rece_cmd));
+    memset(&cmd_info, 0, sizeof(cmd_info));
     idx = 0;
 
     return 0;
@@ -47,12 +51,43 @@ static int acpi_target_write_requested_cb(struct i2c_target_config *config) {
  * @param val The byte received from the master.
  */
 static int acpi_target_write_received_cb(struct i2c_target_config *config,
-                                        uint8_t val) {
+                                         uint8_t val) {
     printk("acpi target write received: 0x%02x\n", val);
 
-    rece_cmd[idx++] = val;
+    switch (i2c_state) {
+    case I2C_STATE_START_WRITE: {
+        // Get acpi_cmd info
+        int ret = acpi_cmd_info_get(val, &cmd_info);
+        if (ret < 0) {
+            printk("Invalid ACPI CMD received: 0x%02x\n", val);
+        } else {
+            printk("ACPI CMD 0x%02x expected write length: mand=%d, opt=%d\n",
+                   val, cmd_info.mand, cmd_info.opt);
+        }
+        i2c_state = I2C_STATE_WRITE;
+    }
 
-    i2c_state = I2C_STATE_WRITE;
+    case I2C_STATE_WRITE:
+        rece_cmd[idx++] = val;
+
+        if (idx == cmd_info.mand) {
+            printk("Received mandatory part of ACPI CMD: 0x%02x, length: %d\n",
+                   rece_cmd[0], idx);
+            // Send i2c data to ACPI if needed
+            acpi_write(rece_cmd, idx);
+        } else if (idx >= cmd_info.mand + cmd_info.opt) {
+            printk("Received complete ACPI CMD: 0x%02x, length: %d\n",
+                   rece_cmd[0], idx);
+            // Send i2c data to ACPI if needed
+            acpi_write(rece_cmd, idx);
+        }
+        break;
+
+    default:
+        printk("Unexpected I2C state: %d\n", i2c_state);
+        break;
+    }
+
     return 0;
 }
 
@@ -64,12 +99,15 @@ static int acpi_target_write_received_cb(struct i2c_target_config *config,
  */
 static int acpi_target_read_cb(struct i2c_target_config *config, uint8_t *val) {
     switch (i2c_state) {
+    
+    // prevent from restart
+    case I2C_STATE_WRITE:
     case I2C_STATE_IDLE:
         printk("acpi target read request: 0x%02x\n", *val);
 
         // Copy/Read data to resp_buf
         memset(resp_buf, 0, sizeof(resp_buf));
-        acpi_read(resp_buf, sizeof(resp_buf));
+        acpi_read(resp_buf, cmd_info.resp_len);
 
         idx = 0;
         *val = resp_buf[idx++];
@@ -82,6 +120,7 @@ static int acpi_target_read_cb(struct i2c_target_config *config, uint8_t *val) {
         break;
 
     default:
+        printk("Unexpected I2C state: %d\n", i2c_state);
         break;
     }
 
@@ -94,11 +133,6 @@ static int acpi_target_read_cb(struct i2c_target_config *config, uint8_t *val) {
  */
 static int acpi_target_stop_cb(struct i2c_target_config *config) {
     printk("acpi target stop callback\n");
-
-    if (i2c_state == I2C_STATE_WRITE) {
-        // Send i2c data to ACPI if needed
-        acpi_write(rece_cmd, idx);
-    }
 
     idx = 0;
     i2c_state = I2C_STATE_IDLE;
