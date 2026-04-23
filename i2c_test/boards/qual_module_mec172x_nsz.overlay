@@ -1,0 +1,128 @@
+/*
+ * Copyright (c) 2023 Microchip Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+    chosen {
+        zephyr,shell-uart = &uart1;
+    };
+
+    aliases {
+        led0 = &led2;
+
+        tgt-i2c = &i2c_smb_1;
+        master-i2c = &i2c_smb_2;
+    };
+
+    tst_clk_out: tst_clk_out {
+        compatible = "vnd,pinctrl-device";
+        pinctrl-0 = <&tst_clk_out_gpio060>;
+        pinctrl-names = "default";
+        status = "okay";
+    };
+
+};
+
+&uart1 {
+    status = "okay";
+	pinctrl-0 = < &uart1_tx_gpio170 &uart1_rx_gpio171 >;
+	pinctrl-names = "default";
+};
+
+// Target
+&i2c_smb_1 {
+    status = "okay";
+    port_sel = <7>;
+    pinctrl-0 = < &i2c07_sda_gpio012 &i2c07_scl_gpio013 >;  // TP257
+	pinctrl-names = "default";
+
+    label = "target";
+};
+
+// Master
+&i2c_smb_2 {
+    status = "okay";
+    // port_sel = <1>;
+    // pinctrl-0 = < &i2c01_sda_gpio130 &i2c01_scl_gpio131 >;
+
+    port_sel = <6>;
+    pinctrl-0 = < &i2c06_sda_gpio132 &i2c06_scl_gpio140 >; // TP252
+
+    label = "master";
+
+	pinctrl-names = "default";
+};
+
+&i2c06_sda_gpio132 {
+	drive-open-drain;
+	// output-high;
+    bias-pull-up;
+};
+
+&i2c06_scl_gpio140 {
+	drive-open-drain;
+	// output-high;
+    bias-pull-up;
+};
+
+&i2c07_sda_gpio012 {
+	drive-open-drain;
+	// output-high;
+    bias-pull-up;
+};
+
+&i2c07_scl_gpio013 {
+	drive-open-drain;
+	// output-high;
+    bias-pull-up;
+};
+
+// &i2c_smb_0 {
+//     status = "okay";
+//     // port_sel = <0>;
+//     // pinctrl-0 = < &i2c00_tgt_sda_gpio132 &i2c00_tgt_scl_gpio140 >; // TP252
+
+//     port_sel = <2>;
+//     pinctrl-0 = < &i2c02_sda_gpio154 &i2c02_scl_gpio155 >;
+// 	pinctrl-names = "default";
+// };
+
+// &i2c_smb_1 {
+//     status = "okay";
+//     port_sel = <7>;
+//     pinctrl-0 = < &i2c07_sda_gpio012 &i2c07_scl_gpio013 >;  // TP257
+// 	pinctrl-names = "default";
+// };
+
+// &pinctrl {
+// 	/omit-if-no-ref/ i2c00_tgt_scl_gpio140: i2c00_tgt_scl_gpio140 {
+// 		pinmux = < MCHP_XEC_PINMUX(0140, MCHP_AF3) >;
+// 	};
+
+// 	/omit-if-no-ref/ i2c00_tgt_sda_gpio132: i2c00_tgt_sda_gpio132 {
+// 		pinmux = < MCHP_XEC_PINMUX(0132, MCHP_AF3) >;
+// 	};
+// };
+
+
+// &i2c00_tgt_sda_gpio132 {
+// 	drive-open-drain;
+// 	output-high;
+// };
+
+// &i2c00_tgt_scl_gpio140 {
+// 	drive-open-drain;
+// 	output-high;
+// };
+
+// &i2c07_sda_gpio012 {
+// 	drive-open-drain;
+// 	output-high;
+// };
+
+// &i2c07_scl_gpio013 {
+// 	drive-open-drain;
+// 	output-high;
+// };
