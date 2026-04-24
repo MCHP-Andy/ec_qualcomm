@@ -21,6 +21,7 @@ manifest:
         name-allowlist:
           - cmsis
           - hal_microchip
+          - zcbor
 
     - name: app
       path: modules/app
