@@ -27,14 +27,33 @@
                 // For single debug
                 "load",
 
-                "monitor mem2array vtable 32 0x000B0000 2",
-                "monitor reg msp $vtable(0)",
-                "monitor reg pc $vtable(1)",
-                "monitor echo \"Ready to debug from RAM\""
+                // 1. Parse the vector table in GDB
+                "set $v_addr = &_vector_table",
+                "set $v_msp = *(unsigned int*)$v_addr",
+                "set $v_pc = *(unsigned int*)($v_addr + 4)",
+
+                // 2. Sync REGs
+                "set $sp = $v_msp",
+                "set $pc = $v_pc",
+
+                // 3. Print the value
+                "monitor echo --------------------------------------",
+                "eval \"monitor echo Vector_Table:_0x%08X\", $v_addr",
+                "eval \"monitor echo MSP_Value:____0x%08X\", $v_msp",
+                "eval \"monitor echo PC_Value:_____0x%08X\", $v_pc",
+                "monitor echo --------------------------------------",
+
+                "monitor echo \"Ready to debug from RAM\"",
+
+                // 4. Break point in main
+                "thbreak main"
             ],
-            "postStartSessionCommands": [
-                "monitor resume"
-            ],
+
+            // "postStartSessionCommands": [
+            //     "monitor resume"
+            // ],
+            // "runToEntryPoint": "main",
+
             // "showDevDebugOutput": "raw"
         },
         {
@@ -67,11 +86,15 @@
                 "monitor mem2array vtable 32 0x000B0000 2",
                 "monitor reg msp $vtable(0)",
                 "monitor reg pc $vtable(1)",
-                "monitor echo \"Ready to debug from RAM\""
+                "monitor echo \"Ready to debug from RAM\"",
+                "thbreak main"
             ],
-            "postStartSessionCommands": [
-                "monitor resume"
-            ],
+
+            // "postStartSessionCommands": [
+            //     "monitor resume"
+            // ],
+            // "runToEntryPoint": "main",
+
             // "showDevDebugOutput": "raw"
         }
     ]
