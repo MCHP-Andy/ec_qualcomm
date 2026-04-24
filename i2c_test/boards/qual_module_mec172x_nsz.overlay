@@ -6,7 +6,7 @@
 
 / {
     chosen {
-        zephyr,shell-uart = &uart1;
+        zephyr,shell-uart = &uart0;
     };
 
     aliases {
@@ -79,50 +79,9 @@
     bias-pull-up;
 };
 
-// &i2c_smb_0 {
-//     status = "okay";
-//     // port_sel = <0>;
-//     // pinctrl-0 = < &i2c00_tgt_sda_gpio132 &i2c00_tgt_scl_gpio140 >; // TP252
-
-//     port_sel = <2>;
-//     pinctrl-0 = < &i2c02_sda_gpio154 &i2c02_scl_gpio155 >;
-// 	pinctrl-names = "default";
-// };
-
-// &i2c_smb_1 {
-//     status = "okay";
-//     port_sel = <7>;
-//     pinctrl-0 = < &i2c07_sda_gpio012 &i2c07_scl_gpio013 >;  // TP257
-// 	pinctrl-names = "default";
-// };
-
-// &pinctrl {
-// 	/omit-if-no-ref/ i2c00_tgt_scl_gpio140: i2c00_tgt_scl_gpio140 {
-// 		pinmux = < MCHP_XEC_PINMUX(0140, MCHP_AF3) >;
-// 	};
-
-// 	/omit-if-no-ref/ i2c00_tgt_sda_gpio132: i2c00_tgt_sda_gpio132 {
-// 		pinmux = < MCHP_XEC_PINMUX(0132, MCHP_AF3) >;
-// 	};
-// };
-
-
-// &i2c00_tgt_sda_gpio132 {
-// 	drive-open-drain;
-// 	output-high;
-// };
-
-// &i2c00_tgt_scl_gpio140 {
-// 	drive-open-drain;
-// 	output-high;
-// };
-
-// &i2c07_sda_gpio012 {
-// 	drive-open-drain;
-// 	output-high;
-// };
-
-// &i2c07_scl_gpio013 {
-// 	drive-open-drain;
-// 	output-high;
-// };
+&uart0 {
+    status = "okay";
+    current-speed = <115200>;
+    pinctrl-0 = < &uart0_tx_gpio104 &uart0_rx_gpio105 >;
+	pinctrl-names = "default";
+};
