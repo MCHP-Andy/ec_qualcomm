@@ -33,50 +33,65 @@ LOG_MODULE_REGISTER(app_pm, LOG_LEVEL_INF);
 #define CLK_RQST 					0x50
 #define CLK_RQST_LEN				(5)
 
-#ifdef CONFIG_ADC
-#define ADC_0_XEC_REG_BASE                                                     \
-    ((struct adc_regs *)(DT_REG_ADDR(DT_NODELABEL(adc0))))
-#endif
-
 static void periph_sleep(void) {
-    volatile uint32_t *slp_en = NULL;
+    volatile uint32_t *slp_en = (uint32_t *)(PCR_XEC_REG_BASE + SLP_EN);
 
-#ifdef CONFIG_ADC
+// ADC
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(adc0), okay)
     #if 0 // Disable via periph
-          // struct adc_regs *adc0 = ADC_0_XEC_REG_BASE;
-          // /* ADC deactivate  */
-          // adc0->CONTROL &= ~(MCHP_ADC_CTRL_ACTV);
+
     #else // Disable via PCR
         slp_en = (uint32_t *)(PCR_XEC_REG_BASE + SLP_EN);
         slp_en[3] |= BIT(3); // Assert SLP_EN for ADC
     #endif
 #endif
+// ADC end
 
-#ifdef CONFIG_TACH_XEC
+// TACH 
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(tach0), okay)
     #if 0 // Disable via periph
 
     #else // Disable via PCR
-        slp_en = (uint32_t *)(PCR_XEC_REG_BASE + SLP_EN);
         slp_en[1] |= BIT(2);  // Assert SLP_EN for TACH0
+    #endif
+#endif
+
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(tach1), okay)
+    #if 0 // Disable via periph
+
+    #else // Disable via PCR
         slp_en[1] |= BIT(11); // Assert SLP_EN for TACH1
     #endif
 #endif
+// TACH end
 
-#ifdef CONFIG_I2C
+// I2C 
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(i2c_smb_0), okay)
+    #if 1 // Disable via periph
+	    // Force disable SMB 0 Configuration Register Enable bit (Bit 10)
+        volatile uint32_t *smb0_config = (uint32_t *)0x40004028;
+        *smb0_config &= ~BIT(10);
+    #else // Disable via PCR
+        slp_en[1] |= BIT(10); // Assert SLP_EN for SMB0
+    #endif
+#endif
 
-    // Force disable SMB 0 Configuration Register Enable bit (Bit 10)
-    volatile uint32_t *smb0_config = (uint32_t *)0x40004028;
-    *smb0_config &= ~BIT(10);
-
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(i2c_smb_1), okay)
     #if 0 // Disable via periph
 
     #else // Disable via PCR
-        slp_en = (uint32_t *)(PCR_XEC_REG_BASE + SLP_EN);
-        slp_en[1] |= BIT(10); // Assert SLP_EN for SMB0
         slp_en[3] |= BIT(13); // Assert SLP_EN for SMB1
+    #endif
+#endif
+
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(i2c_smb_2), okay)
+    #if 0 // Disable via periph
+
+    #else // Disable via PCR
         slp_en[3] |= BIT(14); // Assert SLP_EN for SMB2
     #endif
 #endif
+// I2C end
 
 // Timer
     #if 1 // Disable via periph
@@ -92,38 +107,64 @@ static void periph_sleep(void) {
 }
 
 static void periph_wake(void) {
-    volatile uint32_t *slp_en = NULL;
+    volatile uint32_t *slp_en = (uint32_t *)(PCR_XEC_REG_BASE + SLP_EN);
 
-#ifdef CONFIG_ADC
+// ADC
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(adc0), okay)
     #if 0 // Disable via periph
-          // struct adc_regs *adc0 = ADC_0_XEC_REG_BASE;
-          // adc0->CONTROL |= MCHP_ADC_CTRL_ACTV;
+
     #else // Disable via PCR
         slp_en = (uint32_t *)(PCR_XEC_REG_BASE + SLP_EN);
         slp_en[3] &= ~BIT(3); // Deassert SLP_EN for ADC
     #endif
 #endif
+// ADC end
 
-#ifdef CONFIG_TACH_XEC
+// TACH 
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(tach0), okay)
     #if 0 // Disable via periph
 
     #else // Disable via PCR
-        slp_en = (uint32_t *)(PCR_XEC_REG_BASE + SLP_EN);
         slp_en[1] &= ~BIT(2);  // Deassert SLP_EN for TACH0
+    #endif
+#endif
+
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(tach1), okay)
+    #if 0 // Disable via periph
+
+    #else // Disable via PCR
         slp_en[1] &= ~BIT(11); // Deassert SLP_EN for TACH1
     #endif
 #endif
+// TACH end
 
-#ifdef CONFIG_I2C
+// I2C 
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(i2c_smb_0), okay)
+    #if 1 // Disable via periph
+	    // Force disable SMB 0 Configuration Register Enable bit (Bit 10)
+        volatile uint32_t *smb0_config = (uint32_t *)0x40004028;
+        *smb0_config |= BIT(10);
+    #else // Disable via PCR
+        slp_en[1] &= ~BIT(10); // Deassert SLP_EN for SMB0
+    #endif
+#endif
+
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(i2c_smb_1), okay)
     #if 0 // Disable via periph
 
     #else // Disable via PCR
-        slp_en = (uint32_t *)(PCR_XEC_REG_BASE + SLP_EN);
-        slp_en[1] &= ~BIT(10); // Deassert SLP_EN for SMB0
         slp_en[3] &= ~BIT(13); // Deassert SLP_EN for SMB1
+    #endif
+#endif
+
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(i2c_smb_2), okay)
+    #if 0 // Disable via periph
+
+    #else // Disable via PCR
         slp_en[3] &= ~BIT(14); // Deassert SLP_EN for SMB2
     #endif
 #endif
+// I2C end
 
 // Timer
     #if 1 // Disable via periph
