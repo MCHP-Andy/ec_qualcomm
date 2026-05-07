@@ -33,6 +33,111 @@ LOG_MODULE_REGISTER(app_pm, LOG_LEVEL_INF);
 #define CLK_RQST 					0x50
 #define CLK_RQST_LEN				(5)
 
+#ifdef CONFIG_ADC
+#define ADC_0_XEC_REG_BASE                                                     \
+    ((struct adc_regs *)(DT_REG_ADDR(DT_NODELABEL(adc0))))
+#endif
+
+static void periph_sleep(void) {
+    volatile uint32_t *slp_en = NULL;
+
+#ifdef CONFIG_ADC
+    #if 0 // Disable via periph
+          // struct adc_regs *adc0 = ADC_0_XEC_REG_BASE;
+          // /* ADC deactivate  */
+          // adc0->CONTROL &= ~(MCHP_ADC_CTRL_ACTV);
+    #else // Disable via PCR
+        slp_en = (uint32_t *)(PCR_XEC_REG_BASE + SLP_EN);
+        slp_en[3] |= BIT(3); // Assert SLP_EN for ADC
+    #endif
+#endif
+
+#ifdef CONFIG_TACH_XEC
+    #if 0 // Disable via periph
+
+    #else // Disable via PCR
+        slp_en = (uint32_t *)(PCR_XEC_REG_BASE + SLP_EN);
+        slp_en[1] |= BIT(2);  // Assert SLP_EN for TACH0
+        slp_en[1] |= BIT(11); // Assert SLP_EN for TACH1
+    #endif
+#endif
+
+#ifdef CONFIG_I2C
+
+    // Force disable SMB 0 Configuration Register Enable bit (Bit 10)
+    volatile uint32_t *smb0_config = (uint32_t *)0x40004028;
+    *smb0_config &= ~BIT(10);
+
+    #if 0 // Disable via periph
+
+    #else // Disable via PCR
+        slp_en = (uint32_t *)(PCR_XEC_REG_BASE + SLP_EN);
+        slp_en[1] |= BIT(10); // Assert SLP_EN for SMB0
+        slp_en[3] |= BIT(13); // Assert SLP_EN for SMB1
+        slp_en[3] |= BIT(14); // Assert SLP_EN for SMB2
+    #endif
+#endif
+
+// Timer
+    #if 1 // Disable via periph
+        #define TIMER_BASE (DT_REG_ADDR_BY_IDX(DT_NODELABEL(timer4), 0))
+        #define TIMER_CTRL_OFFSET 0x10
+        volatile uint32_t *timer_ctrl = (uint32_t *)(TIMER_BASE + TIMER_CTRL_OFFSET);
+        timer_ctrl[0] &= ~BIT(5); // Disable timer4
+    #else // Disable via PCR
+        slp_en = (uint32_t *)(PCR_XEC_REG_BASE + SLP_EN);
+        slp_en[3] |= BIT(23); // Assert SLP_EN for TIMER32 0
+    #endif
+// Timer end
+}
+
+static void periph_wake(void) {
+    volatile uint32_t *slp_en = NULL;
+
+#ifdef CONFIG_ADC
+    #if 0 // Disable via periph
+          // struct adc_regs *adc0 = ADC_0_XEC_REG_BASE;
+          // adc0->CONTROL |= MCHP_ADC_CTRL_ACTV;
+    #else // Disable via PCR
+        slp_en = (uint32_t *)(PCR_XEC_REG_BASE + SLP_EN);
+        slp_en[3] &= ~BIT(3); // Deassert SLP_EN for ADC
+    #endif
+#endif
+
+#ifdef CONFIG_TACH_XEC
+    #if 0 // Disable via periph
+
+    #else // Disable via PCR
+        slp_en = (uint32_t *)(PCR_XEC_REG_BASE + SLP_EN);
+        slp_en[1] &= ~BIT(2);  // Deassert SLP_EN for TACH0
+        slp_en[1] &= ~BIT(11); // Deassert SLP_EN for TACH1
+    #endif
+#endif
+
+#ifdef CONFIG_I2C
+    #if 0 // Disable via periph
+
+    #else // Disable via PCR
+        slp_en = (uint32_t *)(PCR_XEC_REG_BASE + SLP_EN);
+        slp_en[1] &= ~BIT(10); // Deassert SLP_EN for SMB0
+        slp_en[3] &= ~BIT(13); // Deassert SLP_EN for SMB1
+        slp_en[3] &= ~BIT(14); // Deassert SLP_EN for SMB2
+    #endif
+#endif
+
+// Timer
+    #if 1 // Disable via periph
+        #define TIMER_BASE (DT_REG_ADDR_BY_IDX(DT_NODELABEL(timer4), 0))
+        #define TIMER_CTRL_OFFSET 0x10
+        volatile uint32_t *timer_ctrl = (uint32_t *)(TIMER_BASE + TIMER_CTRL_OFFSET);
+        timer_ctrl[0] |= BIT(5); // Disable timer4
+    #else // Disable via PCR
+        slp_en = (uint32_t *)(PCR_XEC_REG_BASE + SLP_EN);
+        slp_en[3] &= ~BIT(23); // Deassert SLP_EN for TIMER32 0
+    #endif
+// Timer end
+}
+
 /*
  * Deep Sleep
  * Pros:
@@ -70,15 +175,12 @@ static void z_power_soc_deep_sleep(void)
 	// soc_deep_sleep_wake_en();
 	// soc_deep_sleep_non_wake_en();
 
+	periph_sleep();
+
     volatile uint32_t *clk_req = (uint32_t *)(PCR_XEC_REG_BASE + CLK_RQST);
     for (int i = 0; i < CLK_RQST_LEN; i++) {
         LOG_DBG("CLK_REQ%d: 0x%08X", i, clk_req[i]);
     }
-
-#define MEC5_TIMER5_BASE (DT_REG_ADDR_BY_IDX(DT_NODELABEL(timer5), 0))
-	#define TIMER5_CTRL_OFFSET 0x10
-    volatile uint32_t *timer5_ctrl = (uint32_t *)(MEC5_TIMER5_BASE + TIMER5_CTRL_OFFSET);
-    timer5_ctrl[0] &= ~BIT(5); // Disable timer5
 
 	/*
 	 * Enable deep sleep mode in CM4 and MEC172x.
@@ -115,10 +217,11 @@ static void z_power_soc_deep_sleep(void)
 		}
 	} while (1);
 
+	periph_wake();
+
 	// soc_deep_sleep_non_wake_dis();
 	// soc_deep_sleep_wake_dis();
 	// soc_deep_sleep_periph_restore();
-	timer5_ctrl[0] |= BIT(5); // Enable timer5
 }
 
 /*
@@ -200,6 +303,7 @@ static int pwr_clk_init(void) {
         LOG_ERR("Failed to apply pinctrl state: %d", ret);
         return ret;
     }
+	LOG_INF("TST_CLK_OUT initialized successfully");
 
     return 0;
 }
