@@ -14,16 +14,10 @@
 
 LOG_MODULE_REGISTER(soccp, CONFIG_SOCCP_LOG_LEVEL);
 
-typedef struct {
-    uint8_t cmd;
-    int (*cmd_hdl)(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp,
-                   uint8_t resp_len);
-} soccp_cmd_t;
-
 static const soccp_cmd_t soccp_cmd_tbl[] = {
     // clang-format off
-    {SOCCP_CMD_WHO_AM_I,            soccp_who_am_i},
-    {SOCCP_CMD_POWER_STATE_FEATURE, soccp_power_state_ctrl},
+    {SOCCP_CMD_WHO_AM_I,            soccp_who_am_i, 1, 0, 1},
+    {SOCCP_CMD_POWER_STATE_FEATURE, soccp_power_state_ctrl, 4, 0, 0},
     // clang-format on
 };
 
@@ -40,6 +34,20 @@ typedef struct soccp_evt_t {
 #define SOCCP_EVT_LEN 4
 
 K_MSGQ_DEFINE(soccp_evt_queue, sizeof(soccp_evt_t), SOCCP_EVT_LEN, 4);
+
+int soccp_cmd_info_get(uint8_t cmd, const soccp_cmd_t *cmd_info) {
+    if (cmd_info == NULL) {
+        return -EINVAL;
+    }
+
+    for (size_t i = 0; i < ARRAY_SIZE(soccp_cmd_tbl); i++) {
+        if (soccp_cmd_tbl[i].cmd == cmd) {
+            memcpy((void *)cmd_info, &soccp_cmd_tbl[i], sizeof(soccp_cmd_t));
+            return 0;
+        }
+    }
+    return -EINVAL;
+}
 
 int soccp_write(uint8_t *data, uint16_t len) {
     int ret;
@@ -72,35 +80,44 @@ static int soccp_cmd_dispatcher(void) {
 
     ret = k_msgq_get(&soccp_evt_queue, &event, K_NO_WAIT);
     if (ret < 0)
-        return 0;
+        return -EINVAL;
 
     uint16_t len = MIN(event.len, sizeof(rece_cmd));
     memcpy(rece_cmd, event.pdata, len);
 
     if (len < 1)
-        return;
+        return -EINVAL;
 
-    uint8_t cmd_id = rece_cmd[0];
-    size_t i;
-
+    // Parse the cmd and call corresponding handler function, then copy response
+    // to interface buffer
+    size_t i = 0;
     for (i = 0; i < ARRAY_SIZE(soccp_cmd_tbl); i++) {
-        if (cmd_id == soccp_cmd_tbl[i].cmd) {
-            if (soccp_cmd_tbl[i].cmd_hdl) {
-                ret = soccp_cmd_tbl[i].cmd_hdl(&rece_cmd[1], len - 1, resp_buf,
-                                               sizeof(resp_buf));
+        const soccp_cmd_t *cmd_info = &soccp_cmd_tbl[i];
+
+        if (rece_cmd[0] == cmd_info->cmd) {
+            if (cmd_info->cmd_hdl != NULL) {
+                soccp_cmd_hdl_t cmd_hdl = cmd_info->cmd_hdl;
+
+                ret = cmd_hdl(cmd_info, rece_cmd, len, resp_buf,
+                              sizeof(resp_buf));
                 if (ret < 0) {
-                    LOG_ERR("SoCCP Cmd 0x%02x handle failed: %d", cmd_id, ret);
+                    LOG_ERR("Failed to handle SoCCP cmd 0x%02x: %d", rece_cmd[0],
+                            ret);
                 } else {
-                    LOG_INF("SoCCP Cmd 0x%02x executed", cmd_id);
+                    LOG_INF("Handled SoCCP cmd 0x%02x successfully",
+                            rece_cmd[0]);
                 }
+            } else {
+                LOG_WRN("No handler for SoCCP cmd 0x%02x", rece_cmd[0]);
             }
             break;
         }
     }
 
     if (i == ARRAY_SIZE(soccp_cmd_tbl)) {
-        LOG_WRN("Unknown SoCCP command: 0x%02x", cmd_id);
+        LOG_WRN("Unknown SoCCP command: 0x%02x", rece_cmd[0]);
     }
+
     return 0;
 }
 

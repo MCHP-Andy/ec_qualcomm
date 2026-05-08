@@ -5,20 +5,30 @@
 
 LOG_MODULE_DECLARE(soccp, LOG_LEVEL_DBG);
 
-#define SOCCP_CHECK_IN(c, cl, min)                                             \
+#define SOCCP_CHECK_IN(cmd_info_ptr, c, cl)                                    \
     do {                                                                       \
-        if ((c) == NULL || (cl) < (min)) {                                     \
-            LOG_ERR("Invalid input: ptr=%p, len=%u (min=%u)", (void *)(c),     \
-                    (unsigned int)(cl), (unsigned int)(min));                  \
+        if (!(cmd_info_ptr)) {                                                 \
+            LOG_ERR("Invalid cmd_info_ptr (NULL) for SOCCP_CHECK_IN");         \
+            return -EINVAL;                                                    \
+        }                                                                      \
+        if (!(c) || (cl) < (cmd_info_ptr)->mand) {                             \
+            LOG_ERR("Invalid input for cmd 0x%02x: ptr=%p, len=%u (min=%u)",   \
+                    (cmd_info_ptr)->cmd, (void *)(c), (unsigned int)(cl),      \
+                    (unsigned int)((cmd_info_ptr)->mand));                     \
             return -EINVAL;                                                    \
         }                                                                      \
     } while (0)
 
-#define SOCCP_CHECK_OUT(r, rl, min)                                            \
+#define SOCCP_CHECK_OUT(cmd_info_ptr, r, rl)                                   \
     do {                                                                       \
-        if ((r) == NULL || (rl) < (min)) {                                     \
-            LOG_ERR("Invalid output: ptr=%p, len=%u (min=%u)", (void *)(r),    \
-                    (unsigned int)(rl), (unsigned int)(min));                  \
+        if (!(cmd_info_ptr)) {                                                 \
+            LOG_ERR("Invalid cmd_info_ptr (NULL) for SOCCP_CHECK_OUT");        \
+            return -EINVAL;                                                    \
+        }                                                                      \
+        if (!(r) || (rl) < (cmd_info_ptr)->resp_len) {                         \
+            LOG_ERR("Invalid output for cmd 0x%02x: ptr=%p, len=%u (min=%u)",  \
+                    (cmd_info_ptr)->cmd, (void *)(r), (unsigned int)(rl),      \
+                    (unsigned int)((cmd_info_ptr)->resp_len));                 \
             return -EINVAL;                                                    \
         }                                                                      \
     } while (0)
@@ -27,11 +37,11 @@ LOG_MODULE_DECLARE(soccp, LOG_LEVEL_DBG);
  * @brief EC SoCCP who-am-i interface (Cmd: 0x43)
  * Ref: Page 54 of Spec
  */
-int soccp_who_am_i(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp, uint8_t resp_len) {
+int soccp_who_am_i(const soccp_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len, uint8_t *resp, uint16_t resp_len) {
     ARG_UNUSED(cmd);
     ARG_UNUSED(cmd_len);
 
-    SOCCP_CHECK_OUT(resp, resp_len, 1);
+    SOCCP_CHECK_OUT(cmd_info, resp, resp_len);
 
     /* SoCCP identify value is 0x05 */
     resp[0] = 0x05;
@@ -44,12 +54,12 @@ int soccp_who_am_i(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp, uint8_t resp_le
  * Handles Fan Constraints (0x20), OOB State (0x25), and Power State (0x11)
  * Ref: Page 55-57 of Spec
  */
-int soccp_power_state_ctrl(uint8_t *cmd, uint8_t cmd_len, uint8_t *resp, uint8_t resp_len) {
+int soccp_power_state_ctrl(const soccp_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len, uint8_t *resp, uint16_t resp_len) {
     /* cmd[0] is Register ID, cmd[1-2] is Data (LSB-MS) */
-    SOCCP_CHECK_IN(cmd, cmd_len, 3); 
+    SOCCP_CHECK_IN(cmd_info, cmd, cmd_len);
 
-    uint8_t reg_id = cmd[0];
-    uint16_t status = (cmd[2] << 8) | cmd[1];
+    uint8_t reg_id = cmd[1];
+    uint16_t status = (cmd[3] << 8) | cmd[2];
 
     switch (reg_id) {
     case 0x20: /* EC FAN Constraints Message */
