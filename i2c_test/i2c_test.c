@@ -115,8 +115,8 @@ static struct i2c_target_callbacks acpi_target_callbacks = {
 #define SOCCP_ADDR (0x0C)
 
 static struct i2c_target_config target_cfg = {
-    // TODO: support multiple addresses e.g. SOCCP_ADDR
-    .address = ACPI_ADDR,
+    // Workaround for 2 slave address
+    .address = ACPI_ADDR | (SOCCP_ADDR << 8),
     .callbacks = &acpi_target_callbacks,
 };
 
