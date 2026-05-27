@@ -7,6 +7,7 @@
 / {
     chosen {
         zephyr,shell-uart = &uart1;
+        zephyr,keyboard-scan = &kscan_input;
         zephyr,code-partition = &app_partition;
     };
 
@@ -49,6 +50,9 @@
         status = "okay";
     };
 
+    btns {
+        compatible = "gpio-users";
+    };
 };
 
 &uart0 {
@@ -126,5 +130,42 @@
 		zephyr,reference = "ADC_REF_INTERNAL";
 		zephyr,acquisition-time = <0>;
 		zephyr,resolution = <12>;
+	};
+};
+
+&kbd0 {
+	status = "okay";
+
+	pinctrl-0 = < &ksi0_gpio017
+		      &ksi1_gpio020
+		      &ksi2_gpio021
+		      &ksi3_gpio026
+		      &ksi4_gpio027
+		      &ksi5_gpio030
+		      &ksi6_gpio031
+		      &ksi7_gpio032
+		      &kso00_gpio040
+		      &kso01_gpio045
+		      &kso02_gpio046
+		      &kso03_gpio047
+		      &kso04_gpio107
+		      &kso05_gpio112
+		      &kso06_gpio113
+		      &kso07_gpio120
+		      &kso08_gpio121
+		      &kso09_gpio122
+		      &kso10_gpio123
+		      &kso11_gpio124
+		      &kso12_gpio125
+		      &kso13_gpio126
+		      &kso14_gpio152
+		      &kso15_gpio151
+		      &kso16_gpio132 >;
+	pinctrl-names = "default";
+    row-size = <8>;
+	col-size = <16>;
+
+    kscan_input: kscan-input {
+		compatible = "zephyr,kscan-input";
 	};
 };

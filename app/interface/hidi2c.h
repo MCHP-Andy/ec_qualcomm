@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include <zephyr/toolchain.h>
+#include <zephyr/usb/class/hid.h>
 
 /*
  * HIDI2C driver layer public API
@@ -40,6 +41,9 @@
  * HID over I2C keyboard report 格式 (10 bytes, 含長度欄位)
  *
  * 由 service 層打包；driver/hidi2c.c 會原樣搬進 I2C TX 緩衝區送給 Host。
+ *
+ * !!! 此 struct 的 layout 必須與下方 hidi2c_report_descriptor[] 描述的
+ *     HID Report 一致；任一邊修改時請同步修改另一邊。
  */
 struct keyboard_report {
     uint16_t length;   /* 整體長度 (= sizeof(struct keyboard_report)) */
@@ -47,6 +51,36 @@ struct keyboard_report {
     uint8_t  reserved; /* 0x00 */
     uint8_t  keys[6];  /* 按鍵陣列 (6-key rollover) */
 } __packed;
+
+/*
+ * HID descriptor (HIDI2C_REG_HID_DESCRIPTOR 讀回內容)
+ *
+ * 描述本裝置在 HID over I2C 通訊中使用的 register 位址、版本、Report Descriptor
+ * 長度等。HID descriptor 自身的 wHIDDescLength = 30。
+ */
+static const uint8_t hidi2c_hid_descriptor[] __unused = {
+    0x1E, 0x00,                                    /* wHIDDescLength = 30 */
+    0x00, 0x01,                                    /* bcdVersion = 1.0 */
+    0x3F, 0x00,                                    /* wReportDescLength (~63 bytes) */
+    HIDI2C_REG_LE16(HIDI2C_REG_REPORT_DESCRIPTOR), /* wReportDescRegister */
+    HIDI2C_REG_LE16(HIDI2C_REG_INPUT),             /* wInputRegister */
+    0x00, 0x00,                                    /* wMaxInputLength */
+    HIDI2C_REG_LE16(HIDI2C_REG_OUTPUT),            /* wOutputRegister */
+    HIDI2C_REG_LE16(HIDI2C_REG_COMMAND),           /* wCommandRegister */
+    /* 剩餘填充欄位 (依 HID over I2C spec 補齊到 30 bytes) */
+};
+
+/*
+ * Report descriptor (HIDI2C_REG_REPORT_DESCRIPTOR 讀回內容)
+ *
+ * 使用 Zephyr 內建的 HID_KEYBOARD_REPORT_DESC() 巨集，描述標準 HID Boot
+ * Keyboard 格式：8-bit modifier、1-byte reserved、6-byte keys，正好對應
+ * 上方的 keyboard_report struct (length 欄位是 HIDI2C 框架附加，不在
+ * report descriptor 範圍內)。
+ *
+ * 修改 keyboard_report layout 時請同步調整這裡。
+ */
+static const uint8_t hidi2c_report_descriptor[] __unused = HID_KEYBOARD_REPORT_DESC();
 
 /**
  * @brief 把最新 report 丟進 HIDI2C driver 的 queue

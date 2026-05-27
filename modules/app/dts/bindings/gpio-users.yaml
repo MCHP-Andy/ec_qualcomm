@@ -1,0 +1,27 @@
+
+description: |
+  This allows you to define a gpio node.
+
+  Here is an example which defines gpio in the node /pins:
+
+  / {
+  	pins {
+  		compatible = "gpio-users";
+  		pwr_btn0: pwr_btn0 {
+  			gpios = <&gpio0 1 GPIO_ACTIVE_LOW>;
+  		};
+  	};
+  };
+
+compatible: "gpio-users"
+
+child-binding:
+  description: GPIO user child node
+  properties:
+    gpios:
+      type: phandle-array
+      required: true
+    label:
+      type: string
+      description: |
+        Description of the gpio user.

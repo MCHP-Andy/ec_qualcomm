@@ -1,0 +1,18 @@
+menuconfig KEYBOARD_SERVICE
+	bool "Keyboard Service"
+	default y
+	help
+	  Enable the Keyboard service for HID 6KRO report management.
+
+if KEYBOARD_SERVICE
+module = KEYBOARD
+module-str = keyboard
+source "subsys/logging/Kconfig.template.log_config"
+
+config KEYBOARD_SHELL
+	bool "Keyboard Shell commands"
+	depends on SHELL
+	default y
+	help
+	  Enable shell commands for the Keyboard service.
+endif

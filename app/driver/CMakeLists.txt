@@ -7,6 +7,8 @@ else()
     target_sources(app PRIVATE thermal.c)
     target_sources(app PRIVATE power_limit.c)
     target_sources(app PRIVATE acpi.c)
+    target_sources(app PRIVATE keyboard.c)
+    target_sources(app PRIVATE hidi2c.c)
 endif()
 
 target_sources(app PRIVATE fan_profile_tbl.c)

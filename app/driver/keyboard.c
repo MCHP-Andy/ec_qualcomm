@@ -66,7 +66,7 @@ static void kb_callback(const struct device *dev, uint32_t row, uint32_t col,
  */
 static int keyboard_init(void) {
     const struct device *const kscan_dev =
-        DEVICE_DT_GET(DT_CHOSEN(zephyr_keyboard_scan));
+        DEVICE_DT_GET_OR_NULL(DT_CHOSEN(zephyr_keyboard_scan));
 
     if (!device_is_ready(kscan_dev)) {
         LOG_ERR("kscan device %s is not ready", kscan_dev->name);

@@ -16,6 +16,10 @@
 #include <interface/hidi2c.h>
 #include <interface/keyboard.h>
 
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_REGISTER(hidi2c, LOG_LEVEL_INF);
+
 /* I2C 狀態定義 */
 enum {
     HIDI2C_STATE_IDLE = 0,
@@ -132,24 +136,9 @@ int hidi2c_post_report(const struct keyboard_report *report) {
 }
 
 /* -------------------------------------------------------------------------
- * HID descriptor / report descriptor
+ * HID descriptor / report descriptor 已搬到 interface/hidi2c.h
+ * (與 keyboard_report struct 並列，方便同步修改)
  * ------------------------------------------------------------------------- */
-
-/* 1a. HID descriptor */
-static const uint8_t hid_descriptor[] = {
-    0x1E, 0x00,                                  // Length = 30
-    0x00, 0x01,                                  // Version 1.0
-    0x3F, 0x00,                                  // Report Desc Length (~63 bytes)
-    HIDI2C_REG_LE16(HIDI2C_REG_REPORT_DESCRIPTOR), // Report Desc Register
-    HIDI2C_REG_LE16(HIDI2C_REG_INPUT),             // Input Register
-    0x00, 0x00,                                  // Max Input Length
-    HIDI2C_REG_LE16(HIDI2C_REG_OUTPUT),            // Output Register
-    HIDI2C_REG_LE16(HIDI2C_REG_COMMAND),           // wCommandRegister
-    /* ... 剩餘填充欄位 ... */
-};
-
-/* 1b. Report descriptor */
-static const uint8_t report_descriptor[] = {HID_KEYBOARD_REPORT_DESC()};
 
 /* -------------------------------------------------------------------------
  * I2C write / read dispatchers
@@ -194,13 +183,14 @@ static int hidi2c_dispatch_read(uint16_t reg_addr, uint8_t *out_buf,
     switch (reg_addr) {
     case HIDI2C_REG_HID_DESCRIPTOR:
         /* HID descriptor */
-        memcpy(out_buf, hid_descriptor, MIN(max_len, sizeof(hid_descriptor)));
+        memcpy(out_buf, hidi2c_hid_descriptor,
+               MIN(max_len, sizeof(hidi2c_hid_descriptor)));
         return 0;
 
     case HIDI2C_REG_REPORT_DESCRIPTOR:
         /* Report descriptor */
-        memcpy(out_buf, report_descriptor,
-               MIN(max_len, sizeof(report_descriptor)));
+        memcpy(out_buf, hidi2c_report_descriptor,
+               MIN(max_len, sizeof(hidi2c_report_descriptor)));
         return 0;
 
     case HIDI2C_REG_INPUT: {
@@ -266,7 +256,7 @@ static int hidi2c_target_write_received_cb(struct i2c_target_config *config,
         hidi2c_reg_addr = val;
     } else if (hidi2c_idx == 1) {
         hidi2c_reg_addr |= ((uint16_t)val << 8);
-        printk("HIDI2C: Host select REG 0x%04x\n", hidi2c_reg_addr);
+        LOG_INF("Host select REG 0x%04x", hidi2c_reg_addr);
     } else {
         /* 之後的資料為指令 Payload */
         uint16_t payload_idx = hidi2c_idx - 2;
@@ -339,7 +329,7 @@ static int hidi2c_init(void) {
     }
 
     if (!bus || !device_is_ready(bus)) {
-        printk("HIDI2C: I2C bus not ready\n");
+        LOG_ERR("I2C bus not ready");
         return -ENODEV;
     }
 
@@ -349,7 +339,7 @@ static int hidi2c_init(void) {
     }
 
     if (i2c_target_register(bus, &target_cfg) < 0) {
-        printk("HIDI2C: Failed to register target\n");
+        LOG_ERR("Failed to register target");
         return -EIO;
     }
 

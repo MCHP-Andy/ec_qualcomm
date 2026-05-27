@@ -18,6 +18,8 @@ static struct gpio_callback btn_cb_data;
 static void btn_callback(const struct device *dev, struct gpio_callback *cb,
                          uint32_t pins) {
     // TODO:
+    LOG_INF("Button %d %s", (pins & BIT(btn.pin)) ? 1 : 0,
+            gpio_pin_get_dt(&btn) ? "pressed" : "released");
 }
 
 #include <zephyr/init.h>
