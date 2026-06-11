@@ -59,8 +59,9 @@ int acpi_ec_fan_rpm(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
         return ret;
     }
 
-    resp[0] = ctrl.rpm & 0xFF;
-    resp[1] = (ctrl.rpm >> 8) & 0xFF;
+    resp[0] = 2; // Byte count
+    resp[1] = ctrl.rpm & 0xFF;        // Fan speed LSB
+    resp[2] = (ctrl.rpm >> 8) & 0xFF; // Fan speed MSB
     LOG_DBG("Fan %d status rpm: %d", fan_id, ctrl.rpm);
 
     return 0;
@@ -187,6 +188,7 @@ int acpi_ec_fan_profile_num(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     fan_id_t fan_id = cmd[1];
     fan_ctrl_t ctrl;
 
+    // Validate the requested fan exists before reporting capabilities.
     int ret = fan_ctrl_get(fan_id, &ctrl);
     if (ret < 0) {
         LOG_ERR("Failed to get fan control for fan_id=%d: %d", fan_id, ret);
@@ -268,7 +270,8 @@ int acpi_ec_fan_lut(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
                     entries_to_write, len);
             entries_to_write = len;
         }
-        memcpy((uint8_t *)tbl, &cmd[3], entries_to_write * sizeof(fan_tbl_t));
+        // LUT data starts at cmd[4]; cmd[3] is the byte count field.
+        memcpy((uint8_t *)tbl, &cmd[4], entries_to_write * sizeof(fan_tbl_t));
         LOG_DBG("Fan %d, profile %d, source %d LUT updated with %u entries",
                 fan_id, profile, tmp_src,
                 entries_to_write); // Corrected to use cmd[3]

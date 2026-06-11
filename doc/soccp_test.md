@@ -22,8 +22,16 @@
 
 ```bash
 # mand=1, 回應 0x05
-soccp write 43
-soccp read                       # -> 第 1 byte = 0x05 (SoCCP who-am-i value)
+uart:~$ soccp write 43
+SoCCP CMD written successfully
+[829:51:04.994,000] <inf> soccp: SoCCP Who-Am-I called, returning 0x05
+[829:51:04.994,000] <inf> soccp: Handled SoCCP cmd 0x43 successfully
+uart:~$ soccp read                       # -> 第 1 byte = 0x05 (SoCCP who-am-i value)
+SoCCP Read Response:
+00000000: 05 00 00 00 00 00 00 00  77 00 00 00 dc 31 00 20 |........ w....1. |
+00000010: 2c d2 00 00 57 aa 00 00  20 32 00 20 19 e9 00 00 |,...W...  2. ....|
+00000020: 1f e9 00 00 28 d2 00 00  0e 00 00 00 80 18 00 20 |....(... ....... |
+00000030: 00 00 00 00 4b 7f 00 00  ec 17 00 20 70 cc 00 00 |....K... ... p...|
 ```
 
 ---
@@ -32,8 +40,15 @@ soccp read                       # -> 第 1 byte = 0x05 (SoCCP who-am-i value)
 
 ```bash
 # [0x03, 0x20, status_LSB, status_MSB] ; 0=OFF(default), 1=ON
-soccp write 03 20 00 00          # Fan 維持 OFF
-soccp write 03 20 01 00          # Fan 允許 ON
+uart:~$ soccp write 03 20 00 00          # Fan 維持 OFF
+SoCCP CMD written successfully
+[395:42:56.988,000] <inf> soccp: SoCCP: Fan Constraints set to OFF
+[395:42:56.988,000] <inf> soccp: Handled SoCCP cmd 0x03 successfully
+uart:~$ soccp write 03 20 01 00          # Fan 允許 ON
+SoCCP CMD written successfully
+[441:31:50.998,000] <inf> soccp: SoCCP: Fan Constraints set to ON
+[441:31:50.998,000] <inf> soccp: Handled SoCCP cmd 0x03 successfully
+uart:~$
 ```
 
 ---
@@ -55,12 +70,32 @@ soccp write 03 25 07 00          # 0x07  -> S4/S5 + OOB  (Bit0,1,2)
 
 ```bash
 # 1=S0, 2=ModernStandby, 3=S3, 4=S4, 5=S5, 6=G3
-soccp write 03 11 01 00          # S0
-soccp write 03 11 02 00          # Modern Standby (Entry)
-soccp write 03 11 03 00          # S3
-soccp write 03 11 04 00          # S4
-soccp write 03 11 05 00          # S5
-soccp write 03 11 06 00          # G3
+uart:~$ soccp write 03 11 01 00          # S0
+SoCCP CMD written successfully
+[215:12:15.042,000] <inf> soccp: SoCCP: SoC Power State changed to: 1
+[215:12:15.042,000] <inf> soccp: Handled SoCCP cmd 0x03 successfully
+uart:~$ 
+uart:~$ soccp write 03 11 02 00          # Modern Standby (Entry)
+SoCCP CMD written successfully
+[356:04:08.972,000] <inf> soccp: SoCCP: SoC Power State changed to: 2
+[356:04:08.972,000] <inf> soccp: Handled SoCCP cmd 0x03 successfully
+uart:~$ soccp write 03 11 03 00          # S3
+SoCCP CMD written successfully
+[396:52:35.492,000] <inf> soccp: SoCCP: SoC Power State changed to: 3
+[396:52:35.492,000] <inf> soccp: Handled SoCCP cmd 0x03 successfully
+uart:~$ soccp write 03 11 04 00          # S4
+SoCCP CMD written successfully
+[439:38:40.902,000] <inf> soccp: SoCCP: SoC Power State changed to: 4
+[439:38:40.902,000] <inf> soccp: Handled SoCCP cmd 0x03 successfully
+uart:~$ soccp write 03 11 05 00          # S5
+SoCCP CMD written successfully
+[472:29:03.422,000] <inf> soccp: SoCCP: SoC Power State changed to: 5
+[472:29:03.422,000] <inf> soccp: Handled SoCCP cmd 0x03 successfully
+uart:~$ soccp write 03 11 06 00          # G3
+SoCCP CMD written successfully
+[506:54:32.442,000] <inf> soccp: SoCCP: SoC Power State changed to: 6
+[506:54:32.442,000] <inf> soccp: Handled SoCCP cmd 0x03 successfully
+uart:~$
 ```
 
 ---
