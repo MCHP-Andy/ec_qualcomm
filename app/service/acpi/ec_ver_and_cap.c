@@ -7,7 +7,7 @@
 
 LOG_MODULE_DECLARE(acpi);
 
-int acpi_dev_fw_ver(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
+static int acpi_dev_fw_ver(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
                     uint8_t *resp, uint16_t resp_len) {
     (void)cmd;
     (void)cmd_len;
@@ -23,7 +23,7 @@ int acpi_dev_fw_ver(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
     return 0;
 }
 
-int acpi_dev_fw_ver_and_lowest_supported(const acpi_cmd_t *cmd_info,
+static int acpi_dev_fw_ver_and_lowest_supported(const acpi_cmd_t *cmd_info,
                                          uint8_t *cmd, uint16_t cmd_len,
                                          uint8_t *resp, uint16_t resp_len) {
     (void)cmd;
@@ -47,7 +47,7 @@ int acpi_dev_fw_ver_and_lowest_supported(const acpi_cmd_t *cmd_info,
 
 // This command is currently Not Supported.
 #if 0
-int acpi_dev_flashing_capabilities(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len, uint8_t *resp, uint16_t resp_len) {
+static int acpi_dev_flashing_capabilities(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len, uint8_t *resp, uint16_t resp_len) {
     (void) cmd;
     (void) cmd_len;
     ARG_UNUSED(cmd_info);
@@ -76,7 +76,7 @@ int acpi_dev_flashing_capabilities(const acpi_cmd_t *cmd_info, uint8_t *cmd, uin
 }
 #endif
 
-int acpi_dev_thermal_capabilities(const acpi_cmd_t *cmd_info, uint8_t *cmd,
+static int acpi_dev_thermal_capabilities(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                   uint16_t cmd_len, uint8_t *resp,
                                   uint16_t resp_len) {
     ARG_UNUSED(resp_len); // resp_len is passed to macro, not used directly here
@@ -103,7 +103,7 @@ int acpi_dev_thermal_capabilities(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     return 0;
 }
 
-int acpi_dev_active_cooling_caps(const acpi_cmd_t *cmd_info, uint8_t *cmd,
+static int acpi_dev_active_cooling_caps(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                  uint16_t cmd_len, uint8_t *resp,
                                  uint16_t resp_len) {
     (void)cmd;
@@ -127,7 +127,7 @@ int acpi_dev_active_cooling_caps(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     return 0;
 }
 
-int acpi_who_am_i(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
+static int acpi_who_am_i(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
                   uint8_t *resp, uint16_t resp_len) {
     (void)cmd;
     (void)cmd_len;
@@ -141,7 +141,7 @@ int acpi_who_am_i(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
     return 0;
 }
 
-int acpi_dev_id(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
+static int acpi_dev_id(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
                 uint8_t *resp, uint16_t resp_len) {
     (void)cmd;
     (void)cmd_len;
@@ -157,3 +157,13 @@ int acpi_dev_id(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
 
     return 0;
 }
+
+// clang-format off
+ACPI_CMD_SUBSCRIBE(board, EC_DEV_FW_VER,                             acpi_dev_fw_ver, 1, 0, 4); // Page 8
+ACPI_CMD_SUBSCRIBE(board, EC_DEV_FW_VER_AND_LOWEST_SUPPORTED_FW_VER, acpi_dev_fw_ver_and_lowest_supported, 1, 0, 8); // Page 9
+// ACPI_CMD_SUBSCRIBE(board, EC_DEV_FLASHING_CAP,                       acpi_dev_flashing_capabilities, 1, 0, 65); // Page 10 (Not Supported)
+ACPI_CMD_SUBSCRIBE(board, EC_DEV_THERMAL_CAP,                        acpi_dev_thermal_capabilities, 2, 0, 3); // Page 11 (SubCmd)
+ACPI_CMD_SUBSCRIBE(board, EC_DEV_ACTIVE_COOLING_IF_VER_AND_CAP,      acpi_dev_active_cooling_caps, 1, 0, 6); // Page 12
+ACPI_CMD_SUBSCRIBE(board, EC_ACPI_WHOAMI_IF,                         acpi_who_am_i, 1, 0, 1); // Page 13
+ACPI_CMD_SUBSCRIBE(board, EC_DEV_ID,                                 acpi_dev_id, 1, 0, 3); // Page 14
+// clang-format on

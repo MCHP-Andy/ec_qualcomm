@@ -59,6 +59,15 @@ int therm_sample_get(therm_id_t id, int16_t *temp) {
     return 0;
 }
 
+int acpi_resp_set(uint8_t *pdata, uint16_t len) {
+    LOG_INF("[SIM] ACPI data len: %d", len);
+
+    // Dump acpi data
+    LOG_HEXDUMP_INF(pdata, len, "[SIM] ACPI data :");
+
+    return 0;
+}
+
 /* --- Shell Interface --- */
 
 static int cmd_sim_fan_set(const struct shell *sh, size_t argc, char **argv) {

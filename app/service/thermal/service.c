@@ -13,6 +13,9 @@
 #include <interface/system.h>
 #include <interface/power.h>
 #include <interface/thermal.h>
+#include <interface/acpi.h>
+
+#include <service/acpi/acpi_tbl.h> // ACPI_CHECK_IN/OUT macros for therm handlers
 
 LOG_MODULE_REGISTER(thermal, CONFIG_THERMAL_LOG_LEVEL);
 
@@ -53,44 +56,12 @@ static therm_ctrl_t therm_ctrl = {
     .sample_ms = 1000,
 };
 
-int therm_sensor_blk_get(therm_id_t dev_id, therm_dev_t *blk) {
-    if (dev_id == 0 || dev_id >= therm_ctrl.therm_num || blk == NULL) {
-        return -EINVAL;
+static therm_dev_t *therm_blk_get(therm_id_t dev_id) {
+    if (dev_id == 0 || dev_id >= therm_ctrl.therm_num) {
+        return NULL;
     }
 
-    memcpy(blk, &therm_ctrl.therm_blk[dev_id], sizeof(therm_dev_t));
-
-    return 0;
-}
-
-int therm_sensor_blk_set(therm_id_t dev_id, const therm_dev_t *blk) {
-    if (dev_id == 0 || dev_id >= therm_ctrl.therm_num || blk == NULL) {
-        return -EINVAL;
-    }
-
-    memcpy(&therm_ctrl.therm_blk[dev_id], blk, sizeof(therm_dev_t));
-
-    return 0;
-}
-
-int therm_adc_sample_rate_get(uint16_t *ms) {
-    if (ms == NULL) {
-        return -EINVAL;
-    }
-
-    *ms = therm_ctrl.sample_ms;
-
-    return 0;
-}
-
-int therm_adc_sample_rate_set(uint16_t ms) {
-    if (ms < 100) {
-        ms = 100;
-    }
-
-    therm_ctrl.sample_ms = ms;
-
-    return 0;
+    return &therm_ctrl.therm_blk[dev_id];
 }
 
 static void service(void) {
@@ -155,6 +126,134 @@ static void service(void) {
 K_THREAD_DEFINE(therm_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M,
                 0, 0);
 
+static int acpi_ec_thermistors(therm_id_t idx, uint8_t *resp, uint16_t resp_len,
+                               const acpi_cmd_t *cmd_info) {
+    ARG_UNUSED(resp_len); // resp_len is passed to macro, not used directly here
+    ACPI_CHECK_OUT(cmd_info, resp, resp_len);
+
+    therm_dev_t *therm_dev = therm_blk_get(idx);
+    if (therm_dev == NULL) {
+        LOG_ERR("Invalid thermistor idx=%d", idx);
+        return -EINVAL;
+    }
+
+    uint16_t report_val;
+
+    /* Format: Bit 15 is sign bit, Bits 0-14 is magnitude in 0.1C */
+    if (therm_dev->temp < 0) {
+        /* Negative: Set MSB (Bit 15) and store absolute value */
+        report_val = (uint16_t)((-therm_dev->temp) & 0x7FFF) | 0x8000;
+    } else {
+        /* Positive: Clear MSB and store value */
+        report_val = (uint16_t)(therm_dev->temp & 0x7FFF);
+    }
+
+    resp[0] = 2;                        // Byte count
+    resp[1] = report_val & 0xFF;        // Little Endian Low Byte
+    resp[2] = (report_val >> 8) & 0xFF; // Little Endian High Byte
+
+    LOG_DBG("Thermistor %d temp: %d.%d deg C (Report: 0x%04x)", idx,
+            therm_dev->temp / 10, abs(therm_dev->temp % 10), report_val);
+    return 0;
+}
+
+static int acpi_ec_thermistor1(const acpi_cmd_t *cmd_info, uint8_t *cmd,
+                               uint16_t cmd_len, uint8_t *resp,
+                               uint16_t resp_len) {
+    ARG_UNUSED(cmd);
+    ARG_UNUSED(cmd_len);
+    return acpi_ec_thermistors(THERM_DEV_1, resp, resp_len, cmd_info);
+}
+
+static int acpi_ec_thermistor2(const acpi_cmd_t *cmd_info, uint8_t *cmd,
+                               uint16_t cmd_len, uint8_t *resp,
+                               uint16_t resp_len) {
+    ARG_UNUSED(cmd);
+    ARG_UNUSED(cmd_len);
+    return acpi_ec_thermistors(THERM_DEV_2, resp, resp_len, cmd_info);
+}
+
+static int acpi_ec_thermistor3(const acpi_cmd_t *cmd_info, uint8_t *cmd,
+                               uint16_t cmd_len, uint8_t *resp,
+                               uint16_t resp_len) {
+    ARG_UNUSED(cmd);
+    ARG_UNUSED(cmd_len);
+    return acpi_ec_thermistors(THERM_DEV_3, resp, resp_len, cmd_info);
+}
+
+static int acpi_ec_thermistor_temp_thre(const acpi_cmd_t *cmd_info,
+                                        uint8_t *cmd, uint16_t cmd_len,
+                                        uint8_t *resp, uint16_t resp_len) {
+    ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
+    ACPI_CHECK_OUT(cmd_info, resp, resp_len);
+
+    therm_id_t idx = cmd[1] & 0x0f;
+    therm_dev_t *therm_dev = therm_blk_get(idx);
+    if (therm_dev == NULL) {
+        LOG_ERR("Invalid thermistor idx=%d", idx);
+        return -EINVAL;
+    }
+
+    // If cmd_len is (mand + opt), it's a write operation
+    if (cmd_len == (cmd_info->mand + cmd_info->opt)) { // 2 + 5 = 7
+        therm_dev->psv = cmd[3];
+        therm_dev->cr3 = cmd[4];
+        therm_dev->hot = cmd[5];
+        therm_dev->crt = cmd[6];
+    }
+
+    resp[0] = 0x04; // Byte count
+    resp[1] = therm_dev->psv;
+    resp[2] = therm_dev->cr3;
+    resp[3] = therm_dev->hot;
+    resp[4] = therm_dev->crt;
+
+    LOG_DBG("Thermistor %d set psv: %d", idx, therm_dev->psv);
+    LOG_DBG("Thermistor %d set cr3: %d", idx, therm_dev->cr3);
+    LOG_DBG("Thermistor %d set hot: %d", idx, therm_dev->hot);
+    LOG_DBG("Thermistor %d set crt: %d", idx, therm_dev->crt);
+
+    return 0;
+}
+
+static int acpi_ec_thermistor_sampling_rate(const acpi_cmd_t *cmd_info,
+                                            uint8_t *cmd, uint16_t cmd_len,
+                                            uint8_t *resp, uint16_t resp_len) {
+    uint16_t sample_rate_ms = 0;
+
+    ACPI_CHECK_IN(cmd_info, cmd, cmd_len);    // Check for read operation
+    ACPI_CHECK_OUT(cmd_info, resp, resp_len); // Check for read operation
+
+    // If cmd_len is mand + opt, it's a write operation
+    if (cmd_len == (cmd_info->mand + cmd_info->opt)) { // 1 + 2 = 3
+        sample_rate_ms = (cmd[2] << 8) | cmd[1];
+
+        if (sample_rate_ms < 100) {
+            LOG_WRN("Invalid ADC sample rate: %d ms, using default: 100 ms",
+                    sample_rate_ms);
+            sample_rate_ms = 100;
+        }
+
+        therm_ctrl.sample_ms = sample_rate_ms;
+        LOG_DBG("Set ADC sample rate to %d ms", sample_rate_ms);
+    }
+
+    sample_rate_ms = therm_ctrl.sample_ms;
+    resp[0] = sample_rate_ms & 0xff;
+    resp[1] = (sample_rate_ms >> 8) & 0xff;
+
+    LOG_DBG("Get ADC sample rate %d ms", sample_rate_ms);
+    return 0;
+}
+
+// clang-format off
+ACPI_CMD_SUBSCRIBE(fan, EC_THERMISTOR1,                            acpi_ec_thermistor1, 1, 0, 3); // Page 28
+ACPI_CMD_SUBSCRIBE(fan, EC_THERMISTOR2,                            acpi_ec_thermistor2, 1, 0, 3); // Page 28
+ACPI_CMD_SUBSCRIBE(fan, EC_THERMISTOR3,                            acpi_ec_thermistor3, 1, 0, 3); // Page 28
+ACPI_CMD_SUBSCRIBE(fan, EC_THERMISTOR_TEMP_THRE,                   acpi_ec_thermistor_temp_thre, 2, 5, 5); // Page 31/32 (ThermID + Optional ByteCount + PSV + CR3 + HOT + CRT)
+ACPI_CMD_SUBSCRIBE(fan, EC_THERMISTOR_SAMPLING_RATE,               acpi_ec_thermistor_sampling_rate, 1, 2, 2); // Page 33/34 (Optional SampleRate(2))
+// clang-format on
+
 #ifdef CONFIG_THERMAL_SHELL
 #include <zephyr/shell/shell.h>
 
@@ -184,19 +283,17 @@ static int cmd_therm_set(const struct shell *sh, size_t argc, char **argv) {
     uint8_t hot = (uint8_t)strtoul(argv[4], NULL, 0);
     uint8_t crt = (uint8_t)strtoul(argv[5], NULL, 0);
 
-    therm_dev_t blk;
-
-    if (therm_sensor_blk_get(id, &blk) != 0) {
+    therm_dev_t *blk = therm_blk_get(id);
+    if (blk == NULL) {
         shell_error(sh, "Invalid therm ID: %d", id);
         return -EINVAL;
     }
 
-    blk.psv = psv;
-    blk.cr3 = cr3;
-    blk.hot = hot;
-    blk.crt = crt;
+    blk->psv = psv;
+    blk->cr3 = cr3;
+    blk->hot = hot;
+    blk->crt = crt;
 
-    therm_sensor_blk_set(id, &blk);
     shell_info(sh, "Updated Thermal %d thresholds", id);
     return 0;
 }
@@ -204,8 +301,8 @@ static int cmd_therm_set(const struct shell *sh, size_t argc, char **argv) {
 static int cmd_therm_sample(const struct shell *sh, size_t argc, char **argv) {
     uint16_t ms = (uint16_t)strtoul(argv[1], NULL, 0);
 
-    therm_adc_sample_rate_set(ms);
-    shell_info(sh, "Thermal sample rate set to %d ms", ms);
+    therm_ctrl.sample_ms = ms;
+    shell_info(sh, "Thermal sample rate set to %d ms", therm_ctrl.sample_ms);
     return 0;
 }
 

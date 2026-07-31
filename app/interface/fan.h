@@ -77,9 +77,6 @@ int fan_tmp_set(fan_id_t tmp_src, uint16_t tmp);
 
 int fan_rpm_write(fan_id_t fan_id, uint16_t rpm);
 
-int fan_ctrl_get(fan_id_t fan_id, fan_ctrl_t *ctrl);
-int fan_ctrl_set(fan_id_t fan_id, const fan_ctrl_t *ctrl);
-
 int fan_tbl_get(fan_id_t profile, fan_id_t fan_id, fan_id_t tmp_src,
                 fan_tbl_t **tbl, uint8_t *len);
 
