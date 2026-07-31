@@ -37,11 +37,4 @@ typedef struct therm_ctrl_t{
     uint16_t sample_ms; // ADC sample rate in the unit of ms (Min: 100ms)
 } therm_ctrl_t;
 
-
-int therm_sensor_blk_get(therm_id_t dev_id, therm_dev_t *blk);
-int therm_sensor_blk_set(therm_id_t dev_id, const therm_dev_t *blk);
-
-int therm_adc_sample_rate_get(uint16_t *ms);
-int therm_adc_sample_rate_set(uint16_t ms);
-
 int therm_sample_get(therm_id_t id, int16_t *temp);

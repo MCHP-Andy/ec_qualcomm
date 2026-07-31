@@ -9,6 +9,17 @@
 
 // ACPI command
 
+#define ACPI_CMD_SUBSCRIBE(A, B, C, D, E, F)                                   \
+    STRUCT_SECTION_ITERABLE(                                                   \
+        acpi_cmd_t, UTIL_CAT(_acpi_cmd_, UTIL_CAT(B, UTIL_CAT(_, C)))) = {     \
+        .cmd = B,                                                              \
+        .cmd_hdl = C,                                                          \
+        .mand = D,                                                             \
+        .opt = E,                                                              \
+        .resp_len = F,                                                         \
+        .name = #A,                                                            \
+    }
+
 struct acpi_cmd_t; 
 typedef struct acpi_cmd_t acpi_cmd_t;
 
@@ -23,13 +34,23 @@ typedef struct acpi_cmd_t {
     uint16_t opt;  // Number of optional arguments *after* the command opcode.
     uint16_t
         resp_len; // Expected response length (including byte count if present).
+    const char *name;
 } acpi_cmd_t;
 
-int acpi_cmd_info_get(uint8_t cmd, const acpi_cmd_t *cmd_info);
+typedef enum {
+    ACPI_TYPE_CMD = 0,
+    ACPI_TYPE_DATA,
+} acpi_type_t;
 
-int acpi_write(uint8_t *data, uint16_t len);
+/**
+ * 
+ */
+int acpi_buf_set(acpi_type_t id, uint8_t data);
 
-int acpi_read(uint8_t *data, uint16_t len);
+/*
+ * 
+ */
+int acpi_resp_set(uint8_t *pdata, uint16_t len);
 
 
 // SCI event

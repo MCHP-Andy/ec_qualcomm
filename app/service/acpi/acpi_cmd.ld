@@ -1,0 +1,2 @@
+
+ITERABLE_SECTION_ROM(acpi_cmd_t, 4)
