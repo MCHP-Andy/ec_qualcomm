@@ -68,6 +68,15 @@ int acpi_resp_set(uint8_t *pdata, uint16_t len) {
     return 0;
 }
 
+int soccp_resp_set(uint8_t *pdata, uint16_t len) {
+    LOG_INF("[SIM] SOCCP data len: %d", len);
+
+    // Dump soccp data
+    LOG_HEXDUMP_INF(pdata, len, "[SIM] SOCCP data :");
+
+    return 0;
+}
+
 /* --- Shell Interface --- */
 
 static int cmd_sim_fan_set(const struct shell *sh, size_t argc, char **argv) {

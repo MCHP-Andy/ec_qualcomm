@@ -29,8 +29,17 @@ typedef struct soccp_cmd_t {
         resp_len; // Expected response length (including byte count if present).
 } soccp_cmd_t;
 
-int soccp_cmd_info_get(uint8_t cmd, const soccp_cmd_t *cmd_info);
+typedef enum {
+    SOCCP_TYPE_CMD = 0,
+    SOCCP_TYPE_DATA,
+} soccp_type_t;
 
-int soccp_write(uint8_t *data, uint16_t len);
+/**
+ * 
+ */
+int soccp_buf_set(soccp_type_t id, uint8_t data);
 
-int soccp_read(uint8_t *data, uint16_t len);
+/**
+ * 
+ */
+int soccp_resp_set(uint8_t *pdata, uint16_t len);
