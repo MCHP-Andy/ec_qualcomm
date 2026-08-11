@@ -21,6 +21,7 @@ static const soccp_cmd_t soccp_cmd_tbl[] = {
     // clang-format on
 };
 
+static uint8_t cmd_idx = 0;
 static uint8_t rece_cmd[SOCCP_RECE_LEN];
 static uint8_t resp_buf[SOCCP_RESP_LEN];
 static K_EVENT_DEFINE(event);
@@ -35,58 +36,36 @@ typedef struct soccp_evt_t {
 
 K_MSGQ_DEFINE(soccp_evt_queue, sizeof(soccp_evt_t), SOCCP_EVT_LEN, 4);
 
-int soccp_cmd_info_get(uint8_t cmd, const soccp_cmd_t *cmd_info) {
-    if (cmd_info == NULL) {
-        return -EINVAL;
+int soccp_buf_set(soccp_type_t id, uint8_t data) {
+
+    if (cmd_idx >= sizeof(rece_cmd)) {
+        LOG_WRN("cmd_idx: %d", cmd_idx);
+        cmd_idx = 0;
     }
 
-    for (size_t i = 0; i < ARRAY_SIZE(soccp_cmd_tbl); i++) {
-        if (soccp_cmd_tbl[i].cmd == cmd) {
-            memcpy((void *)cmd_info, &soccp_cmd_tbl[i], sizeof(soccp_cmd_t));
-            return 0;
-        }
-    }
-    return -EINVAL;
-}
+    switch (id) {
+    case SOCCP_TYPE_CMD:
+        // Recieve cmd
+        cmd_idx = 0;
+        __fallthrough;
 
-int soccp_write(uint8_t *data, uint16_t len) {
-    int ret;
-    soccp_evt_t evt = {.pdata = data, .len = len};
+    case SOCCP_TYPE_DATA:
+        rece_cmd[cmd_idx] = data;
+        cmd_idx++;
 
-    ret = k_msgq_put(&soccp_evt_queue, &evt, K_NO_WAIT);
-    if (ret < 0) {
-        LOG_ERR("Put SoCCP CMD fail: %d", ret);
-        return ret;
-    }
+        k_event_post(&event, SOCCP_EVT_CMD);
+        break;
 
-    k_event_post(&event, SOCCP_EVT_CMD);
-    return 0;
-}
-
-int soccp_read(uint8_t *data, uint16_t len) {
-    uint16_t max = MIN(len, sizeof(resp_buf));
-
-    if (data == NULL) {
-        return -ENOMEM;
+    default:
+        LOG_WRN("Unknow ID: %d", id);
+        break;
     }
 
-    memcpy(data, resp_buf, max);
     return 0;
 }
 
 static int soccp_cmd_dispatcher(void) {
     int ret;
-    soccp_evt_t event;
-
-    ret = k_msgq_get(&soccp_evt_queue, &event, K_NO_WAIT);
-    if (ret < 0)
-        return -EINVAL;
-
-    uint16_t len = MIN(event.len, sizeof(rece_cmd));
-    memcpy(rece_cmd, event.pdata, len);
-
-    if (len < 1)
-        return -EINVAL;
 
     // Parse the cmd and call corresponding handler function, then copy response
     // to interface buffer
@@ -95,10 +74,11 @@ static int soccp_cmd_dispatcher(void) {
         const soccp_cmd_t *cmd_info = &soccp_cmd_tbl[i];
 
         if (rece_cmd[0] == cmd_info->cmd) {
-            if (cmd_info->cmd_hdl != NULL) {
+            if (((cmd_idx == cmd_info->mand) || (cmd_idx == cmd_info->mand + cmd_info->opt)) &&
+                (cmd_info->cmd_hdl != NULL)) {
                 soccp_cmd_hdl_t cmd_hdl = cmd_info->cmd_hdl;
 
-                ret = cmd_hdl(cmd_info, rece_cmd, len, resp_buf,
+                ret = cmd_hdl(cmd_info, rece_cmd, cmd_idx, resp_buf,
                               sizeof(resp_buf));
                 if (ret < 0) {
                     LOG_ERR("Failed to handle SoCCP cmd 0x%02x: %d", rece_cmd[0],
@@ -106,8 +86,9 @@ static int soccp_cmd_dispatcher(void) {
                 } else {
                     LOG_INF("Handled SoCCP cmd 0x%02x successfully",
                             rece_cmd[0]);
+                    soccp_resp_set(resp_buf, cmd_info->resp_len);
                 }
-            } else {
+            } else if (cmd_info->cmd_hdl == NULL) {
                 LOG_WRN("No handler for SoCCP cmd 0x%02x", rece_cmd[0]);
             }
             break;
@@ -127,8 +108,10 @@ static void service(void *p1, void *p2, void *p3) {
     ARG_UNUSED(p3);
 
     while (1) {
-        uint32_t evt = k_event_wait(&event, SOCCP_EVT_CMD, true, K_FOREVER);
+        uint32_t evt = k_event_wait(&event, SOCCP_EVT_CMD, false, K_FOREVER);
+
         if (evt & SOCCP_EVT_CMD) {
+            k_event_clear(&event, SOCCP_EVT_CMD);
             soccp_cmd_dispatcher();
         }
     }
@@ -142,14 +125,18 @@ K_THREAD_DEFINE(soccp_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M,
 
 static int cmd_soccp_write(const struct shell *sh, size_t argc, char **argv) {
     int ret = 0;
-    uint8_t buff[64];
-    uint16_t max = MIN(argc - 1, sizeof(buff));
+    uint8_t buff;
 
-    for (size_t i = 0; i < max; i++) {
-        buff[i] = strtoul(argv[i + 1], NULL, 16);
+    for (size_t i = 0; i < argc-1; i++) {
+        buff = strtoul(argv[i + 1], NULL, 16);
+
+        if (i == 0) {
+            soccp_buf_set(SOCCP_TYPE_CMD, buff);
+        } else {
+            soccp_buf_set(SOCCP_TYPE_DATA, buff);
+        }
     }
 
-    ret = soccp_write(buff, max);
     if (ret < 0) {
         shell_error(sh, "Failed to write SoCCP CMD: %d", ret);
     } else {
@@ -159,27 +146,27 @@ static int cmd_soccp_write(const struct shell *sh, size_t argc, char **argv) {
     return ret;
 }
 
-static int cmd_soccp_read(const struct shell *sh, size_t argc, char **argv) {
-    int ret = 0;
-    uint8_t buff[64];
+// static int cmd_soccp_read(const struct shell *sh, size_t argc, char **argv) {
+//     int ret = 0;
+//     uint8_t buff[64];
 
-    ret = soccp_read(buff, sizeof(buff));
-    if (ret < 0) {
-        shell_error(sh, "Failed to read SoCCP CMD: %d", ret);
-        return ret;
-    }
+//     ret = soccp_read(buff, sizeof(buff));
+//     if (ret < 0) {
+//         shell_error(sh, "Failed to read SoCCP CMD: %d", ret);
+//         return ret;
+//     }
 
-    shell_print(sh, "SoCCP Read Response:");
-    shell_hexdump(sh, buff, sizeof(buff));
+//     shell_print(sh, "SoCCP Read Response:");
+//     shell_hexdump(sh, buff, sizeof(buff));
 
-    return ret;
-}
+//     return ret;
+// }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_soccp,
 	SHELL_CMD_ARG(write, NULL,
 		"Write SoCCP command and optional data bytes (hex)", cmd_soccp_write, 2, 64),
-	SHELL_CMD_ARG(read, NULL,
-		"Read the last SoCCP response buffer", cmd_soccp_read, 1, 0),
+	// SHELL_CMD_ARG(read, NULL,
+	// 	"Read the last SoCCP response buffer", cmd_soccp_read, 1, 0),
 	SHELL_SUBCMD_SET_END /* Array terminated. */
 );
 

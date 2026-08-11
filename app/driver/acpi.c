@@ -41,6 +41,11 @@ int acpi_resp_set(uint8_t *pdata, uint16_t len) {
     return 0;
 }
 
+int soccp_resp_set(uint8_t *pdata, uint16_t len) {
+    memcpy(resp_buf, pdata, (len <= sizeof(resp_buf)) ? len : sizeof(resp_buf));
+    return 0;
+}
+
 /*
  * @brief Callback which is called when a write request is received from the
  * master.
@@ -66,14 +71,13 @@ static int acpi_target_write_received_cb(struct i2c_target_config *config,
     switch (i2c_state) {
     case I2C_STATE_START_WRITE:
         acpi_buf_set(ACPI_TYPE_CMD, val);
-        // TODO: Support SOCCP cmd
+        soccp_buf_set(SOCCP_TYPE_CMD, val);
 
         i2c_state = I2C_STATE_WRITE;
         break;
     case I2C_STATE_WRITE:
         acpi_buf_set(ACPI_TYPE_DATA, val);
-
-        // TODO: Support SOCCP cmd
+        soccp_buf_set(SOCCP_TYPE_DATA, val);
         break;
     default:
         LOG_WRN("Unexpected I2C state: %d", i2c_state);
