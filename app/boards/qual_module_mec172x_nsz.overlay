@@ -75,6 +75,8 @@
     port_sel = <7>;
     pinctrl-0 = < &i2c07_sda_gpio012 &i2c07_scl_gpio013 >;
 	pinctrl-names = "default";
+
+    label = "acpi_i2c";
 };
 
 &i2c_smb_2 {
@@ -82,6 +84,8 @@
     port_sel = <1>;
     pinctrl-0 = < &i2c01_sda_gpio130 &i2c01_scl_gpio131 >;
 	pinctrl-names = "default";
+
+    label = "sen_i2c";
 };
 
 &adc0 {
