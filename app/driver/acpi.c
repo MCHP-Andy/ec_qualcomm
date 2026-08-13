@@ -16,6 +16,9 @@
 
 LOG_MODULE_REGISTER(acpi_i2c, LOG_LEVEL_INF);
 
+#define ACPI_ADDR  (0x76)
+#define SOCCP_ADDR (0x0C)
+
 enum {
 	I2C_STATE_IDLE = 0,
 	I2C_STATE_START_WRITE,
@@ -32,9 +35,11 @@ enum {
 static const struct device *bus = DEVICE_DT_GET_OR_NULL(DT_ALIAS(acpi_i2c));
 
 static uint8_t i2c_state = I2C_STATE_IDLE;
-
 static uint16_t resp_idx = 0;
 static uint8_t resp_buf[ACPI_RESP_LEN] = {0};
+
+// Workaround for 2 slave address, check address to determine which command to process
+static uint8_t i2c_addr = 0;
 
 int acpi_resp_set(uint8_t *pdata, uint16_t len) {
     memcpy(resp_buf, pdata, (len <= sizeof(resp_buf)) ? len : sizeof(resp_buf));
@@ -56,6 +61,11 @@ static int acpi_target_write_requested_cb(struct i2c_target_config *config) {
 
     i2c_state = I2C_STATE_START_WRITE;
 
+    // Workaround for 2 slave address, check address to determine which command to process
+    #define ACPI_I2C_REG_BASE (DT_REG_ADDR_BY_IDX(DT_ALIAS(acpi_i2c), 0))
+    #define I2C_DATA_REG_OFFSET 0x08
+    i2c_addr = (sys_read32(ACPI_I2C_REG_BASE + I2C_DATA_REG_OFFSET) >> 1) & 0x7F;
+
     return 0;
 }
 
@@ -70,14 +80,24 @@ static int acpi_target_write_received_cb(struct i2c_target_config *config,
 
     switch (i2c_state) {
     case I2C_STATE_START_WRITE:
-        acpi_buf_set(ACPI_TYPE_CMD, val);
-        soccp_buf_set(SOCCP_TYPE_CMD, val);
+        if (i2c_addr == ACPI_ADDR) {
+            acpi_buf_set(ACPI_TYPE_CMD, val);
+        } else if (i2c_addr == SOCCP_ADDR) {
+            soccp_buf_set(SOCCP_TYPE_CMD, val);
+        } else {
+            LOG_WRN("Unknown I2C address: 0x%02x", i2c_addr);
+        }            
 
         i2c_state = I2C_STATE_WRITE;
         break;
     case I2C_STATE_WRITE:
-        acpi_buf_set(ACPI_TYPE_DATA, val);
-        soccp_buf_set(SOCCP_TYPE_DATA, val);
+        if (i2c_addr == ACPI_ADDR) {
+            acpi_buf_set(ACPI_TYPE_DATA, val);
+        } else if (i2c_addr == SOCCP_ADDR) {
+            soccp_buf_set(SOCCP_TYPE_DATA, val);
+        } else {
+            LOG_WRN("Unknown I2C address: 0x%02x", i2c_addr);
+        }
         break;
     default:
         LOG_WRN("Unexpected I2C state: %d", i2c_state);
@@ -93,22 +113,11 @@ static int acpi_target_write_received_cb(struct i2c_target_config *config,
  * @param config Pointer to the target configuration.
  * @param val Pointer to the byte to be sent to the master.
  */
-static int acpi_target_read_cb(struct i2c_target_config *config, uint8_t *val) {
+static int acpi_target_read_processed_cb(struct i2c_target_config *config, uint8_t *val) {
     switch (i2c_state) {
-    
-    // prevent from restart
-    case I2C_STATE_WRITE:
-    case I2C_STATE_IDLE:
-        LOG_DBG("acpi target read request: 0x%02x", *val);
-
-        resp_idx = 0;
-        *val = resp_buf[resp_idx++];
-
-        i2c_state = I2C_STATE_READ;
-        break;
     case I2C_STATE_READ:
-        LOG_DBG("acpi target read processed: 0x%02x", *val);
         *val = resp_buf[resp_idx++];
+        LOG_DBG("acpi target read processed: 0x%02x", *val);
         break;
 
     default:
@@ -117,6 +126,14 @@ static int acpi_target_read_cb(struct i2c_target_config *config, uint8_t *val) {
     }
 
     return 0;
+}
+
+static int acpi_target_read_requested_cb(struct i2c_target_config *config, uint8_t *val) {
+
+    i2c_state = I2C_STATE_READ;
+    resp_idx = 0;
+
+    return acpi_target_read_processed_cb(config, val);
 }
 
 /*
@@ -135,13 +152,10 @@ static int acpi_target_stop_cb(struct i2c_target_config *config) {
 static struct i2c_target_callbacks acpi_target_callbacks = {
     .write_requested = acpi_target_write_requested_cb,
     .write_received = acpi_target_write_received_cb,
-    .read_requested = acpi_target_read_cb,
-    .read_processed = acpi_target_read_cb,
+    .read_requested = acpi_target_read_requested_cb,
+    .read_processed = acpi_target_read_processed_cb,
     .stop = acpi_target_stop_cb,
 };
-
-#define ACPI_ADDR  (0x76)
-#define SOCCP_ADDR (0x0C)
 
 static struct i2c_target_config target_cfg = {
     // Workaround for 2 slave address
