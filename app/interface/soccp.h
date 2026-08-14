@@ -34,6 +34,28 @@ typedef enum {
     SOCCP_TYPE_DATA,
 } soccp_type_t;
 
+/*
+ * OffMode/OOB status bits (Ref: EC Off mode / OOB State Message, page 56)
+ *
+ * Expected combinations:
+ *   S0 + OOB    : 0x06 (bit 1, 2)
+ *   S4/S5 + OOB : 0x07 (bit 0, 1, 2)
+ *   S0          : 0x02 (bit 1)
+ *   S4/S5       : 0x03 (bit 0, 1)
+ */
+#define SOCCP_OOB_STA_OFF_MODE (1U << 0) // SoC is on Off-mode
+#define SOCCP_OOB_STA_ACTIVE   (1U << 1) // SoCCP is active (always set)
+#define SOCCP_OOB_STA_INITED   (1U << 2) // OOB initialized, can talk to SoCCP
+#define SOCCP_OOB_STA_MASK     (0x07U)   // Bit 3 to 7 are reserved
+
+/**
+ * @brief Get the latest OffMode/OOB status reported by SoC-CP.
+ *
+ * @param status Output for the raw status, see SOCCP_OOB_STA_*.
+ * @retval 0 on success, -EINVAL when @p status is NULL.
+ */
+int soccp_oob_state_get(uint16_t *status);
+
 /**
  * 
  */

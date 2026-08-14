@@ -86,7 +86,11 @@ static int soccp_cmd_dispatcher(void) {
                 } else {
                     LOG_INF("Handled SoCCP cmd 0x%02x successfully",
                             rece_cmd[0]);
-                    soccp_resp_set(resp_buf, cmd_info->resp_len);
+                    /* Write-only commands have no response, leave the
+                     * interface buffer untouched */
+                    if (cmd_info->resp_len) {
+                        soccp_resp_set(resp_buf, cmd_info->resp_len);
+                    }
                 }
             } else if (cmd_info->cmd_hdl == NULL) {
                 LOG_WRN("No handler for SoCCP cmd 0x%02x", rece_cmd[0]);
@@ -162,9 +166,30 @@ static int cmd_soccp_write(const struct shell *sh, size_t argc, char **argv) {
 //     return ret;
 // }
 
+static int cmd_soccp_state(const struct shell *sh, size_t argc, char **argv) {
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    uint16_t status = 0;
+
+    soccp_oob_state_get(&status);
+
+    shell_info(sh, "OffMode/OOB status: 0x%04x", status);
+    shell_info(sh, "\tBit 0 SoC on Off-mode : %d",
+               !!(status & SOCCP_OOB_STA_OFF_MODE));
+    shell_info(sh, "\tBit 1 SoCCP active    : %d",
+               !!(status & SOCCP_OOB_STA_ACTIVE));
+    shell_info(sh, "\tBit 2 OOB initialized : %d",
+               !!(status & SOCCP_OOB_STA_INITED));
+
+    return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_soccp,
 	SHELL_CMD_ARG(write, NULL,
 		"Write SoCCP command and optional data bytes (hex)", cmd_soccp_write, 2, 64),
+	SHELL_CMD_ARG(state, NULL,
+		"Dump the latest OffMode/OOB status reported by SoC-CP", cmd_soccp_state, 1, 0),
 	// SHELL_CMD_ARG(read, NULL,
 	// 	"Read the last SoCCP response buffer", cmd_soccp_read, 1, 0),
 	SHELL_SUBCMD_SET_END /* Array terminated. */

@@ -35,6 +35,39 @@ SYS_EVENT_SUBSCRIBE(fan, event);
 static uint16_t temps[THERM_SRC_MAX] = {0};
 static fan_ctrl_t fan_blks[FAN_ID_MAX] = {0};
 
+/*
+ * SoC-CP fan power constraint (Ref: EC FAN Constraints Message, page 55).
+ * Spec default is 0 (OFF), the fan(s) stay OFF until SoC-CP grants permission
+ * to turn them ON, so a brown out cannot be triggered before SoC-CP is up.
+ */
+static bool fan_allow_on = false;
+
+int fan_constraint_set(bool allow_on) {
+
+    if (fan_allow_on == allow_on) {
+        return 0;
+    }
+
+    fan_allow_on = allow_on;
+    LOG_INF("Fan constraint: FAN(s) can %s", allow_on ? "turn ON" : "only stay OFF");
+
+    // Notify service thread to re-evaluate the fan output
+    k_event_post(&event, FAN_CFG_UPDATE);
+
+    return 0;
+}
+
+int fan_constraint_get(bool *allow_on) {
+
+    if (allow_on == NULL) {
+        return -EINVAL;
+    }
+
+    *allow_on = fan_allow_on;
+
+    return 0;
+}
+
 int fan_tmp_get(fan_id_t tmp_src, uint16_t *tmp) {
 
     if (tmp_src == 0 || tmp_src >= ARRAY_SIZE(temps) || tmp == NULL) {
@@ -179,6 +212,13 @@ static void service(void) {
 
             // Check debug mode
             if (check_fan_debug(fan_blk)) {
+                continue;
+            }
+
+            // Check SoC-CP fan power constraint
+            if (!fan_allow_on) {
+                LOG_DBG("Fan%d forced OFF by SoC-CP fan constraint", fan);
+                fan_rpm_update(fan_blk, 0);
                 continue;
             }
 
@@ -566,6 +606,7 @@ static void dump_fan_info(const struct shell *sh, fan_ctrl_t *fan_blk) {
         }
     }
 
+    shell_info(sh, "Fan constraint allow_on: %d", fan_allow_on);
     shell_info(sh, "Fan dbg_mode: 0x%02x", fan_blk->dbg_mode);
     shell_info(sh, "Fan dbg_rpm: %d", fan_blk->dbg_rpm);
     shell_info(sh, "Fan dbg_pwm: %d", fan_blk->dbg_pwm);
@@ -649,6 +690,20 @@ static int cmd_fan_debug(const struct shell *sh, size_t argc, char **argv) {
     return 0;
 }
 
+static int cmd_fan_constraint(const struct shell *sh, size_t argc, char **argv) {
+    bool allow_on;
+
+    if (argc >= 2) {
+        fan_constraint_set(strtoul(argv[1], NULL, 0) != 0);
+    }
+
+    fan_constraint_get(&allow_on);
+    shell_info(sh, "Fan constraint: %d (FAN(s) can %s)", allow_on,
+               allow_on ? "turn ON" : "only stay OFF");
+
+    return 0;
+}
+
 static int cmd_temp_set(const struct shell *sh, size_t argc, char **argv) {
     int ret = 0;
 
@@ -686,6 +741,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_fan,
 		"Set fan trip points <id> <low> <high>", cmd_fan_trip, 4, 0),
 	SHELL_CMD_ARG(profile, NULL,
 		"Set fan profile <id> <profile_id>", cmd_fan_profile, 3, 0),
+	SHELL_CMD_ARG(constraint, NULL,
+		"Get/set SoC-CP fan constraint [0: FAN(s) OFF, 1: FAN(s) can turn ON]",
+		cmd_fan_constraint, 1, 1),
 	SHELL_CMD_ARG(debug, NULL,
 		"Set debug settings <id> <mode_hex> [val]\n"
         "Usage:\n"
