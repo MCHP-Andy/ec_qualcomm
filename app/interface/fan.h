@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 
@@ -80,6 +81,22 @@ int fan_rpm_write(fan_id_t fan_id, uint16_t rpm);
 int fan_tbl_get(fan_id_t profile, fan_id_t fan_id, fan_id_t tmp_src,
                 fan_tbl_t **tbl, uint8_t *len);
 
+
+/**
+ * @brief Apply the SoC-CP power constraint on the fan(s).
+ *
+ * SoC-CP notifies the EC about power constraints to avoid brown out of the
+ * device. While constrained the fan(s) shall remain OFF regardless of the
+ * thermal LUT.
+ *
+ * @param allow_on false: FAN(s) should remain OFF, true: FAN(s) can turn ON.
+ */
+int fan_constraint_set(bool allow_on);
+
+/**
+ * @brief Get the current SoC-CP fan power constraint.
+ */
+int fan_constraint_get(bool *allow_on);
 
 int fan_pwm_set(fan_id_t id, uint16_t pwm);
 
