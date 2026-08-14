@@ -5,6 +5,7 @@
  * @Last Modified time: 2026-04-23 23:44:13
  */
 
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
@@ -34,6 +35,17 @@ enum {
 
 static const struct device *bus = DEVICE_DT_GET_OR_NULL(DT_ALIAS(acpi_i2c));
 
+#define ACPI_INT_NODE DT_PATH(zephyr_user)
+#define ACPI_INT_AVAILABLE DT_NODE_HAS_PROP(ACPI_INT_NODE, acpi_int_gpios)
+
+// Width of the notification pulse, wide enough for the host edge detection
+#define ACPI_INT_PULSE_US (100)
+
+#if ACPI_INT_AVAILABLE
+static const struct gpio_dt_spec acpi_int =
+    GPIO_DT_SPEC_GET(ACPI_INT_NODE, acpi_int_gpios);
+#endif
+
 static uint8_t i2c_state = I2C_STATE_IDLE;
 static uint16_t resp_idx = 0;
 static uint8_t resp_buf[ACPI_RESP_LEN] = {0};
@@ -49,6 +61,37 @@ int acpi_resp_set(uint8_t *pdata, uint16_t len) {
 int soccp_resp_set(uint8_t *pdata, uint16_t len) {
     memcpy(resp_buf, pdata, (len <= sizeof(resp_buf)) ? len : sizeof(resp_buf));
     return 0;
+}
+
+int acpi_int_pulse(void) {
+#if ACPI_INT_AVAILABLE
+    int ret;
+
+    if (!gpio_is_ready_dt(&acpi_int)) {
+        LOG_ERR("ACPI int pin not ready");
+        return -ENODEV;
+    }
+
+    ret = gpio_pin_set_dt(&acpi_int, 1);
+    if (ret < 0) {
+        LOG_ERR("Failed to assert ACPI int pin: %d", ret);
+        return ret;
+    }
+
+    k_busy_wait(ACPI_INT_PULSE_US);
+
+    ret = gpio_pin_set_dt(&acpi_int, 0);
+    if (ret < 0) {
+        LOG_ERR("Failed to release ACPI int pin: %d", ret);
+        return ret;
+    }
+
+    LOG_DBG("ACPI int pin pulsed %d us", ACPI_INT_PULSE_US);
+
+    return 0;
+#else
+    return -ENOTSUP;
+#endif
 }
 
 /*
@@ -175,6 +218,16 @@ static int init_config(void) {
         LOG_ERR("Failed to register target");
         return -1;
     }
+
+#if ACPI_INT_AVAILABLE
+    // Host interrupt line idles low, SCI service pulses it per event
+    if (gpio_pin_configure_dt(&acpi_int, GPIO_OUTPUT_INACTIVE) < 0) {
+        LOG_ERR("Failed to configure ACPI int pin");
+        return -1;
+    }
+#else
+    LOG_WRN("No acpi-int-gpios in DT, SCI cannot notify host");
+#endif
 
     return 0;
 }
