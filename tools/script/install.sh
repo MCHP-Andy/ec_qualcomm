@@ -20,9 +20,13 @@ fi
 export PIP_TRUSTED_HOST="pypi.org files.pythonhosted.org pypi.python.org"
 pip install west
 
+west config manifest.group-filter -- -local_app
+
 west init -l tools
 west update
 
-# west zephyr-export
+west config manifest.group-filter ""
+
+west zephyr-export
 
 pip install -r zephyr-rtos/scripts/requirements.txt
