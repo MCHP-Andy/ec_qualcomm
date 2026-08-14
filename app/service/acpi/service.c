@@ -45,7 +45,10 @@ K_MSGQ_DEFINE(acpi_evt_queue, sizeof(acpi_evt_t), ACPI_EVT_LEN, 4);
 K_MSGQ_DEFINE(sci_queue, sizeof(sci_t), SCI_LEN, 4);
 
 int acpi_buf_set(acpi_type_t id, uint8_t data) {
-    static uint8_t mand = 0; 
+    static uint8_t mand = 0;
+    // Whether the mandatory argument dispatch already handled the command as
+    // it currently stands, so the end of transfer does not run it a second time
+    static bool dispatched = false;
 
     if (cmd_idx >= sizeof(rece_cmd)) {
         LOG_WRN("cmd_idx: %d", cmd_idx);
@@ -57,6 +60,11 @@ int acpi_buf_set(acpi_type_t id, uint8_t data) {
         // Recieve cmd
         cmd_idx = 0;
         mand = 0;
+        dispatched = false;
+
+        // Store the opcode before the lookup, otherwise the previous command
+        // opcode is the one being searched for
+        rece_cmd[0] = data;
 
         // Search for the mandatory argument count for the command
         STRUCT_SECTION_FOREACH(acpi_cmd_t, p) {
@@ -72,12 +80,23 @@ int acpi_buf_set(acpi_type_t id, uint8_t data) {
         cmd_idx++;
 
         if (cmd_idx == mand) {
+            // Mandatory arguments complete, handle it now so the response is
+            // ready even when the host reads without ending the transfer
+            dispatched = true;
             k_event_post(&event, ACPI_CMD);
+        } else if (cmd_idx > mand) {
+            // Optional payload arrived after that dispatch, the handler has to
+            // run again to see the complete command
+            dispatched = false;
         }
         break;
 
     case ACPI_TYPE_PROCESS:
-        k_event_post(&event, ACPI_CMD);
+        // End of transfer, only needed when the dispatch above did not already
+        // handle the command as received
+        if (dispatched == false) {
+            k_event_post(&event, ACPI_CMD);
+        }
         break;
 
     default:
