@@ -40,6 +40,7 @@ typedef struct acpi_cmd_t {
 typedef enum {
     ACPI_TYPE_CMD = 0,
     ACPI_TYPE_DATA,
+    ACPI_TYPE_PROCESS,
 } acpi_type_t;
 
 /**
