@@ -9,6 +9,23 @@ module = ACPI
 module-str = acpi
 source "subsys/logging/Kconfig.template.log_config"
 
+config ACPI_SCI_QUEUE_LEN
+	int "SCI event queue length"
+	range 1 64
+	default 16
+	help
+	  Number of SCI events that can be pending in the queue while waiting to
+	  be notified to the host. Events are dropped once the queue is full.
+
+config ACPI_SCI_TIMEOUT_MS
+	int "SCI notification timeout (ms)"
+	range 1 10000
+	default 100
+	help
+	  Time the host is given to read a notified SCI event with cmd 0x05 after
+	  the ACPI interrupt line is asserted. When it expires the event is
+	  dropped and the next queued event, if any, is notified instead.
+
 config ACPI_SHELL
 	bool "ACPI Shell commands"
 	depends on SHELL

@@ -12,10 +12,17 @@
 | `sci en <0\|1>` | 啟用/關閉 SCI 通知 |
 | `sci put <hex>` | 模擬塞入一筆 SCI event |
 | `sci get` | 讀取並清除目前 pending 的 SCI |
+| `sci sta` | 顯示 SCI enable / power state / pending / queue 深度 / timeout |
 
 > 注意:**寫入指令後需再下 `acpi read`** 才能看到回應。
 > `0x24 / 0x25 / 0x28 / 0x30 / 0x32 / 0x34 / 0x35` 為讀寫共用同一 cmd,EC 以 payload 長度(是否帶 data)區分讀/寫。
 > 16-bit 資料一律 **LSB 在前**。
+
+> `acpi write` 結尾會送 `ACPI_TYPE_PROCESS`,與 I2C 的 stop condition 一致,
+> 所以上面那些讀寫共用的 cmd 用 shell 也能測到 write path。
+> Dispatch 規則:mand 收滿時處理一次(讓 host 不下 stop 直接 read 也拿得到回應);
+> 之後若還有 optional payload 進來,才會在結束時再處理一次。
+> 因此純讀取的 cmd(如 `0x05`)一個 transaction 只會被處理**一次**。
 
 ---
 
@@ -382,7 +389,41 @@ sci put 32        # 模擬: Fan1 RPM Cross
 sci put 36        # 模擬: EC Therm1 Cross
 sci put 3D        # 模擬: EC Reset
 sci get           # 讀取並清除目前 pending 的 SCI
+sci sta           # 查看 SCI enable / power state / queue 狀態
 sci en 0          # 關閉 SCI 通知
+```
+
+### SCI 通知流程
+
+`sci_enque()` 是唯一的 producer 入口,流程如下:
+
+1. `sci_enque(sci)` → 檢查 SCI enable(cmd 0x35 bit 0)與 power state,不通過就 **drop**
+2. 通過則存入 queue(長度 `CONFIG_ACPI_SCI_QUEUE_LEN`,預設 16)
+3. ACPI service 取出一筆放入 host 可讀的 buffer,對 `acpi-int-gpios` **送一個 100us pulse** 通知 host(不會一直 keep high)
+4. Host 以 cmd `0x05` 讀回 → queue 內下一筆立刻補上並再送一次 pulse
+5. Host 未在 `CONFIG_ACPI_SCI_TIMEOUT_MS`(預設 100ms)內讀取 → 該筆 **drop**,下一筆補上
+6. Power state 掉出 S0 / Modern Standby → pending 與 queue 全部清空
+
+Power state 政策:僅 **S0** 與 **Modern Standby** 會送出 SCI;S3 / S4 / S5 / G3 一律 drop。
+
+> 注意:power service 開機預設為 **G3**,此時 SCI 會全部被 drop。
+> 測試前需先 `power set 1` 切到 S0。
+
+```bash
+# 完整流程測試
+power set 1        # 切到 S0,否則 SCI 全部被 drop
+sci put 30         # pulse acpi-int-gpios,log: "Notify SCI 0x30"
+sci put 36         # 排在 queue 等待
+sci sta            # Pending SCI: 0x30, Queued: 1/16
+acpi write 05      # Host 讀回 0x30 → 0x36 立刻補上並再 pulse 一次
+sci sta            # Pending SCI: 0x36, Queued: 0/16
+
+# Timeout drop 測試:拉起後不下 0x05,100ms 後
+#   log: "SCI 0x36 timeout, dropped",若 queue 還有資料會自動補上
+
+# Power state drop 測試
+power set 3        # log: "Drop SCI 0x36 and N queued event(s)"
+sci put 31         # 直接 drop,sci sta 仍為 0x00 / 0/16
 ```
 
 ---

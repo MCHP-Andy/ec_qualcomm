@@ -4,8 +4,9 @@
 #define ACPI_RECE_LEN 512
 #define ACPI_RESP_LEN 64
 
-#include <stdio.h>
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 // ACPI command
 
@@ -49,9 +50,18 @@ typedef enum {
 int acpi_buf_set(acpi_type_t id, uint8_t data);
 
 /*
- * 
+ *
  */
 int acpi_resp_set(uint8_t *pdata, uint16_t len);
+
+/**
+ * @brief Pulse the ACPI interrupt (SCI alert) line to notify the host.
+ *
+ * The line is only pulsed when an SCI event is sent, it is not held asserted
+ * while waiting for the host to read the event back with cmd
+ * EC_ACTIVE_COOLING_SCI_EVENT (0x05).
+ */
+int acpi_int_pulse(void);
 
 
 // SCI event
@@ -78,7 +88,18 @@ typedef enum {
 int acpi_sci_enable_set(bool en);
 int acpi_sci_enable_get(bool *en);
 
-int acpi_sci_put(sci_t sci);
-int acpi_sci_get(sci_t * psci);
-
-
+/**
+ * @brief Queue an SCI event to be notified to the host.
+ *
+ * The event is stored in the SCI queue and the ACPI interrupt line is pulsed
+ * so the host reads it back with cmd 0x05. Events are dropped (not queued)
+ * when SCI notification is disabled by the host (cmd 0x35 bit 0) or when the
+ * current power state cannot service them.
+ *
+ * @param sci SCI notification code.
+ *
+ * @retval 0 on success, or when the event is intentionally dropped.
+ * @retval -EINVAL invalid SCI code.
+ * @retval -ENOMSG SCI queue is full.
+ */
+int sci_enque(sci_t sci);

@@ -14,6 +14,7 @@
 #include <zephyr/shell/shell.h>
 #include <stdlib.h>
 
+#include <interface/acpi.h>
 #include <interface/fan.h>
 #include <interface/thermal.h>
 
@@ -64,6 +65,12 @@ int acpi_resp_set(uint8_t *pdata, uint16_t len) {
 
     // Dump acpi data
     LOG_HEXDUMP_INF(pdata, len, "[SIM] ACPI data :");
+
+    return 0;
+}
+
+int acpi_int_pulse(void) {
+    LOG_INF("[SIM] ACPI int pin pulsed");
 
     return 0;
 }
