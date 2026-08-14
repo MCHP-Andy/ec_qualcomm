@@ -1,0 +1,90 @@
+name: Zephyr App Review via Reviewdog Action
+
+on:
+  pull_request:
+    branches: 
+      - "test/ci"             # 只有推送到 test/ci 才會觸發 CI
+      - "test/zephyr_v3.7"    # 只有推送到 test/zephyr_v3.7 才會觸發 CI
+    types: [ opened, synchronize, reopened ]
+
+jobs:
+  cppcheck-review:
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
+      pull-requests: write # 必須賦予 Action 在 PR 頁面留言的權限
+
+    steps:
+      # 1. 複製 PR 的原始碼 (僅包含您的 app code)
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 關鍵：改為 0 代表複製所有歷史紀錄，Reviewdog 才能正確計算 diff
+
+      # 2. 自動在 Ubuntu 虛擬機安裝最新版 Cppcheck
+      - name: Install Cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+
+      # 3. 關鍵修正：使用官方 Action 安全安裝 Reviewdog (會自動加入系統 PATH)
+      - name: Setup Reviewdog
+        uses: reviewdog/action-setup@v1
+        with:
+          reviewdog_version: latest
+          
+      # 3. 核心：手動下載 Reviewdog 並直接分析 Cppcheck 結果
+      - name: Run Cppcheck Code Scan
+        run: |          
+          # 執行 Cppcheck (套用您專屬的 arm32-wchar_t4 免編譯黃金參數組合)
+          # 將 stderr 導向 (2>) 到 cppcheck.xml
+          cppcheck --enable=all --inconclusive --force --platform=arm32-wchar_t4 \
+            --library=std \
+            --suppress=missingIncludeSystem \
+            --suppress=unusedFunction \
+            --template='{file}:{line}:{column}: [{severity}] {message}' ./app 2> cppcheck_raw.txt
+          
+          # 2. 核心修正：使用 grep -v 過濾掉不含真實路徑的 nofile 系統噪音，產出乾淨的 txt
+          cat cppcheck_raw.txt | grep -v "nofile" > cppcheck.txt
+          
+          # [除錯區] 印出結果確保檔案寫入正確
+          echo "=== DEBUG: Cppcheck Raw Output ==="
+          cat cppcheck.txt
+          echo "=================================="
+
+      - name: Post Review Comments via github-pr-review
+        env:
+          # 必備：提供憑證讓 Reviewdog 呼叫 GitHub API
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |          
+          # 透過 Reviewdog 讀取 xml 並進行精準的行內留言 (Inline Comment)
+          # %f = 檔案 (app/service/power/service.c)
+          # %l = 行號 (110)
+          # %c = 欄位 (9)
+          # %t = 嚴重級別 (error)
+          # %m = 錯誤訊息 (Return value of allocation function...)
+          # -reporter=github-pr-check : 改用 GitHub 內建的 Checks 圖表與 Annotations 呈現
+          # -filter-mode=nofilter   : added, diff_context 只針對這次 PR 修改到的行數留言，不翻舊帳
+          # -level=error         : 只回報嚴重錯誤（也可調整成 warning）
+          echo "=> Processing serious errors..."
+          cat cppcheck.txt | grep "\[error\]" | reviewdog -efm="%f:%l:%c: %m" \
+            -name="Cppcheck Critical Error" \
+            -reporter=github-pr-review \
+            -filter-mode=nofilter \
+            -fail-level=error \
+            -level=error
+      
+      - name: Generate Global Checks Report via github-pr-check
+        # 關鍵大絕招：if: always() 強迫此步驟不受前面紅燈影響，必定執行！
+        if: always() 
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "=> Processing serious errors..."
+          cat cppcheck.txt | grep "\[error\]" | reviewdog -efm="%f:%l:%c: %m" \
+            -name="Cppcheck Critical Error" \
+            -reporter=github-pr-check \
+            -filter-mode=nofilter \
+            -fail-level=error \
+            -level=error

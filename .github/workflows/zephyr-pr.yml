@@ -1,0 +1,145 @@
+name: Qualcomm EC Zephyr PR
+
+on:
+  push:
+    branches: 
+      - "test/ci"             # 只有推送到 test/ci 才會觸發 CI
+      - "test/zephyr_v3.7"    # 只有推送到 test/zephyr_v3.7 才會觸發 CI
+  pull_request:
+    branches: 
+      - "test/zephyr_v3.7"       # 只有向 test/zephyr_v3.7 提 PR 才會觸發 CI
+
+jobs:
+  build-verification:
+    runs-on: ubuntu-24.04
+
+    strategy:
+      matrix:
+        # 使用 include 語法，為各個板子量身打造設定
+        include:
+          - board: qual_module/mec172x_nsz
+            upload-spi: true   # 這個板子要上傳特殊 bin 檔
+          - board: qemu_cortex_m3
+            upload-spi: false  # 這個板子不需要
+
+    steps:
+    # 【修正 1】Checkout 必須移到最前面，確保工作區基底乾淨
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    # 2. 安裝 Linux 必要編譯套件與 Python
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ninja-build wget
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Cache Toolchain, Python Environment and Zephyr SDK
+      id: zephyr-cache
+      uses: actions/cache@v6
+      with:
+        path: |
+          .venv
+          zephyr-rtos
+          zephyr-sdk-0.16.8
+        # 主要 Key：加上板子名稱，讓兩邊在結束時「分開儲存」，絕對不打架
+        key: ${{ runner.os }}-shared-env-${{ matrix.board }}
+        # 後備 Key：如果上面找不到，只要開頭符合這段文字的快取，就直接拿來用！
+        restore-keys: |
+          ${{ runner.os }}-shared-env-
+
+    - name: Install Python Environment and Zephyr SDK
+      if: steps.zephyr-cache.outputs.cache-hit != 'true'
+      run: |
+        echo "快取不存在！開始進行完整安裝..."
+        
+        # 1. 建立 Python 虛擬環境並安裝 west
+        python -m venv .venv
+        source .venv/bin/activate
+        pip install --upgrade pip
+        pip install west
+        
+        # 2. 下載並解壓 Zephyr SDK 最小化版本
+        wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.16.8/zephyr-sdk-0.16.8_linux-x86_64_minimal.tar.xz
+        tar -xf zephyr-sdk-0.16.8_linux-x86_64_minimal.tar.xz
+        
+        # 3. 進入 SDK 目錄並安裝 ARM 工具鏈
+        cd zephyr-sdk-0.16.8
+        ./setup.sh -t arm-zephyr-eabi -c
+        
+        # 清理下載的壓縮檔，避免它佔用快取空間
+        cd ..
+        rm zephyr-sdk-0.16.8_linux-x86_64_minimal.tar.xz
+
+    # 3. 安裝 west 工具並透過你自己的 west.yml 初始化工作區
+    - name: Initialize West workspace
+      run: |
+        source .venv/bin/activate
+
+        # 以包含你自訂 west.yml 的資料夾初始化工作區
+        west init -l tools
+        # 同步所有在 west.yml 裡面定義的 repositories (包含 Zephyr 核心)
+
+        # 關鍵：告訴 west 「不要（-）」下載帶有 local_app 標籤的專案
+        west config manifest.group-filter -- -local_app
+
+        west update
+
+        west config manifest.group-filter ""
+
+        # 匯出 Zephyr 的 CMake 套件設定
+        west zephyr-export
+
+    # 4. 安裝專案所需的 Python 依賴套件
+    - name: Install Python requirements
+      run: |
+        source .venv/bin/activate
+        pip install -r zephyr-rtos/scripts/requirements.txt
+
+    # 5. 下載與設定 Zephyr SDK 編譯器 (以 v0.16.8 ARM 為例)
+    - name: Setup Zephyr SDK
+      run: |
+        # 將 SDK 路徑加入 GitHub Actions 的環境變數中
+        echo "ZEPHYR_SDK_INSTALL_DIR=$GITHUB_WORKSPACE/zephyr-sdk-0.16.8" >> $GITHUB_ENV
+        echo "MEC5_SPI_GEN=$GITHUB_WORKSPACE/tools/kf_spi_gen_revb/mec175x_spi_gen_linux_x86_64" >> $GITHUB_ENV
+        echo "MEC5_SPI_CFG=$GITHUB_WORKSPACE/tools/kf_spi_gen_revb/spi_cfg.ini" >> $GITHUB_ENV
+
+    # 6. 使用 West 編譯你的應用程式
+    - name: Build Application
+      run: |
+        source .venv/bin/activate
+        west build -p -b ${{ matrix.board }} app
+
+    # 情況 A：如果是 qual_module/mec172x_nsz (upload-spi 為 true)，上傳包含特殊 bin 檔的完整結果
+    - name: Upload Full Results (with SPI & Primary Binaries)
+      if: matrix.upload-spi == true
+      uses: actions/upload-artifact@v6
+      with:
+        # name: compiled-result-${{ matrix.board }}
+        name: compiled-result-qual_module_mec172x_nsz
+        retention-days: 7
+        include-hidden-files: true
+        path: |
+          build/zephyr/.config
+          build/zephyr/zephyr.dts
+          build/zephyr/zephyr_final.map
+          build/zephyr/zephyr.elf
+          build/zephyr/spi_image.bin
+
+    # 情況 B：如果是其他板子 (upload-spi 為 false)，只上傳基本編譯結果，不包含那兩個 bin 檔
+    - name: Upload Standard Results
+      if: matrix.upload-spi == false
+      uses: actions/upload-artifact@v6
+      with:
+        name: compiled-result-${{ matrix.board }}
+        retention-days: 7
+        include-hidden-files: true
+        path: |
+          build/zephyr/.config
+          build/zephyr/zephyr.dts
+          build/zephyr/zephyr_final.map
+          build/zephyr/zephyr.elf

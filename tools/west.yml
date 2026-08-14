@@ -24,6 +24,8 @@ manifest:
 
     - name: app
       path: modules/app
+      groups:
+        - local_app
 
   self:
     path: tool
