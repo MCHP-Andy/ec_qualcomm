@@ -45,6 +45,7 @@ K_MSGQ_DEFINE(acpi_evt_queue, sizeof(acpi_evt_t), ACPI_EVT_LEN, 4);
 K_MSGQ_DEFINE(sci_queue, sizeof(sci_t), SCI_LEN, 4);
 
 int acpi_buf_set(acpi_type_t id, uint8_t data) {
+    static uint8_t mand = 0; 
 
     if (cmd_idx >= sizeof(rece_cmd)) {
         LOG_WRN("cmd_idx: %d", cmd_idx);
@@ -55,12 +56,27 @@ int acpi_buf_set(acpi_type_t id, uint8_t data) {
     case ACPI_TYPE_CMD:
         // Recieve cmd
         cmd_idx = 0;
+        mand = 0;
+
+        // Search for the mandatory argument count for the command
+        STRUCT_SECTION_FOREACH(acpi_cmd_t, p) {
+            if (rece_cmd[0] == p->cmd) {
+                mand = p->mand;
+                break;
+            }
+        }
         __fallthrough;
 
     case ACPI_TYPE_DATA:
         rece_cmd[cmd_idx] = data;
         cmd_idx++;
 
+        if (cmd_idx == mand) {
+            k_event_post(&event, ACPI_CMD);
+        }
+        break;
+
+    case ACPI_TYPE_PROCESS:
         k_event_post(&event, ACPI_CMD);
         break;
 
@@ -125,8 +141,7 @@ static int acpi_cmd_hdl(void) {
     // to interface buffer
     STRUCT_SECTION_FOREACH(acpi_cmd_t, p) {
         if (rece_cmd[0] == p->cmd) {
-            if (((cmd_idx == p->mand) || (cmd_idx == p->mand + p->opt)) &&
-                (p->cmd_hdl != NULL)) {
+            if ((cmd_idx >= p->mand) && (p->cmd_hdl != NULL)) {
                 acpi_cmd_hdl_t cmd_hdl = p->cmd_hdl;
 
                 ret = cmd_hdl(p, rece_cmd, cmd_idx, resp_buf, sizeof(resp_buf));

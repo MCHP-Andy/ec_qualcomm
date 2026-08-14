@@ -146,6 +146,10 @@ static int acpi_target_stop_cb(struct i2c_target_config *config) {
     resp_idx = 0;
     i2c_state = I2C_STATE_IDLE;
 
+    if (i2c_addr == ACPI_ADDR) {
+        acpi_buf_set(ACPI_TYPE_PROCESS, 0);
+    }
+
     return 0;
 }
 
