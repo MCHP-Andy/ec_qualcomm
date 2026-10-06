@@ -48,6 +48,28 @@ cd tools/KF_JLINK_Flash_Utility_L0100
 python kf_flsh_util.py -w -f ../../build/zephyr/spi_image.bin
 ```
 
+```shell
+$ cd tools/app_flash
+$ pyocd cmd -t cortex_m
+pyocd> halt
+Successfully halted device
+pyocd> 
+pyocd> 
+pyocd> load zephyr.bin 0x0c8000
+[==================================================] 100%
+[==================================================] 100%
+pyocd> 
+pyocd> wreg pc 0x0cc72D
+pyocd> reg pc
+pc = 0x000cc72c
+pyocd> go
+Successfully resumed device
+pyocd> exit
+
+$ python3 fw_upgrade.py ../../build/zephyr/spi_image.bin 0x0
+
+```
+
 
 ## Framework
 
