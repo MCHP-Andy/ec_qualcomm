@@ -4,7 +4,7 @@
     "search.useGlobalIgnoreFiles": false,
 
     // Code Format settings
-    "clang-format.executable": "C:\\Program Files\\LLVM\\bin\\clang-format.exe",
+    // "clang-format.executable": "C:\\Program Files\\LLVM\\bin\\clang-format.exe",
     "clang-format.style": "{ BasedOnStyle: LLVM, IndentWidth: 4}",
     "[c]": {
         "editor.defaultFormatter": "xaver.clang-format"
