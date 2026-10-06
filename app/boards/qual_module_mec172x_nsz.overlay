@@ -6,7 +6,7 @@
 
 / {
     chosen {
-        zephyr,shell-uart = &uart1;
+        zephyr,shell-uart = &uart0;
         zephyr,code-partition = &app_partition;
     };
 
@@ -53,6 +53,7 @@
 
 &uart0 {
     status = "okay";
+    current-speed = <115200>;
 	pinctrl-0 = < &uart0_tx_gpio104 &uart0_rx_gpio105 >;
 	pinctrl-names = "default";
 };

@@ -1,10 +1,10 @@
 
 / {
-	/delete-node/ flash@c0000;
+	// /delete-node/ flash@c0000;
 	/delete-node/ memory@118000;
-	flash0: flash@b0000 {
-		reg = <0x000b0000 0x68000>;
-	};
+	// flash0: flash@b0000 {
+	// 	reg = <0x000b0000 0x68000>;
+	// };
 
 	sram0: memory@118000 {
 		compatible = "mmio-sram";
@@ -35,7 +35,7 @@
     // port-sel = <1>;
     clock-frequency = <DT_FREQ_M(8)>;
 
-    // For external flash
+    // // For external flash
     // chip-select = < 0x0 >;
     // pinctrl-0 = < &shd_io0_gpio223 
     //               &shd_io1_gpio224

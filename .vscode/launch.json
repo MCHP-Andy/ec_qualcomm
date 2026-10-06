@@ -8,16 +8,16 @@
             "servertype": "openocd",
 
             // Openocd path
-            "serverpath": "${workspaceFolder}/tools/openocd-v0.12.0-i686-w64-mingw32/bin/openocd.exe",
+            // "serverpath": "${workspaceFolder}/tools/openocd-v0.12.0-i686-w64-mingw32/bin/openocd.exe",
             // GDB path
-            "gdbPath": "${workspaceFolder}/../zephyr_main/zephyr-sdk-0.16.8/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb.exe",
+            "gdbPath": "/home/andy/Desktop/toolchain/zephyr-sdk-0.16.8/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb",
 
             // For single debug
             "executable": "${workspaceFolder}/build/zephyr/zephyr.elf",
 
             "configFiles": [
-                "interface/jlink.cfg",
-                // "interface/cmsis-dap.cfg",
+                // "interface/jlink.cfg",
+                "interface/cmsis-dap.cfg",
 
                 "${workspaceFolder}/tools/mec1753_ram.cfg"
             ],
@@ -46,12 +46,12 @@
                 "monitor echo \"Ready to debug from RAM\"",
 
                 // 4. Break point in main
-                "thbreak main"
+                // "thbreak main"
             ],
 
-            // "postStartSessionCommands": [
-            //     "monitor resume"
-            // ],
+            "postStartSessionCommands": [
+                "monitor resume"
+            ],
             // "runToEntryPoint": "main",
 
             // "showDevDebugOutput": "raw"
