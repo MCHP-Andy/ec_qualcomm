@@ -10,10 +10,10 @@
     pwmfans {
 		compatible = "pwm-leds";
 		fan0: fan0 {
-			pwms = <&pwm8 0 PWM_USEC(40) PWM_POLARITY_INVERTED>;
+			pwms = <&pwm8 0 PWM_USEC(40) PWM_POLARITY_NORMAL>;
 		};
 		fan1: fan1 {
-			pwms = <&pwm9 0 PWM_USEC(40) PWM_POLARITY_INVERTED>;
+			pwms = <&pwm9 0 PWM_USEC(40) PWM_POLARITY_NORMAL>;
 		};
 	};
 
