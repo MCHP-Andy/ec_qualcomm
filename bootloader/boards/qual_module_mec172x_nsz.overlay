@@ -1,0 +1,41 @@
+/*
+ * Copyright (c) 2023 Microchip Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+    chosen {
+        zephyr,shell-uart = &uart1;
+        zephyr,code-partition = &boot_partition;
+    };
+
+    aliases {
+        acpi-i2c = &i2c_smb_1;
+    };
+
+    zephyr,user {
+
+    };
+};
+
+&uart0 {
+    status = "okay";
+	pinctrl-0 = < &uart0_tx_gpio104 &uart0_rx_gpio105 >;
+	pinctrl-names = "default";
+};
+
+&uart1 {
+    status = "okay";
+	pinctrl-0 = < &uart1_tx_gpio170 &uart1_rx_gpio171 >;
+	pinctrl-names = "default";
+};
+
+&i2c_smb_1 {
+    status = "okay";
+    port_sel = <7>;
+    pinctrl-0 = < &i2c07_sda_gpio012 &i2c07_scl_gpio013 >;
+	pinctrl-names = "default";
+
+    label = "acpi_i2c";
+};

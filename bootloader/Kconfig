@@ -1,0 +1,11 @@
+# Kconfig - Config options for EC FW
+
+mainmenu "EC firmware application"
+
+menu "EC optional features"
+rsource "service/Kconfig"
+endmenu
+
+menu "Zephyr OS options"
+source "Kconfig.zephyr"
+endmenu
