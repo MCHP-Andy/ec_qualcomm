@@ -7,6 +7,7 @@
 
 #include <errno.h>
 #include <zephyr/kernel.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/pwm.h>
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
@@ -14,6 +15,9 @@
 #include <interface/fan.h>
 
 LOG_MODULE_REGISTER(fan_dev, LOG_LEVEL_DBG);
+
+static const struct gpio_dt_spec fan_en =
+    GPIO_DT_SPEC_GET(DT_PATH(zephyr_user), fan_12v_enable_gpios);
 
 static const struct fan_dev_t {
     const struct pwm_dt_spec fan;
@@ -31,6 +35,7 @@ static const struct fan_dev_t {
         },
 };
 
+// pwm: 0~65535 (0~100% duty cycle)
 int fan_pwm_set(fan_id_t id, uint16_t pwm) {
     int ret = 0;
 
@@ -46,9 +51,11 @@ int fan_pwm_set(fan_id_t id, uint16_t pwm) {
         return -EINVAL;
     }
     
+    // dev_list[id].fan.period = 40000ns
     uint32_t pulse = ((uint64_t)dev_list[id].fan.period * pwm) >> 16;
     LOG_DBG("Fan id: %d, pwm: %d, pulse: %dns", id, pwm, pulse);
 
+    // Invert the pulse width
     ret = pwm_set_pulse_dt(&dev_list[id].fan, pulse);
     if (ret < 0) {
         LOG_ERR("Failed to set speed for fan%d: %d", id, ret);
@@ -60,7 +67,32 @@ int fan_pwm_set(fan_id_t id, uint16_t pwm) {
 }
 
 int fan_rpm_set(fan_id_t id, uint16_t rpm) {
-    uint16_t pwm = rpm*30;
+    uint16_t pwm = 0;
+
+    switch (id) {
+        case FAN_ID_1:
+            if (rpm < 3000) {
+                pwm = 0;
+            } else if (rpm > 10327) {
+                pwm = 65535;
+            } else {
+                pwm = (uint16_t)((rpm - 3000.0f) * 65535.0f / 7327.0f);
+            }
+            break;
+        case FAN_ID_2:
+            if (rpm < 2000) {
+                pwm = 0;
+            } else if (rpm > 9500) {
+                pwm = 65535;
+            } else {
+                pwm = (uint16_t)(rpm - 1931) * 65535.0f / 7488.0f;
+            }
+            break;
+        default:
+            LOG_ERR("Invalid fan ID: %d", id);
+            return -EINVAL;
+            break;
+    }
 
     return fan_pwm_set(id, pwm);
 }
@@ -112,13 +144,23 @@ static int init_config(void) {
 
     LOG_INF("Initializing fan...");
 
+    if (!gpio_is_ready_dt(&fan_en)) {
+        LOG_ERR("Fan enable pin not ready");
+        return -ENODEV;
+    }
+
+    if (gpio_pin_configure_dt(&fan_en, GPIO_OUTPUT_ACTIVE) < 0) {
+        LOG_ERR("Failed to configure FAN enable pin");
+        return -1;
+    }
+
     for (size_t i = 0; i < ARRAY_SIZE(dev_list); i++) {
 
         if (!pwm_is_ready_dt(&dev_list[i].fan)) {
             LOG_ERR("fan%d not ready", i);
             ret = -ENODEV;
         } else {
-            ret = pwm_set_pulse_dt(&dev_list[i].fan, 0);
+            ret = fan_pwm_set(i, 0);
             if (ret < 0) {
                 LOG_ERR("Failed to set PWM for fan%d: %d", i, ret);
             }
