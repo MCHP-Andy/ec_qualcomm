@@ -2,9 +2,7 @@
 
 mainmenu "EC firmware application"
 
-menu "EC optional features"
-rsource "service/Kconfig"
-endmenu
+rsource "../service/Kconfig"
 
 menu "Zephyr OS options"
 source "Kconfig.zephyr"

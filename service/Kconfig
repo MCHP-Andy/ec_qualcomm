@@ -1,0 +1,16 @@
+
+config EC_BOOTLOADER
+	bool "EC bootloader"
+	default n
+	help
+	  Enable functionality and components that are only used by the EC bootloader.
+
+rsource "acpi/Kconfig"
+
+if !EC_BOOTLOADER
+rsource "sci/Kconfig"
+rsource "fan/Kconfig"
+rsource "power/Kconfig"
+rsource "soccp/Kconfig"
+rsource "thermal/Kconfig"
+endif

@@ -61,10 +61,17 @@ graph TD
 
 ## 2. Directory Responsibilities
 
-### 📂 `app/interface` (Interface Layer)
+The app and bootloader share their interfaces, drivers, and services from the
+repository root. `CONFIG_EC_BOOTLOADER` selects bootloader-only components.
 
+### 📂 `interface/` (Shared Interface Layer)
+Public APIs used by the shared drivers and services.
 
-### 📂 `app/service` (Core Logic Layer)
+### 📂 `service/` (Shared and App Services)
+ACPI command handling is shared; SCI event queueing is provided by the separate
+`service/sci` service. Fan, thermal, power, and SoCCP services are app-only.
 
-
-### 📂 `app/driver` (Driver Layer / Infrastructure)
+### 📂 `driver/` (Shared and App Drivers)
+Shared ACPI and storage drivers plus app-only peripheral drivers. Bootloader
+flash and image-validation implementations are selected by
+`CONFIG_EC_BOOTLOADER`.

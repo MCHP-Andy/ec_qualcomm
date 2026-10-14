@@ -6,8 +6,10 @@ cmake_minimum_required(VERSION 3.20.0)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(bootloader)
 
-include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 target_sources(app PRIVATE main.c)
-add_subdirectory(service)
-add_subdirectory(driver)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../driver
+                 ${CMAKE_CURRENT_BINARY_DIR}/shared_driver)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../service
+                 ${CMAKE_CURRENT_BINARY_DIR}/shared_service)

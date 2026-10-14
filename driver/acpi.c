@@ -11,12 +11,18 @@
 #include <zephyr/sys/printk.h>
 
 #include <interface/acpi.h>
+#if !defined(CONFIG_EC_BOOTLOADER) || !CONFIG_EC_BOOTLOADER
+#include <interface/soccp.h>
+#endif
 
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(acpi_i2c, LOG_LEVEL_INF);
 
 #define ACPI_ADDR  (0x76)
+#if !defined(CONFIG_EC_BOOTLOADER) || !CONFIG_EC_BOOTLOADER
+#define SOCCP_ADDR (0x0C)
+#endif
 
 enum {
 	I2C_STATE_IDLE = 0,
@@ -33,14 +39,68 @@ enum {
 
 static const struct device *bus = DEVICE_DT_GET_OR_NULL(DT_ALIAS(acpi_i2c));
 
+#if !defined(CONFIG_EC_BOOTLOADER) || !CONFIG_EC_BOOTLOADER
+#define ACPI_INT_NODE DT_PATH(zephyr_user)
+#define ACPI_INT_AVAILABLE DT_NODE_HAS_PROP(ACPI_INT_NODE, acpi_int_gpios)
+
+// Width of the notification pulse, wide enough for the host edge detection
+#define ACPI_INT_PULSE_US (100)
+
+#if ACPI_INT_AVAILABLE
+static const struct gpio_dt_spec acpi_int =
+    GPIO_DT_SPEC_GET(ACPI_INT_NODE, acpi_int_gpios);
+#endif
+#endif
+
 static uint8_t i2c_state = I2C_STATE_IDLE;
 static uint16_t resp_idx = 0;
 static uint8_t resp_buf[ACPI_RESP_LEN] = {0};
+
+// Workaround for 2 slave address, check address to determine which command to process
+static uint8_t i2c_addr = 0;
 
 int acpi_resp_set(uint8_t *pdata, uint16_t len) {
     memcpy(resp_buf, pdata, (len <= sizeof(resp_buf)) ? len : sizeof(resp_buf));
     return 0;
 }
+
+#if !defined(CONFIG_EC_BOOTLOADER) || !CONFIG_EC_BOOTLOADER
+int soccp_resp_set(uint8_t *pdata, uint16_t len) {
+    memcpy(resp_buf, pdata, (len <= sizeof(resp_buf)) ? len : sizeof(resp_buf));
+    return 0;
+}
+
+int acpi_int_pulse(void) {
+#if ACPI_INT_AVAILABLE
+    int ret;
+
+    if (!gpio_is_ready_dt(&acpi_int)) {
+        LOG_ERR("ACPI int pin not ready");
+        return -ENODEV;
+    }
+
+    ret = gpio_pin_set_dt(&acpi_int, 1);
+    if (ret < 0) {
+        LOG_ERR("Failed to assert ACPI int pin: %d", ret);
+        return ret;
+    }
+
+    k_busy_wait(ACPI_INT_PULSE_US);
+
+    ret = gpio_pin_set_dt(&acpi_int, 0);
+    if (ret < 0) {
+        LOG_ERR("Failed to release ACPI int pin: %d", ret);
+        return ret;
+    }
+
+    LOG_DBG("ACPI int pin pulsed %d us", ACPI_INT_PULSE_US);
+
+    return 0;
+#else
+    return -ENOTSUP;
+#endif
+}
+#endif
 
 /*
  * @brief Callback which is called when a write request is received from the
@@ -51,6 +111,15 @@ static int acpi_target_write_requested_cb(struct i2c_target_config *config) {
     LOG_DBG("acpi target write requested");
 
     i2c_state = I2C_STATE_START_WRITE;
+
+#if !defined(CONFIG_EC_BOOTLOADER) || !CONFIG_EC_BOOTLOADER
+    // Workaround for 2 slave address, check address to determine which command to process
+    #define ACPI_I2C_REG_BASE (DT_REG_ADDR_BY_IDX(DT_ALIAS(acpi_i2c), 0))
+    #define I2C_DATA_REG_OFFSET 0x08
+    i2c_addr = (sys_read32(ACPI_I2C_REG_BASE + I2C_DATA_REG_OFFSET) >> 1) & 0x7F;
+#else
+    i2c_addr = ACPI_ADDR;
+#endif
 
     return 0;
 }
@@ -66,12 +135,32 @@ static int acpi_target_write_received_cb(struct i2c_target_config *config,
 
     switch (i2c_state) {
     case I2C_STATE_START_WRITE:
-        acpi_buf_set(ACPI_TYPE_CMD, val);         
+#if !defined(CONFIG_EC_BOOTLOADER) || !CONFIG_EC_BOOTLOADER
+        if (i2c_addr == ACPI_ADDR) {
+            acpi_buf_set(ACPI_TYPE_CMD, val);
+        } else if (i2c_addr == SOCCP_ADDR) {
+            soccp_buf_set(SOCCP_TYPE_CMD, val);
+        } else {
+            LOG_WRN("Unknown I2C address: 0x%02x", i2c_addr);
+        }            
+#else
+        acpi_buf_set(ACPI_TYPE_CMD, val);
+#endif
 
         i2c_state = I2C_STATE_WRITE;
         break;
     case I2C_STATE_WRITE:
+#if !defined(CONFIG_EC_BOOTLOADER) || !CONFIG_EC_BOOTLOADER
+        if (i2c_addr == ACPI_ADDR) {
+            acpi_buf_set(ACPI_TYPE_DATA, val);
+        } else if (i2c_addr == SOCCP_ADDR) {
+            soccp_buf_set(SOCCP_TYPE_DATA, val);
+        } else {
+            LOG_WRN("Unknown I2C address: 0x%02x", i2c_addr);
+        }
+#else
         acpi_buf_set(ACPI_TYPE_DATA, val);
+#endif
         break;
     default:
         LOG_WRN("Unexpected I2C state: %d", i2c_state);
@@ -120,7 +209,9 @@ static int acpi_target_stop_cb(struct i2c_target_config *config) {
     resp_idx = 0;
     i2c_state = I2C_STATE_IDLE;
 
-    acpi_buf_set(ACPI_TYPE_PROCESS, 0);
+    if (i2c_addr == ACPI_ADDR) {
+        acpi_buf_set(ACPI_TYPE_PROCESS, 0);
+    }
 
     return 0;
 }
@@ -135,7 +226,11 @@ static struct i2c_target_callbacks acpi_target_callbacks = {
 
 static struct i2c_target_config target_cfg = {
     // Workaround for 2 slave address
+#if !defined(CONFIG_EC_BOOTLOADER) || !CONFIG_EC_BOOTLOADER
+    .address = ACPI_ADDR | (SOCCP_ADDR << 8),
+#else
     .address = ACPI_ADDR,
+#endif
     .callbacks = &acpi_target_callbacks,
 };
 
@@ -147,6 +242,18 @@ static int init_config(void) {
         LOG_ERR("Failed to register target");
         return -1;
     }
+
+#if !defined(CONFIG_EC_BOOTLOADER) || !CONFIG_EC_BOOTLOADER
+#if ACPI_INT_AVAILABLE
+    // Host interrupt line idles low, SCI service pulses it per event
+    if (gpio_pin_configure_dt(&acpi_int, GPIO_OUTPUT_INACTIVE) < 0) {
+        LOG_ERR("Failed to configure ACPI int pin");
+        return -1;
+    }
+#else
+    LOG_WRN("No acpi-int-gpios in DT, SCI cannot notify host");
+#endif
+#endif
 
     return 0;
 }

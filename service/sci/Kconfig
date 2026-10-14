@@ -1,0 +1,33 @@
+menuconfig SCI_SERVICE
+	bool "SCI Service"
+	default y
+	help
+	  Enable queueing and host notification of System Control Interrupt events.
+
+if SCI_SERVICE
+module = SCI
+module-str = sci
+source "subsys/logging/Kconfig.template.log_config"
+
+config ACPI_SCI_QUEUE_LEN
+	int "SCI event queue length"
+	range 1 64
+	default 16
+	help
+	  Number of SCI events that can be pending while waiting for host readback.
+
+config ACPI_SCI_TIMEOUT_MS
+	int "SCI notification timeout (ms)"
+	range 1 10000
+	default 100
+	help
+	  Time allowed for the host to read an announced SCI event before it is
+	  dropped and the next queued event is notified.
+
+config SCI_SHELL
+	bool "SCI Shell commands"
+	depends on SHELL
+	default y
+	help
+	  Enable shell commands for the SCI service.
+endif

@@ -26,6 +26,8 @@ static uint16_t sim_fan_rpm[FAN_ID_MAX] = {
     [FAN_ID_2] = 3000
 };
 
+static bool sim_fan_allow_on = true;
+
 static uint16_t sim_therm_temp[THERM_DEV_MAX] = {
     [THERM_DEV_1] = 350, // 35.0 C (假設單位為 0.1C)
     [THERM_DEV_2] = 400, // 40.0 C
@@ -49,6 +51,17 @@ int fan_rpm_set(fan_id_t id, uint16_t rpm) {
 int fan_rpm_get(fan_id_t id, uint16_t *prpm) {
     if (id <= 0 || id >= FAN_ID_MAX || prpm == NULL) return -EINVAL;
     *prpm = sim_fan_rpm[id];
+    return 0;
+}
+
+int fan_constraint_set(bool allow_on) {
+    sim_fan_allow_on = allow_on;
+    return 0;
+}
+
+int fan_constraint_get(bool *allow_on) {
+    if (allow_on == NULL) return -EINVAL;
+    *allow_on = sim_fan_allow_on;
     return 0;
 }
 

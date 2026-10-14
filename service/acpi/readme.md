@@ -10,7 +10,7 @@ graph LR
     end
 
     subgraph "Data Transport & Storage"
-        MQ[(acpi_evt_queue)]
+        EVT[ACPI command event]
         BUF[resp_buf]
     end
 
@@ -20,8 +20,8 @@ graph LR
     end
 
     %% Input Flow
-    IN -->|Pack Event| MQ
-    MQ -->|k_msgq_get| Wait
+    IN -->|Post event| EVT
+    EVT --> Wait
     
     %% Handling Flow
     Wait --> Search
@@ -31,6 +31,9 @@ graph LR
     Handle -->|Write Results| BUF
     BUF -.->|memcpy| OUT
 ```
+
+SCI notification queueing, timeout handling, and host interrupt pulses are
+implemented separately in `service/sci`.
 
 ## Test
 ```shell

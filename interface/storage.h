@@ -5,7 +5,53 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/toolchain.h>
 
-/* 與 bootloader/interface/storage.h 的 boot info 定義保持一致 */
+#if defined(CONFIG_EC_BOOTLOADER) && CONFIG_EC_BOOTLOADER
+#include <stddef.h>
+#include <sys/types.h>
+
+#define EC_FW_HEADER_SIZE               (32)
+
+typedef enum {
+    EC_FW_VALIDATION_NONE     = 0x0,
+    EC_FW_VALIDATION_CRC      = 0x1,
+    EC_FW_VALIDATION_CHECKSUM = 0x2,
+} ec_fw_validation_ctrl_t;
+
+struct __attribute__((packed)) ec_fw_ver {
+    uint8_t major;
+    uint8_t minor;
+    uint8_t test;
+};
+
+typedef struct __attribute__((packed)) fw_hdr_t {
+    union {
+        uint32_t u32;
+        uint8_t bytes[4];
+    } magic;
+    uint32_t load_address;
+    uint32_t fw_size;
+    struct ec_fw_ver version;
+    uint8_t validation_ctrl;
+    struct ec_fw_ver lowest_supported_version;
+    uint8_t reserved_1;
+    union {
+        uint32_t checksum;
+        uint32_t crc32;
+    } check;
+    uint16_t aux_data_size;
+    uint8_t reserved_2[6];
+} fw_hdr_t;
+
+BUILD_ASSERT(sizeof(fw_hdr_t) == EC_FW_HEADER_SIZE,
+             "fw_header size must be exactly 32 bytes!");
+
+bool ec_validate_image_header(const fw_hdr_t *hdr);
+int ec_get_image_header(fw_hdr_t *hdr);
+int ec_cal_image_crc(off_t addr, size_t size, uint32_t *crc);
+int ec_cal_image_checksum(off_t addr, size_t size, uint32_t *checksum);
+#endif
+
+/* App and bootloader share the boot info structure stored in retention memory. */
 /* -------------------------------------------------------------------------
  * App <-> Bootloader 資料交換 (存放於 retention boot_info0 區域)
  * Magic 與 Checksum 由 retention 節點的 prefix / checksum 負責，結構內不重複
