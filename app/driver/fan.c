@@ -14,7 +14,7 @@
 
 #include <interface/fan.h>
 
-LOG_MODULE_REGISTER(fan_dev, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(fan_dev, LOG_LEVEL_INF);
 
 static const struct gpio_dt_spec fan_en =
     GPIO_DT_SPEC_GET(DT_PATH(zephyr_user), fan_12v_enable_gpios);
@@ -34,6 +34,33 @@ static const struct fan_dev_t {
             .tach = DEVICE_DT_GET(DT_ALIAS(base_tach)),
         },
 };
+
+/*
+ * SoC-CP fan power constraint (Ref: EC FAN Constraints Message, page 55).
+ * Spec default is 0 (OFF), the fan(s) stay OFF until SoC-CP grants permission
+ * to turn them ON, so a brown out cannot be triggered before SoC-CP is up.
+ */
+static bool fan_allow_on = false;
+
+int fan_constraint_set(bool allow_on) {
+
+    fan_allow_on = allow_on;
+    gpio_pin_set_dt(&fan_en, fan_allow_on);
+    LOG_INF("Fan constraint: FAN(s) can %s", allow_on ? "turn ON" : "only stay OFF");
+
+    return 0;
+}
+
+int fan_constraint_get(bool *allow_on) {
+
+    if (allow_on == NULL) {
+        return -EINVAL;
+    }
+
+    *allow_on = fan_allow_on;
+
+    return 0;
+}
 
 // pwm: 0~65535 (0~100% duty cycle)
 int fan_pwm_set(fan_id_t id, uint16_t pwm) {
@@ -60,7 +87,7 @@ int fan_pwm_set(fan_id_t id, uint16_t pwm) {
     if (ret < 0) {
         LOG_ERR("Failed to set speed for fan%d: %d", id, ret);
     } else {
-        LOG_INF("Set fan%d speed to %d%%", id, pulse);
+        LOG_DBG("Set fan%d speed to %d%%", id, pulse);
     }
 
     return ret;
@@ -131,7 +158,7 @@ int fan_rpm_get(fan_id_t id, uint16_t *prpm) {
     }
 
     *prpm = (uint16_t)val.val1;
-    LOG_INF("Fan%d RPM is %d", id, *prpm);
+    LOG_DBG("Fan%d RPM is %d", id, *prpm);
 
     return ret;
 }
@@ -149,10 +176,11 @@ static int init_config(void) {
         return -ENODEV;
     }
 
-    if (gpio_pin_configure_dt(&fan_en, GPIO_OUTPUT_ACTIVE) < 0) {
+    if (gpio_pin_configure_dt(&fan_en, GPIO_OUTPUT_INACTIVE) < 0) {
         LOG_ERR("Failed to configure FAN enable pin");
         return -1;
     }
+    fan_constraint_set(fan_allow_on);
 
     for (size_t i = 0; i < ARRAY_SIZE(dev_list); i++) {
 

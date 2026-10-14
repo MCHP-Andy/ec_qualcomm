@@ -35,39 +35,6 @@ SYS_EVENT_SUBSCRIBE(fan, event);
 static uint16_t temps[THERM_SRC_MAX] = {0};
 static fan_ctrl_t fan_blks[FAN_ID_MAX] = {0};
 
-/*
- * SoC-CP fan power constraint (Ref: EC FAN Constraints Message, page 55).
- * Spec default is 0 (OFF), the fan(s) stay OFF until SoC-CP grants permission
- * to turn them ON, so a brown out cannot be triggered before SoC-CP is up.
- */
-static bool fan_allow_on = false;
-
-int fan_constraint_set(bool allow_on) {
-
-    if (fan_allow_on == allow_on) {
-        return 0;
-    }
-
-    fan_allow_on = allow_on;
-    LOG_INF("Fan constraint: FAN(s) can %s", allow_on ? "turn ON" : "only stay OFF");
-
-    // Notify service thread to re-evaluate the fan output
-    k_event_post(&event, FAN_CFG_UPDATE);
-
-    return 0;
-}
-
-int fan_constraint_get(bool *allow_on) {
-
-    if (allow_on == NULL) {
-        return -EINVAL;
-    }
-
-    *allow_on = fan_allow_on;
-
-    return 0;
-}
-
 int fan_tmp_get(fan_id_t tmp_src, uint16_t *tmp) {
 
     if (tmp_src == 0 || tmp_src >= ARRAY_SIZE(temps) || tmp == NULL) {
@@ -113,7 +80,7 @@ static fan_ctrl_t *fan_blk_get(fan_id_t fan_id) {
 static k_timeout_t rpm_update = K_MSEC(1000);
 
 static int fan_rpm_update(fan_ctrl_t *fan_blk, uint16_t rpm) {
-
+#if 0
     if (rpm == 0) {
         // Fan off by PWM
         fan_blk->rpm = 0;
@@ -129,6 +96,11 @@ static int fan_rpm_update(fan_ctrl_t *fan_blk, uint16_t rpm) {
 
         // TODO: RPM PID via PWM
     }
+#else
+    fan_rpm_set(fan_blk->id, rpm);
+    fan_rpm_get(fan_blk->id, &rpm);
+    fan_blk->rpm = rpm;
+#endif
 
     return 0;
 }
@@ -141,7 +113,7 @@ static inline bool check_fan_debug(fan_ctrl_t *fan_blk) {
         if (fan_blk->dbg_mode & BIT(1)) {
             if (fan_blk->dbg_mode & BIT(2)) {
                 // Set fan via pwm
-                fan_pwm_set(fan_blk->id, fan_blk->dbg_pwm);
+                fan_pwm_set(fan_blk->id, (uint16_t)fan_blk->dbg_pwm << 8);
             } else {
                 // Set fan via RPM
                 fan_rpm_update(fan_blk, fan_blk->dbg_rpm);
@@ -215,12 +187,13 @@ static void service(void) {
                 continue;
             }
 
+            // TODO: Implement in driver layer
             // Check SoC-CP fan power constraint
-            if (!fan_allow_on) {
-                LOG_DBG("Fan%d forced OFF by SoC-CP fan constraint", fan);
-                fan_rpm_update(fan_blk, 0);
-                continue;
-            }
+            // if (!fan_allow_on) {
+            //     LOG_DBG("Fan%d forced OFF by SoC-CP fan constraint", fan);
+            //     fan_rpm_update(fan_blk, 0);
+            //     continue;
+            // }
 
             // Check power state
             if (state != PWR_STA_S0) {
@@ -605,6 +578,9 @@ static void dump_fan_info(const struct shell *sh, fan_ctrl_t *fan_blk) {
                        tbl[j].rpm * 100, tbl[j].temp_high, tbl[j].temp_low);
         }
     }
+
+    bool fan_allow_on = false;
+    fan_constraint_get(&fan_allow_on);
 
     shell_info(sh, "Fan constraint allow_on: %d", fan_allow_on);
     shell_info(sh, "Fan dbg_mode: 0x%02x", fan_blk->dbg_mode);
