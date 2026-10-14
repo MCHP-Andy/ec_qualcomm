@@ -50,6 +50,9 @@ python kf_flsh_util.py -w -f ../../build/zephyr/spi_image.bin
 
 ```shell
 $ cd tools/app_flash
+
+$ pyocd cmd -t cortex_m -c "halt; load zephyr.bin 0x0c8000; wreg pc 0x0cc72D; go"
+# OR
 $ pyocd cmd -t cortex_m
 pyocd> halt
 Successfully halted device
@@ -70,6 +73,30 @@ $ python3 fw_upgrade.py ../../build/zephyr/spi_image.bin 0x0
 
 ```
 
+## Release
+```shell
+(.venv) andy@ThinkPad-P1-Gen-7:~/Desktop/MCHP/ec_qualcomm$ cp build/zephyr/spi_image.bin ./image.bin
+(.venv) andy@ThinkPad-P1-Gen-7:~/Desktop/MCHP/ec_qualcomm$ cp build/zephyr/zephyr.bin ./app.bin
+(.venv) andy@ThinkPad-P1-Gen-7:~/Desktop/MCHP/ec_qualcomm$ python tools/pack_ec_image.py -i app.bin -o WoS_EC_MainFirmware_Release.bin
+==================================================
+ Qualcomm Glymur EC Firmware 打包完成
+==================================================
+ 輸入檔案          : app.bin (95440 Bytes)
+ 輸出映像檔        : WoS_EC_MainFirmware_Release.bin (95472 Bytes)
+------------------ Header 內容 -------------------
+ Magic             : ECFW
+ RAM Load Address  : 0x000D0000
+ Firmware Size     : 95440 Bytes (0x000174D0)
+ Firmware Version  : 0.1.13 (Hex: 00.01.0D)
+ Lowest Version    : 0.1.0 (Hex: 00.01.00)
+ Validation Mode   : CRC32 (Ctrl = 0x01)
+ CRC32             : 0xB3A6A169
+ Aux Data Size     : 0 Bytes
+==================================================
+(.venv) andy@ThinkPad-P1-Gen-7:~/Desktop/MCHP/ec_qualcomm$ python ./merge_bin.py --file1 image.bin --file2 WoS_EC_MainFirmware_Release.bin --output tt.bin
+[警告] image.bin 大小 (0x80000) 超出 offset 0x10000 限制，將截斷多餘部分。
+成功生成 tt.bin (大小: 0x80000 / 524288 Bytes)
+```
 
 ## Framework
 
