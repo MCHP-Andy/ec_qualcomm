@@ -9,6 +9,39 @@
         zephyr,code-partition = &app_partition;
     };
 
+    sram0: memory@20000000 {
+        reg = < 0x20000000 0xf800 >;
+    };
+
+    retained_mem: memory@2000f800 {
+        compatible = "zephyr,memory-region", "mmio-sram";
+        reg = <0x2000f800 0x800>;
+        zephyr,memory-region = "retained";
+        status = "okay";
+
+        retainedmem {
+            compatible = "zephyr,retained-ram";
+            status = "okay";
+            #address-cells = <1>;
+            #size-cells = <1>;
+
+            boot_info0: boot_info@0 {
+                compatible = "zephyr,retention";
+                status = "okay";
+                reg = <0x0 0x400>;
+
+                prefix = [08 04];
+                checksum = <1>;
+            };
+
+            sys_info0: sys_info@400 {
+                compatible = "zephyr,retention";
+                status = "okay";
+                reg = <0x400 0x400>;
+            };
+        };
+    };
+
     adc0: adc@40001000 {
         compatible = "zephyr,adc-emul";
         reg = <0x40001000 0x1000>;

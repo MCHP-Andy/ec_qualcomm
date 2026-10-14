@@ -8,7 +8,45 @@
     chosen {
         zephyr,code-partition = &boot_partition;
     };
+
+    sram0: memory@20000000 {
+		// reg = < 0x20000000 0x10000 >;
+        reg = < 0x20000000 0xf800 >;
+	};
+
+    retained_mem: memory@2000f800 {
+		compatible = "zephyr,memory-region", "mmio-sram";
+		reg = <0x2000f800 0x800>;
+		zephyr,memory-region = "retained";
+		status = "okay";
+
+		retainedmem {
+			compatible = "zephyr,retained-ram";
+			status = "okay";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			boot_info0: boot_info@0 {
+				compatible = "zephyr,retention";
+				status = "okay";
+				reg = <0x0 0x400>;
+
+                prefix = [08 04];
+				checksum = <1>;
+			};
+
+			sys_info0: sys_info@400 {
+				compatible = "zephyr,retention";
+				status = "okay";
+				reg = <0x400 0x400>;
+			};
+		};
+	};
 };
+
+// &flash0 {
+//     reg = < 0x10000 0x30000 >;
+// };
 
 &flash0 {
     partitions {
@@ -18,11 +56,16 @@
 
         boot_partition: partition@0 {
             label = "bootloader";
-            reg = <0x00000000 0x20000>;
+            reg = <0x00000000 0x0FFE0>;
         };
-        app_partition: partition@20000 {
+        hdr_partition: partition@0FFE0 {
+            label = "header";
+            reg = <0x0FFE0 0x20>;
+        };
+        app_partition: partition@10000 {
             label = "app";
-            reg = <0x20000 0x20000>;
+            reg = <0x10000 0x30000>;
         };
     };
 };
+
