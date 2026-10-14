@@ -7,3 +7,5 @@ board:
   socs:
   - name: mec1753_qsz
   - name: mec172x_nsz
+    variants:
+    - name: dec1757

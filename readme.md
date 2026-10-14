@@ -17,8 +17,14 @@ tools\script\setup.bat
 ```
 
 ## Build
+The bootloader project enables `CONFIG_EC_BOOTLOADER` in
+`bootloader/prj.conf`; the app build leaves this option disabled.
+
 ```
+source tools/script/setup.sh
 west build -p -b qual_module/mec172x_nsz app
+west build -p -b qual_module/dec1757 app
+west build -p -b qual_module/mec172x_nsz bootloader
 
 west build -p -b qual_module/mec172x_nsz app -- -DOVERLAY_CONFIG=release.conf
 
@@ -161,4 +167,3 @@ uart:~$ i2c direct_read i2c@40004800 0x76 10
 
 ---
 ### Phase 2
-

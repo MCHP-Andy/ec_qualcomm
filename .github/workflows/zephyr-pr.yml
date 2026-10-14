@@ -19,8 +19,13 @@ jobs:
         include:
           - board: qual_module/mec172x_nsz
             upload-spi: true   # 這個板子要上傳特殊 bin 檔
+            artifact-name: qual_module_mec172x_nsz
+          - board: qual_module/dec1757
+            upload-spi: true   # DEC1757 使用 MEC172x_NSZ
+            artifact-name: qual_module_dec1757
           - board: qemu_cortex_m3
             upload-spi: false  # 這個板子不需要
+            artifact-name: qemu_cortex_m3
 
     steps:
     # 【修正 1】Checkout 必須移到最前面，確保工作區基底乾淨
@@ -111,16 +116,15 @@ jobs:
     # 6. 使用 West 編譯你的應用程式
     - name: Build Application
       run: |
-        source .venv/bin/activate
+        source tools/script/setup.sh
         west build -p -b ${{ matrix.board }} app
 
-    # 情況 A：如果是 qual_module/mec172x_nsz (upload-spi 為 true)，上傳包含特殊 bin 檔的完整結果
+    # MEC172x targets upload the generated SPI image with the build results.
     - name: Upload Full Results (with SPI & Primary Binaries)
       if: matrix.upload-spi == true
       uses: actions/upload-artifact@v6
       with:
-        # name: compiled-result-${{ matrix.board }}
-        name: compiled-result-qual_module_mec172x_nsz
+        name: compiled-result-${{ matrix.artifact-name }}
         retention-days: 7
         include-hidden-files: true
         path: |
@@ -135,7 +139,7 @@ jobs:
       if: matrix.upload-spi == false
       uses: actions/upload-artifact@v6
       with:
-        name: compiled-result-${{ matrix.board }}
+        name: compiled-result-${{ matrix.artifact-name }}
         retention-days: 7
         include-hidden-files: true
         path: |

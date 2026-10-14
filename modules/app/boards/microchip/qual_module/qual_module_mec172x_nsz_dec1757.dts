@@ -1,0 +1,183 @@
+/*
+ * Copyright (c) 2025, Microchip Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/dts-v1/;
+
+#include <microchip/mec172xnsz.dtsi>
+#include <microchip/mec172x/mec172xnsz-pinctrl.dtsi>
+
+#include "thermal.dtsi"
+#include "flash_partition.dtsi"
+
+/ {
+	model = "Microchip Qualcomm Module DEC1757";
+	compatible = "microchip,qual_module-dec1757";
+
+	chosen {
+		zephyr,sram = &sram0;
+		zephyr,flash = &flash0;
+		zephyr,console = &uart0;
+		zephyr,shell-uart = &uart0;
+	};
+
+	aliases {
+		cpu-fan = &fan0;
+		cpu-tach = &tach1;
+		base-fan = &fan1;
+		base-tach = &tach0;
+		led0 = &led2;
+		wk-btn = &s2;
+		pw-limit-i2c = &i2c_smb_0;
+		acpi-i2c = &i2c_smb_1;
+		sen-i2c = &i2c_smb_2;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+		led2: led_2 {
+			gpios = <MCHP_GPIO_DECODE_153 GPIO_ACTIVE_HIGH>;
+		};
+
+		led3: led_3 {
+			gpios = <MCHP_GPIO_DECODE_157 GPIO_ACTIVE_HIGH>;
+		};
+	};
+
+	btns {
+		compatible = "gpio-keys";
+		s2: btn_1 {
+			gpios = <MCHP_GPIO_DECODE_141 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	zephyr,user {
+		himax-wk-gpios = <MCHP_GPIO_DECODE_140 GPIO_ACTIVE_HIGH>;
+		acpi-int-gpios = <MCHP_GPIO_DECODE_226 GPIO_ACTIVE_HIGH>;
+		sen-int-gpios = <MCHP_GPIO_DECODE_157 GPIO_ACTIVE_HIGH>;
+		board-id0-gpios = <MCHP_GPIO_DECODE_204 GPIO_ACTIVE_HIGH>;
+		board-id1-gpios = <MCHP_GPIO_DECODE_205 GPIO_ACTIVE_HIGH>;
+		io-channels = <&adc0 0>, <&adc0 1>, <&adc0 2>;
+		thro-mira-gpios = <MCHP_GPIO_DECODE_164 GPIO_ACTIVE_HIGH>;
+		wk-en-gpios = <MCHP_GPIO_DECODE_221 GPIO_ACTIVE_HIGH>;
+		slp-indicator-gpios = <MCHP_GPIO_DECODE_011 GPIO_ACTIVE_HIGH>;
+		soc-rev-gpios = <MCHP_GPIO_DECODE_203 GPIO_ACTIVE_HIGH>;
+		resout-3p3-gpios = <MCHP_GPIO_DECODE_244 GPIO_ACTIVE_HIGH>;
+		misc-1p8-gpios = <MCHP_GPIO_DECODE_240 GPIO_ACTIVE_HIGH>;
+		ec-psl-gpios = <MCHP_GPIO_DECODE_243 GPIO_ACTIVE_HIGH>;
+		soc-pwr-status-gpios = <MCHP_GPIO_DECODE_242 GPIO_ACTIVE_HIGH>;
+	};
+
+	tst_clk_out: tst_clk_out {
+		compatible = "vnd,pinctrl-device";
+		pinctrl-0 = <&tst_clk_out_gpio060>;
+		pinctrl-names = "default";
+		status = "okay";
+	};
+};
+
+&idle {
+	min-residency-us = <100000>;
+};
+
+&suspend_to_ram {
+	min-residency-us = <200000>;
+};
+
+/* Disable ARM SysTick kernel timer driver */
+&systick {
+	status = "disabled";
+};
+
+/* Enable MCHP kernel timer driver using 32KHz RTOS timer and 1MHz basic timer */
+&rtimer {
+	status = "okay";
+};
+
+&uart0 {
+	status = "okay";
+	current-speed = <115200>;
+	pinctrl-0 = <&uart0_tx_gpio104 &uart0_rx_gpio105>;
+	pinctrl-names = "default";
+};
+
+&uart1 {
+	status = "okay";
+	current-speed = <115200>;
+	pinctrl-0 = <&uart1_tx_gpio170 &uart1_rx_gpio171>;
+	pinctrl-names = "default";
+};
+
+&i2c_smb_0 {
+	status = "okay";
+	port_sel = <2>;
+	pinctrl-0 = <&i2c02_sda_gpio154 &i2c02_scl_gpio155>;
+	pinctrl-names = "default";
+};
+
+&i2c_smb_1 {
+	status = "okay";
+	port_sel = <7>;
+	pinctrl-0 = <&i2c07_sda_gpio012 &i2c07_scl_gpio013>;
+	pinctrl-names = "default";
+	label = "acpi_i2c";
+};
+
+&i2c_smb_2 {
+	status = "okay";
+	port_sel = <1>;
+	pinctrl-0 = <&i2c01_sda_gpio130 &i2c01_scl_gpio131>;
+	pinctrl-names = "default";
+	label = "sen_i2c";
+};
+
+&adc0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+	pinctrl-0 = <&adc00_gpio200 &adc01_gpio201 &adc02_gpio202
+		     &adc04_gpio204 &adc05_gpio205>;
+	pinctrl-names = "default";
+
+	channel@0 {
+		reg = <0>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <0>;
+		zephyr,resolution = <12>;
+	};
+
+	channel@1 {
+		reg = <1>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <0>;
+		zephyr,resolution = <12>;
+	};
+
+	channel@2 {
+		reg = <2>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <0>;
+		zephyr,resolution = <12>;
+	};
+
+	channel@4 {
+		reg = <4>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <0>;
+		zephyr,resolution = <12>;
+	};
+
+	channel@5 {
+		reg = <5>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <0>;
+		zephyr,resolution = <12>;
+	};
+};

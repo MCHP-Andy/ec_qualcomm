@@ -19,6 +19,7 @@ export ZEPHYR_SDK_INSTALL_DIR=/home/andy/Desktop/toolchain/zephyr-sdk-0.16.8
 export MEC5_SPI_GEN=${WORKSPACE}/tools/kf_spi_gen_revb/mec175x_spi_gen_linux_x86_64
 export MEC5_SPI_CFG=${WORKSPACE}/tools/kf_spi_gen_revb/spi_cfg.ini
 export EC_IMG_GEN=${WORKSPACE}/tools/spi_image_trim_out/generating_binaries.py
+export ZEPHYR_BOARD_ALIASES=${WORKSPACE}/modules/app/boards/microchip/qual_module/board_aliases.cmake
 
 echo ================ Zephyr ENV =======================
 echo ZES_ENABLE_SYSMAN=$ZES_ENABLE_SYSMAN
