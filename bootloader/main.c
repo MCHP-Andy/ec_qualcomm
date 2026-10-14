@@ -5,11 +5,19 @@
 #include <zephyr/sys/reboot.h>
 #include <zephyr/arch/cpu.h>
 #include <cmsis_core.h>
+#include <interface/flash.h>
+#include <interface/storage.h>
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
 // Get from DTS
+#if defined(CONFIG_BOARD_QEMU_CORTEX_M3)
+#define HDR_ADDR (DT_REG_ADDR(DT_NODELABEL(flash0))+DT_REG_ADDR(DT_NODELABEL(hdr_partition)))
 #define APP_START_ADDR (DT_REG_ADDR(DT_NODELABEL(flash0))+DT_REG_ADDR(DT_NODELABEL(app_partition)))
+#elif defined(CONFIG_BOARD_QUAL_MODULE)
+#define HDR_ADDR (DT_REG_ADDR(DT_NODELABEL(int_flash))+DT_REG_ADDR(DT_NODELABEL(hdr_partition)))
+#define APP_START_ADDR (DT_REG_ADDR(DT_NODELABEL(flash0))+DT_REG_ADDR(DT_NODELABEL(app_partition)))
+#endif
 
 typedef void (*app_entry_t)(void);
 
@@ -38,9 +46,20 @@ void jump_to_app(uint32_t address) {
 }
 
 int main(void) {
-    printk("Hello from bootloader\n");
+    LOG_INF("Hello from bootloader");
 
-    printk("App address in: 0x%08x\n", APP_START_ADDR);
+    LOG_INF("Header address in: 0x%08x", HDR_ADDR);
+    LOG_INF("App address in: 0x%08x", APP_START_ADDR);
+
+    // Get image header from flash
+    fw_hdr_t hdr = {0};
+    if (ec_get_image_header(&hdr) < 0) {
+        LOG_ERR("Failed to read EC FW header");
+    }
+
+    ec_validate_image_header(&hdr);
+    // jump_to_app(0x10000);
+
 
     return 0;
 }
