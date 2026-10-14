@@ -14,7 +14,7 @@
         led0 = &led2;
         wk-btn = &s2;
 
-        pw-limit-i2c = &i2c_smb_0;
+        aoss-i2c = &i2c_smb_0;
 
         acpi-i2c = &i2c_smb_1;
 
@@ -69,6 +69,13 @@
     port_sel = <2>;
     pinctrl-0 = < &i2c02_sda_gpio154 &i2c02_scl_gpio155 >;
 	pinctrl-names = "default";
+    
+    label = "aoss_i2c";
+
+    aoss: aoss@35 {
+        compatible = "vnd,i2c-device";
+        reg = < 0x35 >;
+    };
 };
 
 &i2c_smb_1 {

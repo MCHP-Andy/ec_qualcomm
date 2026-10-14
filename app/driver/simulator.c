@@ -17,6 +17,7 @@
 #include <interface/acpi.h>
 #include <interface/fan.h>
 #include <interface/thermal.h>
+#include <interface/aoss.h>
 
 LOG_MODULE_REGISTER(sim_dev, LOG_LEVEL_DBG);
 
@@ -31,6 +32,10 @@ static uint16_t sim_therm_temp[THERM_DEV_MAX] = {
     [THERM_DEV_2] = 400, // 40.0 C
     [THERM_DEV_3] = 450  // 45.0 C
 };
+
+/* EC-AOSS 模擬暫存器 */
+static uint32_t sim_aoss_status = AOSS_STA_SOC_TEMP_TELEM | AOSS_STA_LMT_CAP;
+static uint32_t sim_aoss_temp = 553; // 55.3 C (單位 0.1C, 2's complement)
 
 /* --- Fan Simulator APIs --- */
 
@@ -84,6 +89,22 @@ int soccp_resp_set(uint8_t *pdata, uint16_t len) {
     return 0;
 }
 
+/* --- EC-AOSS Simulator APIs --- */
+
+int aoss_status_get(aoss_status_t *sta) {
+    if (sta == NULL) return -EINVAL;
+    aoss_status_parse(sim_aoss_status, sta);
+    return 0;
+}
+
+int aoss_temp_get(int16_t *temp_c, int16_t *temp_dc) {
+    int16_t dc = aoss_temp_to_dc(sim_aoss_temp);
+
+    if (temp_dc) *temp_dc = dc;
+    if (temp_c) *temp_c = aoss_dc_to_c(dc);
+    return 0;
+}
+
 /* --- Shell Interface --- */
 
 static int cmd_sim_fan_set(const struct shell *sh, size_t argc, char **argv) {
@@ -114,6 +135,21 @@ static int cmd_sim_temp_set(const struct shell *sh, size_t argc, char **argv) {
     return 0;
 }
 
+static int cmd_sim_aoss_sta_set(const struct shell *sh, size_t argc, char **argv) {
+    sim_aoss_status = (uint32_t)strtoul(argv[1], NULL, 0) & AOSS_STA_MASK;
+    shell_info(sh, "Simulator: AOSS status fixed to 0x%08x", sim_aoss_status);
+    return 0;
+}
+
+static int cmd_sim_aoss_temp_set(const struct shell *sh, size_t argc, char **argv) {
+    int16_t temp = (int16_t)strtol(argv[1], NULL, 0);
+
+    sim_aoss_temp = (uint16_t)temp;
+    shell_info(sh, "Simulator: AOSS temp fixed to %s%d.%d", temp < 0 ? "-" : "",
+               abs(temp / 10), abs(temp % 10));
+    return 0;
+}
+
 static int cmd_sim_status(const struct shell *sh, size_t argc, char **argv) {
     shell_print(sh, "--- Simulator Current Values ---");
     for (int i = 1; i < FAN_ID_MAX; i++) {
@@ -122,12 +158,16 @@ static int cmd_sim_status(const struct shell *sh, size_t argc, char **argv) {
     for (int i = 0; i < THERM_DEV_MAX; i++) {
         shell_print(sh, "Therm %d Temp: %d", i, sim_therm_temp[i]);
     }
+    shell_print(sh, "AOSS status: 0x%08x", sim_aoss_status);
+    shell_print(sh, "AOSS temp: %d", aoss_temp_to_dc(sim_aoss_temp));
     return 0;
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_sim,
     SHELL_CMD_ARG(fan, NULL, "Set simulated fan RPM <id> <val>", cmd_sim_fan_set, 3, 0),
     SHELL_CMD_ARG(temp, NULL, "Set simulated therm temp <id> <val>", cmd_sim_temp_set, 3, 0),
+    SHELL_CMD_ARG(aoss_sta, NULL, "Set simulated AOSS status <val>", cmd_sim_aoss_sta_set, 2, 0),
+    SHELL_CMD_ARG(aoss_temp, NULL, "Set simulated AOSS temp in 0.1C <val>", cmd_sim_aoss_temp_set, 2, 0),
     SHELL_CMD_ARG(status, NULL, "Show all simulated values", cmd_sim_status, 1, 0),
     SHELL_SUBCMD_SET_END
 );
