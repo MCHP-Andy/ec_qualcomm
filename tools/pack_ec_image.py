@@ -15,6 +15,8 @@ import zlib
 # 常數與規格定義 (符合 80-79648-16 / 80-35782-87 規範)
 # ---------------------------------------------------------------------------
 HEADER_SIZE = 32
+TARGET_IMAGE_SIZE = 200 * 1024
+FW_PAYLOAD_SIZE = TARGET_IMAGE_SIZE - HEADER_SIZE
 MAGIC_VALUE = b'ECFW'  # 0x45, 0x43, 0x46, 0x57 (Little-Endian)
 
 # 校驗控制模式 (Validation Control)
@@ -105,10 +107,20 @@ def pack_firmware(
     with open(input_bin, 'rb') as f:
         fw_payload = f.read()
 
-    fw_size = len(fw_payload)
-    if fw_size == 0:
+    input_fw_size = len(fw_payload)
+    if input_fw_size == 0:
         print("[錯誤] 輸入二進制檔大小為 0", file=sys.stderr)
         sys.exit(1)
+    if input_fw_size > FW_PAYLOAD_SIZE:
+        print(
+            f"[錯誤] 輸入二進制檔過大: {input_fw_size} Bytes "
+            f"(上限 {FW_PAYLOAD_SIZE} Bytes)",
+            file=sys.stderr
+        )
+        sys.exit(1)
+
+    fw_payload += b'\xFF' * (FW_PAYLOAD_SIZE - input_fw_size)
+    fw_size = len(fw_payload)
 
     # 2. 讀取可選的 Aux Data (如 Fan LUT 資料)
     aux_payload = b''
@@ -158,7 +170,7 @@ def pack_firmware(
     print("==================================================")
     print(" Qualcomm Glymur EC Firmware 打包完成")
     print("==================================================")
-    print(f" 輸入檔案          : {input_bin} ({fw_size} Bytes)")
+    print(f" 輸入檔案          : {input_bin} ({input_fw_size} Bytes)")
     if aux_size > 0:
         print(f" 附加資料 (Aux)    : {aux_bin} ({aux_size} Bytes)")
     print(f" 輸出映像檔        : {output_bin} ({len(final_image)} Bytes)")
