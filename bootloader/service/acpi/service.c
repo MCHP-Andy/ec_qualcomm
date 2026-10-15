@@ -27,7 +27,7 @@ enum {
 
 static K_EVENT_DEFINE(event);
 
-static uint8_t cmd_idx = 0;
+static uint16_t cmd_idx = 0;
 static uint8_t rece_cmd[ACPI_RECE_LEN];
 static uint8_t resp_buf[ACPI_RESP_LEN];
 

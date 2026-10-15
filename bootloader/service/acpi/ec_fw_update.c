@@ -195,7 +195,7 @@ static int acpi_ec_erase_designated_region(const acpi_cmd_t *cmd_info, uint8_t *
     ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
 
     uint8_t  path        = cmd[2];
-    uint32_t block_count = cmd[3];
+    uint32_t block_count = (uint32_t)cmd[3] * 4096; // 4K
     uint32_t address     = cmd[4] | ((uint32_t)cmd[5] << 8) | ((uint32_t)cmd[6] << 16); // 24-bit Little Endian
 
     LOG_INF("Erase Region: Path=0x%02X, StartAddr=0x%06X, Blocks=%d", path, address, block_count);
@@ -209,6 +209,8 @@ static int acpi_ec_erase_designated_region(const acpi_cmd_t *cmd_info, uint8_t *
 
     return 0;
 }
+
+static uint32_t flash_wr_addr = 0;
 
 /**
  * @brief 0xAF: Erase Particular Memory Partition in EC
@@ -246,6 +248,8 @@ static int acpi_ec_erase_partition(const acpi_cmd_t *cmd_info, uint8_t *cmd,
             if (ret < 0) {
                 LOG_ERR("Failed to erase APP Main partition : %d", ret);
             }
+            flash_wr_addr = DT_REG_ADDR(DT_NODELABEL(int_flash)) +
+                         DT_REG_ADDR(DT_NODELABEL(hdr_partition));
 #else
             LOG_WRN("Quick erase 0x%02X not supported on this board", quick_erase_cmd);
 #endif
@@ -286,8 +290,8 @@ static int acpi_ec_write_ram_buffer(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
 
     uint16_t payload_len = cmd_len - 1; // 扣除 cmd
-    if (payload_len > 256) {
-        LOG_ERR("Write buffer overflow: %d bytes (max 256)", payload_len);
+    if (payload_len > 512) {
+        LOG_ERR("Write buffer overflow: %d bytes (max 512)", payload_len);
         return -EINVAL;
     }
 
@@ -318,6 +322,21 @@ static int acpi_ec_write_designated_region(const acpi_cmd_t *cmd_info, uint8_t *
         bytes_to_program = ram_buffer_data_len;
     }
 
+    switch (path) {
+        case EC_FLASH_PATH_EXT:
+            LOG_ERR("Unsupported path for write commit: 0x%02X", path);
+            return -EINVAL;
+            break;
+        case EC_FLASH_PATH_INT:
+            break;
+        case EC_FLASH_PATH_AUTO:
+            address = flash_wr_addr; // Use the address set by the last erase/partition command
+            break;
+        default:
+            LOG_ERR("Invalid path: 0x%02X", path);
+            return -EINVAL;
+    }
+
     LOG_INF("Commit RAM buffer to Flash: Path=0x%02X, Addr=0x%06X, Len=%d bytes",
             path, address, bytes_to_program);
 
@@ -327,6 +346,7 @@ static int acpi_ec_write_designated_region(const acpi_cmd_t *cmd_info, uint8_t *
         LOG_ERR("Failed to program Flash: %d", ret);
         return ret;
     }
+    flash_wr_addr += bytes_to_program; // Update the write address for next commit
 
     return 0;
 }
@@ -536,7 +556,7 @@ ACPI_CMD_SUBSCRIBE(fw_update, EC_STATE_WP_STATUS,       acpi_ec_state_wp_status,
 ACPI_CMD_SUBSCRIBE(fw_update, EC_READ_CRC_RESULT,       acpi_ec_read_crc_result,              1, 0, 6);   // 0xA2 (ByteCount + Status + CRC4B)
 ACPI_CMD_SUBSCRIBE(fw_update, EC_FLASH_ERASE_REGION,    acpi_ec_erase_designated_region,      7, 0, 0);   // 0xAE (Cmd + BCNT=5 + Path + Blk + Addr(3))
 ACPI_CMD_SUBSCRIBE(fw_update, EC_FLASH_ERASE_PARTITION, acpi_ec_erase_partition,              3, 0, 0);   // 0xAF (Cmd + BCNT=1 + SubCmd)
-ACPI_CMD_SUBSCRIBE(fw_update, EC_FLASH_WRITE_BUF,       acpi_ec_write_ram_buffer,             1, 256, 0); // 0xA0 (Cmd + Data[1..256])
+ACPI_CMD_SUBSCRIBE(fw_update, EC_FLASH_WRITE_BUF,       acpi_ec_write_ram_buffer,           513, 0, 0);   // 0xA0 (Cmd + Data[1..512])
 ACPI_CMD_SUBSCRIBE(fw_update, EC_FLASH_WRITE_COMMIT,    acpi_ec_write_designated_region,      7, 0, 0);   // 0xAA (Cmd + BCNT=5 + Path + Size/32 + Addr(3))
 ACPI_CMD_SUBSCRIBE(fw_update, EC_FLASH_READ_SETUP,      acpi_ec_read_designated_region_setup, 6, 0, 0);   // 0xA7 (Cmd + BCNT=4 + Path + Addr(3))
 ACPI_CMD_SUBSCRIBE(fw_update, EC_FLASH_READ_BUF,        acpi_ec_read_ram_buffer,              1, 0, 512); // 0xA1 (Cmd -> Data)
