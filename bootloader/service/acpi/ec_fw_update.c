@@ -130,6 +130,7 @@ static int acpi_ec_fw_corruption_status(const acpi_cmd_t *cmd_info, uint8_t *cmd
     resp[0] = 1;                         // Byte count = 1
     resp[1] = ec_boot_info_get()->corruption_status; // Corruption status bitfield
 
+    acpi_resp_set(resp, resp_len);
     LOG_INF("EC FW Corruption Status query: 0x%02X", resp[1]);
     return 0;
 }
@@ -155,6 +156,7 @@ static int acpi_ec_state_wp_status(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     resp[1] = state;               // State of EC
     resp[2] = active_control_path; // 0x4F: Internal, 0x0F: External
 
+    acpi_resp_set(resp, resp_len);
     LOG_INF("EC State: 0x%02X, Control Path: 0x%02X", resp[1], resp[2]);
     return 0;
 }
@@ -179,6 +181,7 @@ static int acpi_ec_read_crc_result(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     resp[4] = (last_crc_value >> 16) & 0xFF;
     resp[5] = (last_crc_value >> 24) & 0xFF; // CRC32 MSB
 
+    acpi_resp_set(resp, resp_len);
     LOG_INF("Read CRC: Status=0x%02X, CRC=0x%08X", resp[1], last_crc_value);
     return 0;
 }
@@ -529,7 +532,21 @@ static int acpi_ec_spi_services(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     /* 6. Run CRC */
     case SPI_SUBCMD_CRC_INT_ACT_MAIN:
         LOG_INF("Triggering Partition CRC Calculation: 0x%02X", sub_cmd);
+        {
+            // set spi busy flag
+            uint8_t buf[] = {
+                0x02, 0xFF,
+                active_control_path}; // ByteCount=2, State=Busy, Path=Internal
+            acpi_resp_set(buf, sizeof(buf));
+        }
         ec_run_crc_int_act_main();
+        // {
+        //     // set spi idle flag
+        //     uint8_t buf[] = {
+        //         0x02, EC_STATE_BOOTLOADER_IDLE_WP_OFF,
+        //         active_control_path}; // ByteCount=2, State=idle, Path=Internal
+        //     acpi_resp_set(buf, sizeof(buf));
+        // }
         break;
     case SPI_SUBCMD_CRC_INT_BK_MAIN:
     case SPI_SUBCMD_CRC_INT_ACT_ODM:
