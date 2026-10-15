@@ -1,8 +1,8 @@
 
 #pragma once
 
-#define ACPI_RECE_LEN 512
-#define ACPI_RESP_LEN 512
+#define ACPI_RECE_LEN 1024
+#define ACPI_RESP_LEN 1024
 
 #include <stdbool.h>
 #include <stdint.h>

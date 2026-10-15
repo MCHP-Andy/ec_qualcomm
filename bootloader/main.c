@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdalign.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
@@ -45,8 +46,10 @@ void jump_to_app(uint32_t address) {
     app_entry();
 }
 
+static char hdr_str[] __attribute__((aligned(16))) = {'B', 'B', 'K', ' ', 'V', '\0'};
+
 int main(void) {
-    LOG_INF("Hello from bootloader");
+    LOG_INF("Hello from bootloader: %s", hdr_str);
 
     LOG_INF("Header address in: 0x%08x", HDR_ADDR);
     LOG_INF("App address in: 0x%08x", APP_START_ADDR);
