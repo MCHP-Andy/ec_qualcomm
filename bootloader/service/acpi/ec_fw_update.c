@@ -198,6 +198,7 @@ static int acpi_ec_erase_designated_region(const acpi_cmd_t *cmd_info, uint8_t *
     uint32_t block_count = (uint32_t)cmd[3] * 4096; // 4K
     uint32_t address     = cmd[4] | ((uint32_t)cmd[5] << 8) | ((uint32_t)cmd[6] << 16); // 24-bit Little Endian
 
+    address += 0x9000; // Host lock to 0x8000, so add 0x9000 to align with actual flash address
     LOG_INF("Erase Region: Path=0x%02X, StartAddr=0x%06X, Blocks=%d", path, address, block_count);
 
     int ret = 0;
@@ -328,6 +329,8 @@ static int acpi_ec_write_designated_region(const acpi_cmd_t *cmd_info, uint8_t *
             return -EINVAL;
             break;
         case EC_FLASH_PATH_INT:
+            // Host lock to 0x8000, so add 0x9000 to align with actual flash address
+            address += 0x9000;
             break;
         case EC_FLASH_PATH_AUTO:
             address = flash_wr_addr; // Use the address set by the last erase/partition command
