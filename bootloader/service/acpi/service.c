@@ -39,7 +39,7 @@ typedef struct acpi_evt_t {
     uint16_t len;
 } acpi_evt_t ;
 
-K_MSGQ_DEFINE(acpi_evt_queue, sizeof(acpi_evt_t), ACPI_EVT_LEN, 4);
+K_MSGQ_DEFINE(acpi_evt_queue, sizeof(acpi_evt_t), ACPI_EVT_LEN, 1);
 
 int acpi_buf_set(acpi_type_t id, uint8_t data) {
     static uint8_t mand = 0;
@@ -119,7 +119,7 @@ static int acpi_cmd_hdl(void) {
                     LOG_ERR("Failed to handle ACPI cmd 0x%02x: %d", rece_cmd[0],
                             ret);
                 } else {
-                    LOG_INF("Handled ACPI cmd 0x%02x successfully",
+                    LOG_DBG("Handled ACPI cmd 0x%02x successfully",
                             rece_cmd[0]);
                     acpi_resp_set(resp_buf, p->resp_len);
                 }
@@ -152,7 +152,7 @@ static void service(void) {
     }
 }
 
-K_THREAD_DEFINE(acpi_id, 512, service, NULL, NULL, NULL, 5,
+K_THREAD_DEFINE(acpi_id, 512, service, NULL, NULL, NULL, 0,
                 0, 0);
 
 #ifdef CONFIG_SHELL
