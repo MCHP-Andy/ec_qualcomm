@@ -7,7 +7,7 @@
 #include <zephyr/sys/reboot.h>
 #include <zephyr/logging/log.h>
 
-#include <interface/flash.h>
+#include <interface/flash_service.h>
 #include <interface/storage.h>
 
 #include "acpi_tbl.h"
@@ -204,8 +204,8 @@ static int acpi_ec_erase_designated_region(const acpi_cmd_t *cmd_info, uint8_t *
     address += 0x9000; // Host lock to 0x8000, so add 0x9000 to align with actual flash address
     LOG_INF("Erase Region: Path=0x%02X, StartAddr=0x%06X, Blocks=%d", path, address, block_count);
 
-    int ret = 0;
-    ret = qc_flash_erase(address, block_count);
+    int ret = flash_service_request(FLASH_SERVICE_ERASE, address, block_count,
+                                    NULL, NULL, NULL);
     if (ret < 0) {
         LOG_ERR("Failed to erase flash region: %d", ret);
         return ret;
@@ -245,10 +245,13 @@ static int acpi_ec_erase_partition(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                         DT_REG_ADDR(DT_NODELABEL(hdr_partition)),
                     DT_REG_SIZE(DT_NODELABEL(hdr_partition)) +
                         DT_REG_SIZE(DT_NODELABEL(img_partition)));
-            ret = qc_flash_erase(DT_REG_ADDR(DT_NODELABEL(int_flash)) +
-                                     DT_REG_ADDR(DT_NODELABEL(hdr_partition)),
-                                 DT_REG_SIZE(DT_NODELABEL(hdr_partition)) +
-                                     DT_REG_SIZE(DT_NODELABEL(img_partition)));
+            ret = flash_service_request(
+                FLASH_SERVICE_ERASE,
+                DT_REG_ADDR(DT_NODELABEL(int_flash)) +
+                    DT_REG_ADDR(DT_NODELABEL(hdr_partition)),
+                DT_REG_SIZE(DT_NODELABEL(hdr_partition)) +
+                    DT_REG_SIZE(DT_NODELABEL(img_partition)),
+                NULL, NULL, NULL);
             if (ret < 0) {
                 LOG_ERR("Failed to erase APP Main partition : %d", ret);
             }
@@ -278,6 +281,10 @@ static int acpi_ec_erase_partition(const acpi_cmd_t *cmd_info, uint8_t *cmd,
             break;
     }
     ec_boot_info_save();
+
+    if (ret < 0) {
+        return ret;
+    }
 
     return 0;
 }
@@ -346,8 +353,8 @@ static int acpi_ec_write_designated_region(const acpi_cmd_t *cmd_info, uint8_t *
     LOG_INF("Commit RAM buffer to Flash: Path=0x%02X, Addr=0x%06X, Len=%d bytes",
             path, address, bytes_to_program);
 
-    int ret = 0;
-    ret = qc_flash_write(address, ram_buffer, bytes_to_program);
+    int ret = flash_service_request(FLASH_SERVICE_WRITE, address,
+                                    bytes_to_program, NULL, ram_buffer, NULL);
     if (ret < 0) {
         LOG_ERR("Failed to program Flash: %d", ret);
         return ret;
@@ -374,8 +381,8 @@ static int acpi_ec_read_designated_region_setup(const acpi_cmd_t *cmd_info, uint
     LOG_INF("Setup Read Flash: Path=0x%02X, Addr=0x%06X", path, address);
 
     /* 預設讀取 512 bytes 至 ram_buffer */
-    int ret = 0;
-    ret = qc_flash_read(address, ram_buffer, RAM_BUFFER_SIZE);
+    int ret = flash_service_request(FLASH_SERVICE_READ, address,
+                                    RAM_BUFFER_SIZE, NULL, ram_buffer, NULL);
     if (ret < 0) {
         LOG_ERR("Failed to read flash into buffer: %d", ret);
         return ret;
@@ -418,12 +425,19 @@ static void ec_run_crc_int_act_main(void) {
         LOG_ERR("Failed to read EC FW header");
     } else if (hdr.fw_size == 0 || hdr.fw_size > EC_FW_IMAGE_MAX_SIZE) {
         LOG_ERR("Invalid EC FW Image Size: %u bytes", hdr.fw_size);
-    } else if (ec_cal_image_crc((off_t)IMG_ADDR, hdr.fw_size, &crc) == 0) {
-        info->last_crc_value = crc;
-        info->last_crc_status = (crc == hdr.check.crc32) ? EC_CRC_STATUS_PASSED
-                                                         : EC_CRC_STATUS_FAILED;
-        LOG_INF("Run CRC: Size=%u, Calculated 0x%08X, Expected 0x%08X",
-                hdr.fw_size, crc, hdr.check.crc32);
+    } else {
+        int ret = flash_service_request(FLASH_SERVICE_CRC, (off_t)IMG_ADDR,
+                                        hdr.fw_size, NULL, NULL, &crc);
+        if (ret < 0) {
+            LOG_ERR("Failed to calculate EC FW CRC: %d", ret);
+        } else {
+            info->last_crc_value = crc;
+            info->last_crc_status =
+                (crc == hdr.check.crc32) ? EC_CRC_STATUS_PASSED
+                                         : EC_CRC_STATUS_FAILED;
+            LOG_INF("Run CRC: Size=%u, Calculated 0x%08X, Expected 0x%08X",
+                    hdr.fw_size, crc, hdr.check.crc32);
+        }
     }
 
     if (info->last_crc_status == EC_CRC_STATUS_PASSED) {
