@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include <interface/flash.h>
+#include <interface/flash_service.h>
 #include <interface/storage.h>
 #include <zephyr/retention/retention.h>
 #include <zephyr/sys/crc.h>
@@ -23,6 +24,7 @@ LOG_MODULE_REGISTER(header, LOG_LEVEL_INF);
 
 /* 連續驗證失敗達此次數時停留在 Bootloader 等待 Host 修復 */
 #define EC_BOOT_FAIL_LIMIT              (3)
+#define FLASH_LOAD_CHUNK_SIZE           512
 
 /* Image header / Image 位址 (Get from DTS) */
 #if defined(CONFIG_BOARD_QEMU_CORTEX_M3)
@@ -38,8 +40,7 @@ LOG_MODULE_REGISTER(header, LOG_LEVEL_INF);
 static const struct device *boot_info = DEVICE_DT_GET(DT_NODELABEL(boot_info0));
 static ec_boot_info_t info = {0};
 /* 載入 image 至 RAM 用緩衝區 */
-static uint8_t buf[512] = {0};
-/* ec_cal_image_crc / ec_cal_image_checksum 專用緩衝區，避免與載入流程共用 buf */
+/* ec_cal_image_crc / ec_cal_image_checksum temporary buffer */
 static uint8_t crc_buf[512] = {0};
 
 static uint32_t cal_checksum(uint32_t checksum, const uint8_t *const buffer,
@@ -125,14 +126,13 @@ static int load_image_to_ram(off_t addr, size_t size) {
     LOG_INF("Load image: Flash 0x%08X -> RAM 0x%08X, size %u bytes",
             (uint32_t)addr, (uint32_t)img_addr, (uint32_t)size);
 
-    for (size_t a = 0; a < size; a += sizeof(buf)) {
-        size_t chunk_size = MIN(size - a, sizeof(buf));
-        int ret = read_flash(addr + a, buf, chunk_size);
+    for (size_t a = 0; a < size; a += FLASH_LOAD_CHUNK_SIZE) {
+        size_t chunk_size = MIN(size - a, (size_t)FLASH_LOAD_CHUNK_SIZE);
+        int ret = flash_service_request(FLASH_SERVICE_LOAD_TO_RAM, addr + a,
+                                        chunk_size, img_addr + a, NULL, NULL);
         if (ret < 0) {
             return ret;
         }
-
-        memcpy(img_addr + a, buf, chunk_size);
     }
 
     return 0;
@@ -210,8 +210,11 @@ bool ec_validate_image_header(const fw_hdr_t *hdr)
         uint32_t expected = use_checksum ? hdr->check.checksum : hdr->check.crc32;
         uint32_t value = 0;
         int ret = use_checksum
-                      ? ec_cal_image_checksum((off_t)IMG_ADDR, hdr->fw_size, &value)
-                      : ec_cal_image_crc((off_t)IMG_ADDR, hdr->fw_size, &value);
+                      ? ec_cal_image_checksum((off_t)IMG_ADDR, hdr->fw_size,
+                                              &value)
+                      : flash_service_request(FLASH_SERVICE_CRC,
+                                              (off_t)IMG_ADDR, hdr->fw_size,
+                                              NULL, NULL, &value);
 
         info.last_crc_value = value;
         info.last_crc_status = (ret == 0 && value == expected)
