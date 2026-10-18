@@ -298,6 +298,8 @@ static int init_config(void) {
         info.last_crc_status = EC_CRC_STATUS_PASSED;
     }
 
+    info.status = EC_STATE_BOOTLOADER_IDLE_WP_OFF;
+
     /* 未經軟體記錄的重設 (WDT / 硬體) 下次開機會讀到 UNKNOWN */
     info.reset_reason = EC_RESET_REASON_UNKNOWN;
     ec_boot_info_save();

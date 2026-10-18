@@ -85,16 +85,6 @@ LOG_MODULE_DECLARE(acpi);
 #define SPI_SUBCMD_CRASH_ASSERT             0xC1
 #define SPI_SUBCMD_CRASH_WATCHDOG           0xC2
 
-/* 0xEC EC State Status */
-#define EC_STATE_BOOTLOADER_IDLE_WP_OFF     0x0B
-#define EC_STATE_BOOTLOADER_IDLE_WP_ON      0x1B
-#define EC_STATE_MAIN_IDLE_WP_OFF           0x0C
-#define EC_STATE_MAIN_IDLE_WP_ON            0x1C
-#define EC_STATE_SPI_OP_FAILED              0xFA
-#define EC_STATE_BUSY                       0xFF
-
-
-
 /* 讀寫暫存緩衝區 (A0h 寫入最多 256B，A1h 讀出最多 512B) */
 #define RAM_BUFFER_SIZE         512
 static uint8_t ram_buffer[RAM_BUFFER_SIZE];
@@ -103,7 +93,6 @@ static uint16_t ram_buffer_data_len = 0;
 /* 內部狀態變數 */
 /* Corruption Status / CRC 結果存放於 retention boot info (見 interface/storage.h) */
 static bool     in_bootloader_mode = false;
-static bool     flash_wp_enabled   = false;
 static uint8_t  active_control_path = EC_FLASH_PATH_INT;
 
 /* =========================================================================
@@ -145,12 +134,7 @@ static int acpi_ec_state_wp_status(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
     ACPI_CHECK_OUT(cmd_info, resp, resp_len);
 
-    uint8_t state = 0;
-    if (in_bootloader_mode) {
-        state = flash_wp_enabled ? EC_STATE_BOOTLOADER_IDLE_WP_ON : EC_STATE_BOOTLOADER_IDLE_WP_OFF;
-    } else {
-        state = flash_wp_enabled ? EC_STATE_MAIN_IDLE_WP_ON : EC_STATE_MAIN_IDLE_WP_OFF;
-    }
+    uint8_t state = ec_boot_info_get()->status;
 
     resp[0] = 2;                   // Byte count = 2
     resp[1] = state;               // State of EC
@@ -607,7 +591,7 @@ static int cmd_fw_status(const struct shell *sh, size_t argc, char **argv) {
     ARG_UNUSED(argv);
     shell_info(sh, "=== EC Firmware Update Status ===");
     shell_info(sh, "Execution Mode:    %s", in_bootloader_mode ? "Bootloader" : "Main Block");
-    shell_info(sh, "Write Protection:  %s", flash_wp_enabled ? "Enabled" : "Disabled");
+    shell_info(sh, "Write Protection:  Disabled");
     shell_info(sh, "Control Path:      0x%02X (%s)", active_control_path, 
                active_control_path == EC_FLASH_PATH_INT ? "Internal Flash" : "External Flash");
     const ec_boot_info_t *info = ec_boot_info_get();

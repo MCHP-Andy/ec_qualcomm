@@ -123,6 +123,14 @@ int ec_cal_image_checksum(off_t addr, size_t size, uint32_t *checksum);
 #define EC_RESET_REASON_PANIC               (0x04) /**< Oops / Assert (0xBB 0xC0~C1) */
 #define EC_RESET_REASON_ENTER_BBK           (0x05) /**< 進入 Bootloader 所觸發的重設 */
 
+/* 0xEC EC State Status */
+#define EC_STATE_BOOTLOADER_IDLE_WP_OFF     0x0B
+#define EC_STATE_BOOTLOADER_IDLE_WP_ON      0x1B
+#define EC_STATE_MAIN_IDLE_WP_OFF           0x0C
+#define EC_STATE_MAIN_IDLE_WP_ON            0x1C
+#define EC_STATE_SPI_OP_FAILED              0xFA
+#define EC_STATE_BUSY                       0xFF
+
 /* 0xEB Corruption Status Bits */
 #define FW_CORRUPT_ACT_BOOT_INTACT          BIT(0)
 #define FW_CORRUPT_BK_BOOT_INTACT           BIT(1)
@@ -143,7 +151,7 @@ typedef struct ec_boot_info_t {
     uint8_t  boot_fail_count;   /**< 連續映像檔驗證失敗次數 */
     uint8_t  corruption_status; /**< 0xEB Corruption Status 旗標 */
     uint8_t  last_crc_status;   /**< 0xA2 最近一次 CRC 狀態 */
-    uint8_t  reserved;          /**< 保留對齊 */
+    volatile uint8_t status;    /**< 0xEC EC 狀態；Flash 操作期間為 BUSY */
     uint32_t last_crc_value;    /**< 0xA2 最近一次 CRC32 / Checksum 數值 */
 } ec_boot_info_t;
 
