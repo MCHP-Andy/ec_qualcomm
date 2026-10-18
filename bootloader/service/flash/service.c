@@ -75,12 +75,14 @@ static void flash_service(void) {
             continue;
         }
 
+        ec_boot_info_get()->status = EC_STATE_BUSY;
         ret = flash_service_execute(&msg);
         if (ret < 0) {
             LOG_ERR("Flash command %d failed at 0x%08lx, size %u: %d",
                     msg.command, (long)msg.flash_address,
                     (unsigned int)msg.size, ret);
         }
+        ec_boot_info_get()->status = EC_STATE_BOOTLOADER_IDLE_WP_OFF;
 
         *msg.operation_result = ret;
         k_sem_give(msg.completion);
