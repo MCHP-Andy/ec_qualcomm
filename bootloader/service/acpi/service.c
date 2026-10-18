@@ -107,8 +107,8 @@ int acpi_buf_set(acpi_type_t id, uint8_t data) {
 static int acpi_cmd_hdl(void) {
     int ret = 0;
 
-    // Parse the cmd and call corresponding handler function, then copy response
-    // to interface buffer
+    // Parse the command and let its handler write any response to the
+    // interface buffer when needed.
     STRUCT_SECTION_FOREACH(acpi_cmd_t, p) {
         if (rece_cmd[0] == p->cmd) {
             if ((cmd_idx >= p->mand) && (p->cmd_hdl != NULL)) {
@@ -121,7 +121,6 @@ static int acpi_cmd_hdl(void) {
                 } else {
                     LOG_DBG("Handled ACPI cmd 0x%02x successfully",
                             rece_cmd[0]);
-                    acpi_resp_set(resp_buf, p->resp_len);
                 }
             } else if (p->cmd_hdl == NULL) {
                 LOG_WRN("No handler for ACPI cmd 0x%02x", rece_cmd[0]);
