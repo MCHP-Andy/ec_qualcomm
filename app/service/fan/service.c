@@ -133,13 +133,19 @@ static inline int check_fan_rpm(fan_ctrl_t *fan_blk, uint16_t *rpm) {
 
     for (fan_id_t src = THERM_SRC_CPU; src < THERM_SRC_MAX; src++) {
         fan_tbl_t *tbl = fan_blk->fan_tbl[src];
-        int8_t size = fan_blk->tbl_size[src] - 1;
+        uint8_t size = fan_blk->tbl_size[src];
+
+        // Skip sources without LUT
+        if (tbl == NULL || size == 0) {
+            continue;
+        }
+
         /* temps stores in 0.1C, LUT uses 1C. Convert to 1C for comparison */
         uint8_t temp = (uint8_t)(temps[src] / 10);
 
-        for (; size >= 0; size--) {
-            if (temp > tbl[size].temp_low && temp <= tbl[size].temp_high) {
-                *rpm = (tbl[size].rpm > *rpm) ? tbl[size].rpm : *rpm;
+        for (uint8_t i = 0; i < size; i++) {
+            if (temp > tbl[i].temp_low && temp <= tbl[i].temp_high) {
+                *rpm = MAX(*rpm, tbl[i].rpm);
             }
         }
     }
@@ -453,8 +459,13 @@ static int acpi_ec_fan_lut_num(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     fan_tbl_t *tbl = NULL;
     uint8_t len = 0;
 
-    ret = fan_tbl_get(profile, fan_id, THERM_SRC_CPU, &tbl,
-                      &len); // Assuming CPU as default source for LUT num
+    // Each fan only maps to one temperature source; use the first one found
+    for (fan_id_t src = THERM_SRC_CPU; src < THERM_SRC_MAX; src++) {
+        ret = fan_tbl_get(profile, fan_id, src, &tbl, &len);
+        if (ret == 0) {
+            break;
+        }
+    }
     if (ret < 0) {
         LOG_ERR("Failed to get fan lookup table for fan_id=%d: %d", fan_id,
                 ret);
