@@ -3,6 +3,7 @@
 #include <zephyr/logging/log.h>
 
 #include <interface/acpi.h>
+#include <interface/sci.h>
 
 #include "acpi_tbl.h" // Include the new acpi_tbl.h for macros
 
@@ -54,6 +55,4 @@ static int acpi_func_flag(const acpi_cmd_t *cmd_info, uint8_t *cmd,
 // clang-format off
 ACPI_CMD_SUBSCRIBE(fan, SOC_TO_EC_MODERN_STANDBY_NOTIFI,           acpi_soc_to_ec_modern_standby_notifi, 2, 0, 0); // Page 19 (Status)
 ACPI_CMD_SUBSCRIBE(fan, EC_FUNC_FLAG,                              acpi_func_flag, 1, 9, 9); // Page 35/36 (Optional ByteCount + Flag(8))
-// Note: EC_ACTIVE_COOLING_SCI_EVENT (0x05) is handled in service.c along with
-// the rest of the SCI logic
 // clang-format on
