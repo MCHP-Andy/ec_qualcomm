@@ -33,7 +33,22 @@ static K_EVENT_DEFINE(event);
 SYS_EVENT_SUBSCRIBE(fan, event);
 
 static uint16_t temps[THERM_SRC_MAX] = {0};
-static fan_ctrl_t fan_blks[FAN_ID_MAX] = {0};
+static fan_ctrl_t fan_blks[FAN_ID_MAX] = {
+    [FAN_ID_1] =
+        {
+            .id = FAN_ID_1,
+            .state = FAN_STA_OFF,
+            .trip_low = 0,
+            .trip_high = 10000,
+        },
+    [FAN_ID_2] =
+        {
+            .id = FAN_ID_2,
+            .state = FAN_STA_OFF,
+            .trip_low = 0,
+            .trip_high = 10000,
+        },
+};
 
 int fan_tmp_get(fan_id_t tmp_src, uint16_t *tmp) {
 
@@ -79,32 +94,6 @@ static fan_ctrl_t *fan_blk_get(fan_id_t fan_id) {
 
 static k_timeout_t rpm_update = K_MSEC(1000);
 
-static int fan_rpm_update(fan_ctrl_t *fan_blk, uint16_t rpm) {
-#if 0
-    if (rpm == 0) {
-        // Fan off by PWM
-        fan_blk->rpm = 0;
-        rpm_update = K_FOREVER;
-        fan_pwm_set(fan_blk->id, 0);
-    } else {
-        // Mapping PWM to RPM
-        fan_rpm_set(fan_blk->id, rpm);
-
-        // Get RPM from driver
-        fan_rpm_get(fan_blk->id, &rpm);
-        fan_blk->rpm = rpm;
-
-        // TODO: RPM PID via PWM
-    }
-#else
-    fan_rpm_set(fan_blk->id, rpm);
-    fan_rpm_get(fan_blk->id, &rpm);
-    fan_blk->rpm = rpm;
-#endif
-
-    return 0;
-}
-
 static inline bool check_fan_debug(fan_ctrl_t *fan_blk) {
     if (fan_blk == NULL)
         return 0;
@@ -116,11 +105,11 @@ static inline bool check_fan_debug(fan_ctrl_t *fan_blk) {
                 fan_pwm_set(fan_blk->id, (uint16_t)fan_blk->dbg_pwm << 8);
             } else {
                 // Set fan via RPM
-                fan_rpm_update(fan_blk, fan_blk->dbg_rpm);
+                fan_rpm_set(fan_blk->id, fan_blk->dbg_rpm);
             }
         } else {
             // Fan off
-            fan_rpm_update(fan_blk, 0);
+            fan_pwm_set(fan_blk->id, 0);
         }
         return true;
     }
@@ -159,7 +148,6 @@ static void service(void) {
         // fan id = temp_src
         fan_lut_get(profile, fan, fan, &fan_blk->lut);
         fan_blk->profile = profile;
-        fan_blk->state = FAN_STA_ON;
     }
 
     while (1) {
@@ -174,7 +162,34 @@ static void service(void) {
         pwr_state_get(&state);
 
         for (fan_id_t fan = FAN_ID_1; fan < ARRAY_SIZE(fan_blks); fan++) {
+            uint16_t rpm = 0;
             fan_blk = &fan_blks[fan];
+
+            // Get RPM from driver
+            do {
+                ret = fan_rpm_get(fan_blk->id, &rpm);
+                if (ret < 0) {
+                    LOG_ERR("Fan%d RPM read failed", fan);
+                    break;
+                }
+                if ((fan_blk->rpm == 0 && rpm > 0) ||
+                    (fan_blk->rpm > 0 && rpm == 0)) {
+                    LOG_INF("Fan: %d, rpm changed from %d to %d", fan,
+                            fan_blk->rpm, rpm);
+                    fan_blk->state = (rpm > 0) ? FAN_STA_ON : FAN_STA_OFF;
+                    sci_enque(SCI_FAN1_STA_CHG + (fan-FAN_ID_1));
+                }
+                fan_blk->rpm = rpm;
+                LOG_DBG("Fan: %d, rpm: %d", fan, rpm);
+            } while (0);
+
+            // Check RPM with trip point
+            if ((fan_blk->rpm < fan_blk->trip_low) |
+                (fan_blk->rpm > fan_blk->trip_high)) {
+                LOG_WRN("Fan%d RPM %d below trip low %d", fan, fan_blk->rpm,
+                        fan_blk->trip_low);
+                sci_enque(SCI_FAN1_RPM_CROSS + (fan-FAN_ID_1));
+            }
 
             // Check debug mode
             if (check_fan_debug(fan_blk)) {
@@ -185,36 +200,28 @@ static void service(void) {
             // Check SoC-CP fan power constraint
             // if (!fan_allow_on) {
             //     LOG_DBG("Fan%d forced OFF by SoC-CP fan constraint", fan);
-            //     fan_rpm_update(fan_blk, 0);
+            //     fan_rpm_set(fan_blk->id, 0);
             //     continue;
             // }
 
             // Check power state
             if (state != PWR_STA_S0) {
-                fan_rpm_update(fan_blk, 0);
+                fan_rpm_set(fan_blk->id, 0);
                 continue;
             }
 
-            // Check fan on
-            if (fan_blk->state != FAN_STA_ON) {
-                fan_rpm_update(fan_blk, 0);
-                continue;
-            }
-
-            // Get RPM from table
-            uint16_t rpm = 0;
-            ret = check_fan_rpm(fan_blk, &rpm);
-            if (ret < 0) {
-                LOG_WRN("Fan%d RPM can't found in LUT", fan);
-            } else {
+            // Get RPM from LUT
+            do {
+                ret = check_fan_rpm(fan_blk, &rpm);
+                if (ret < 0) {
+                    LOG_WRN("Fan%d RPM can't found in LUT", fan);
+                    break;
+                }
                 LOG_DBG("Fan: %d, rpm: %d", fan, rpm);
-                fan_rpm_update(fan_blk, rpm);
-                continue;
-            }
+                fan_rpm_set(fan_blk->id, rpm);
+            } while (0);
 
             // TODO: RPM control for Fan
-
-            // TODO: check RPM with trip point
         }
     }
 }
@@ -299,6 +306,7 @@ static int acpi_ec_fan_profile(const acpi_cmd_t *cmd_info, uint8_t *cmd,
         }
 
         ctrl->profile = profile;
+        sci_enque(SCI_FAN_PROFILE_SW);
         k_event_post(&event, FAN_CFG_UPDATE);
 
         LOG_DBG("Fan %d profile set to %d", fan_id, profile);
@@ -504,6 +512,7 @@ static int acpi_ec_fan_lut(const acpi_cmd_t *cmd_info, uint8_t *cmd,
         }
         // LUT data starts at cmd[4]; cmd[3] is the byte count field.
         memcpy((uint8_t *)&lut->tbl, &cmd[4], entries_to_write * 3);
+        sci_enque(SCI_LUT_SET);
         LOG_DBG("Fan %d, profile %d, source %d LUT updated with %u entries",
                 fan_id, profile, tmp_src,
                 entries_to_write); // Corrected to use cmd[3]
