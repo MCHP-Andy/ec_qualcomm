@@ -35,6 +35,157 @@ static const struct fan_dev_t {
         },
 };
 
+// clang-format off
+static struct fan_profile_t {
+    fan_lut_t lut[FAN_ID_MAX][THERM_SRC_MAX];
+} fan_profiles[FAN_PROFILE_MAX] = {
+    [FAN_PROFILE_BETTER_PERFORMANCE_CHG_IN] = {
+        .lut = {
+            [FAN_ID_1][THERM_SRC_CPU] = {
+                .temp_src = THERM_SRC_CPU,
+                .tbl_size = 10,
+                .tbl = {
+                    {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
+                    {.rpm = 0x23, .temp_high = 0x4D, .temp_low = 0x47},
+                    {.rpm = 0x2D, .temp_high = 0x50, .temp_low = 0x4A},
+                    {.rpm = 0x37, .temp_high = 0x53, .temp_low = 0x4D},
+                    {.rpm = 0x41, .temp_high = 0x55, .temp_low = 0x50},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0x53},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                },
+            },
+            [FAN_ID_2][THERM_SRC_SKIN] = {
+                .temp_src = THERM_SRC_SKIN,
+                .tbl_size = 10,
+                .tbl = {
+                    {.rpm = 0x2D, .temp_high = 0x36, .temp_low = 0x00},
+                    {.rpm = 0x32, .temp_high = 0x39, .temp_low = 0x34},
+                    {.rpm = 0x37, .temp_high = 0x3B, .temp_low = 0x36},
+                    {.rpm = 0x3C, .temp_high = 0x3D, .temp_low = 0x38},
+                    {.rpm = 0x46, .temp_high = 0x3F, .temp_low = 0x3A},
+                    {.rpm = 0x50, .temp_high = 0x41, .temp_low = 0x3C},
+                    {.rpm = 0x5A, .temp_high = 0x43, .temp_low = 0x3E},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0x40},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                },
+            },
+        },
+    },
+    [FAN_PROFILE_BETTER_PERFORMANCE_CHG_OUT] = {
+        .lut = {
+            [FAN_ID_1][THERM_SRC_CPU] = {
+                .temp_src = THERM_SRC_CPU,
+                .tbl_size = 10,
+                .tbl = {
+                    {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
+                    {.rpm = 0x23, .temp_high = 0x4D, .temp_low = 0x47},
+                    {.rpm = 0x2D, .temp_high = 0x50, .temp_low = 0x4A},
+                    {.rpm = 0x37, .temp_high = 0x53, .temp_low = 0x4D},
+                    {.rpm = 0x41, .temp_high = 0x55, .temp_low = 0x50},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0x53},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                },
+            },
+            [FAN_ID_2][THERM_SRC_SKIN] = {
+                .temp_src = THERM_SRC_SKIN,
+                .tbl_size = 10,
+                .tbl = {
+                    {.rpm = 0x2D, .temp_high = 0x36, .temp_low = 0x00},
+                    {.rpm = 0x32, .temp_high = 0x39, .temp_low = 0x34},
+                    {.rpm = 0x37, .temp_high = 0x3B, .temp_low = 0x36},
+                    {.rpm = 0x3C, .temp_high = 0x3D, .temp_low = 0x38},
+                    {.rpm = 0x46, .temp_high = 0x3F, .temp_low = 0x3A},
+                    {.rpm = 0x50, .temp_high = 0x41, .temp_low = 0x3C},
+                    {.rpm = 0x5A, .temp_high = 0x43, .temp_low = 0x3E},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0x40},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                },
+            },
+        },
+    },
+    [FAN_PROFILE_BEST_PERFORMANCE_CHG_IN] = {
+        .lut = {
+            [FAN_ID_1][THERM_SRC_CPU] = {
+                .temp_src = THERM_SRC_CPU,
+                .tbl_size = 10,
+                .tbl = {
+                    {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
+                    {.rpm = 0x23, .temp_high = 0x4D, .temp_low = 0x47},
+                    {.rpm = 0x2D, .temp_high = 0x50, .temp_low = 0x4A},
+                    {.rpm = 0x37, .temp_high = 0x53, .temp_low = 0x4D},
+                    {.rpm = 0x41, .temp_high = 0x55, .temp_low = 0x50},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0x53},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                },
+            },
+            [FAN_ID_2][THERM_SRC_SKIN] = {
+                .temp_src = THERM_SRC_SKIN,
+                .tbl_size = 10,
+                .tbl = {
+                    {.rpm = 0x2D, .temp_high = 0x36, .temp_low = 0x00},
+                    {.rpm = 0x32, .temp_high = 0x39, .temp_low = 0x34},
+                    {.rpm = 0x37, .temp_high = 0x3B, .temp_low = 0x36},
+                    {.rpm = 0x3C, .temp_high = 0x3D, .temp_low = 0x38},
+                    {.rpm = 0x46, .temp_high = 0x3F, .temp_low = 0x3A},
+                    {.rpm = 0x50, .temp_high = 0x41, .temp_low = 0x3C},
+                    {.rpm = 0x5A, .temp_high = 0x43, .temp_low = 0x3E},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0x40},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                },
+            },
+        },
+    },
+    [FAN_PROFILE_BEST_PERFORMANCE_CHG_OUT] = {
+        .lut = {
+            [FAN_ID_1][THERM_SRC_CPU] = {
+                .temp_src = THERM_SRC_CPU,
+                .tbl_size = 10,
+                .tbl = {
+                    {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
+                    {.rpm = 0x23, .temp_high = 0x4D, .temp_low = 0x47},
+                    {.rpm = 0x2D, .temp_high = 0x50, .temp_low = 0x4A},
+                    {.rpm = 0x37, .temp_high = 0x53, .temp_low = 0x4D},
+                    {.rpm = 0x41, .temp_high = 0x55, .temp_low = 0x50},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0x53},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                },
+            },
+            [FAN_ID_2][THERM_SRC_SKIN] = {
+                .temp_src = THERM_SRC_SKIN,
+                .tbl_size = 10,
+                .tbl = {
+                    {.rpm = 0x2D, .temp_high = 0x36, .temp_low = 0x00},
+                    {.rpm = 0x32, .temp_high = 0x39, .temp_low = 0x34},
+                    {.rpm = 0x37, .temp_high = 0x3B, .temp_low = 0x36},
+                    {.rpm = 0x3C, .temp_high = 0x3D, .temp_low = 0x38},
+                    {.rpm = 0x46, .temp_high = 0x3F, .temp_low = 0x3A},
+                    {.rpm = 0x50, .temp_high = 0x41, .temp_low = 0x3C},
+                    {.rpm = 0x5A, .temp_high = 0x43, .temp_low = 0x3E},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0x40},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                },
+            },
+        },
+    },
+};
+// clang-format on
+
 /*
  * SoC-CP fan power constraint (Ref: EC FAN Constraints Message, page 55).
  * Spec default is 0 (OFF), the fan(s) stay OFF until SoC-CP grants permission
@@ -58,6 +209,23 @@ int fan_constraint_get(bool *allow_on) {
     }
 
     *allow_on = fan_allow_on;
+
+    return 0;
+}
+
+int fan_lut_get(fan_id_t profile, fan_id_t fan_id, fan_id_t temp_src,
+                fan_lut_t **lut) {
+    if ((profile < FAN_PROFILE_BATTERY_SAVER ||
+         profile > FAN_PROFILE_BEST_PERFORMANCE_CHG_OUT) ||
+        (fan_id < FAN_ID_1 || fan_id > FAN_ID_2) ||
+        (temp_src < THERM_SRC_CPU || temp_src >= THERM_SRC_MAX) ||
+        lut == NULL) {
+        LOG_ERR("Invalid parameters: profile=%d, fan_id=%d, lut=%p", profile,
+                fan_id, lut);
+        return -EINVAL;
+    }
+
+    *lut = &fan_profiles[profile].lut[fan_id][temp_src];
 
     return 0;
 }

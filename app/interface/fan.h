@@ -11,6 +11,29 @@
 #include <stdio.h>
 #include <stdint.h>
 
+// typedef enum {
+//     THERM_SRC_CPU = 1,
+//     THERM_SRC_SKIN,
+//     THERM_SRC_MAX
+// } therm_src_t;
+
+// typedef enum {
+//     FAN_ID_1 = 1,
+//     FAN_ID_2,
+//     FAN_ID_MAX
+// } fan_id_t;
+
+// typedef enum {
+//     FAN_PROFILE_BATTERY_SAVER = 1,
+//     FAN_PROFILE_BETTER_BAT_CHG_IN,
+//     FAN_PROFILE_BETTER_BAT_CHG_OUT,
+//     FAN_PROFILE_BETTER_PERFORMANCE_CHG_IN,
+//     FAN_PROFILE_BETTER_PERFORMANCE_CHG_OUT,
+//     FAN_PROFILE_BEST_PERFORMANCE_CHG_IN,
+//     FAN_PROFILE_BEST_PERFORMANCE_CHG_OUT,
+//     FAN_PROFILE_MAX
+// } fan_profile_id_t;
+
 typedef enum {
     // Temperature source
     THERM_SRC_CPU = 1,
@@ -46,6 +69,12 @@ typedef struct fan_tbl_t{
     uint8_t temp_low;
 } fan_tbl_t;
 
+typedef struct fan_lut_t {
+    uint8_t temp_src;
+    uint8_t tbl_size;
+    fan_tbl_t tbl[10];
+} fan_lut_t;
+
 typedef struct fan_ctrl_t{
     fan_id_t id; // ID for interface
     fan_id_t state; // 0x00: OFF, 0x01: ON, 0x02: Failure
@@ -54,17 +83,16 @@ typedef struct fan_ctrl_t{
     uint16_t trip_low; // Trip point low in the unit of RPM.
     uint16_t trip_high; // Trip point high in the unit of RPM.
 
-    uint8_t profile; // 0x00: Invalid
-                     // 0x01: Battery saver
-                     // 0x02: Better battery with charger plugged in
-                     // 0x03: Better battery with charger plugged out
-                     // 0x04: Better performance with charger plugged in
-                     // 0x05: Better performance with charger plugged out
-                     // 0x06: Best performance with charger plugged in
-                     // 0x07: Best performance with charger plugged out
+    fan_id_t profile; // 0x00: Invalid
+                      // 0x01: Battery saver
+                      // 0x02: Better battery with charger plugged in
+                      // 0x03: Better battery with charger plugged out
+                      // 0x04: Better performance with charger plugged in
+                      // 0x05: Better performance with charger plugged out
+                      // 0x06: Best performance with charger plugged in
+                      // 0x07: Best performance with charger plugged out
 
-    uint8_t tbl_size[THERM_SRC_MAX]; // LUT number for 2 sources. 0: Dummy, 1: CPU, 2: Skin
-    fan_tbl_t *fan_tbl[THERM_SRC_MAX]; // Fan profile table pointer for 2 sources. 0: Dummy, 1: CPU, 2: Skin
+    fan_lut_t *lut;
 
     uint8_t dbg_mode; // BIT0: 0-Normal, 1-Debug mode
                       // BIT1: 0-Fan off, 1-Fan on
@@ -78,9 +106,8 @@ int fan_tmp_set(fan_id_t tmp_src, uint16_t tmp);
 
 int fan_rpm_write(fan_id_t fan_id, uint16_t rpm);
 
-int fan_tbl_get(fan_id_t profile, fan_id_t fan_id, fan_id_t tmp_src,
-                fan_tbl_t **tbl, uint8_t *len);
-
+int fan_lut_get(fan_id_t profile, fan_id_t fan_id, fan_id_t temp_src,
+                fan_lut_t **lut);
 
 /**
  * @brief Apply the SoC-CP power constraint on the fan(s).
