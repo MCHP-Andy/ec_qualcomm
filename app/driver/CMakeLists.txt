@@ -9,8 +9,6 @@ else()
     target_sources(app PRIVATE acpi.c)
 endif()
 
-target_sources(app PRIVATE fan_profile_tbl.c)
-
 target_sources_ifdef(CONFIG_PM app PRIVATE power.c)
 target_sources(app PRIVATE storage.c)
 target_sources_ifdef(CONFIG_SHELL app PRIVATE aoss_shell.c)
