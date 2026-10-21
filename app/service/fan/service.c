@@ -118,15 +118,33 @@ static inline bool check_fan_debug(fan_ctrl_t *fan_blk) {
     return false;
 }
 
+static inline void fan_blk_lut_load(fan_ctrl_t *fan_blk, fan_id_t profile) {
+    for (fan_id_t tmp_src = THERM_SRC_CPU; tmp_src < THERM_SRC_MAX;
+         tmp_src++) {
+        fan_lut_t **lut = &fan_blk->lut[tmp_src - THERM_SRC_CPU];
+
+        if (fan_lut_get(profile, fan_blk->id, tmp_src, lut) < 0) {
+            *lut = NULL;
+        }
+    }
+}
+
 static inline int check_fan_rpm(fan_ctrl_t *fan_blk, uint16_t *rpm) {
     *rpm = 0;
 
-    fan_lut_t *lut = fan_blk->lut;
-    uint8_t temp = (uint8_t)(temps[lut->temp_src] / 10);
+    // Take the maximum RPM over all LUTs (SoC Tj / Tskin)
+    for (size_t n = 0; n < ARRAY_SIZE(fan_blk->lut); n++) {
+        fan_lut_t *lut = fan_blk->lut[n];
+        if (lut == NULL || lut->tbl_size == 0) {
+            continue;
+        }
 
-    for (uint8_t i = 0; i < lut->tbl_size; i++) {
-        if (temp > lut->tbl[i].temp_low && temp <= lut->tbl[i].temp_high) {
-            *rpm = MAX(*rpm, lut->tbl[i].rpm);
+        uint8_t temp = (uint8_t)(temps[THERM_SRC_CPU + n] / 10);
+
+        for (uint8_t i = 0; i < lut->tbl_size; i++) {
+            if (temp > lut->tbl[i].temp_low && temp <= lut->tbl[i].temp_high) {
+                *rpm = MAX(*rpm, lut->tbl[i].rpm);
+            }
         }
     }
 
@@ -146,8 +164,7 @@ static void service(void) {
 
         fan_blk->id = fan;
 
-        // fan id = temp_src
-        fan_lut_get(profile, fan, fan, &fan_blk->lut);
+        fan_blk_lut_load(fan_blk, profile);
         fan_blk->profile = profile;
     }
 
@@ -272,15 +289,18 @@ static int acpi_ec_fan_rpm(const acpi_cmd_t *cmd_info, uint8_t *cmd,
 
     fan_id_t fan_id = cmd[1];
     fan_ctrl_t *ctrl = fan_blk_get(fan_id);
+    uint16_t rpm = 0;
+
     if (ctrl == NULL) {
         LOG_ERR("Invalid fan_id=%d", fan_id);
         return -EINVAL;
     }
+    rpm = ctrl->rpm;
 
     resp[0] = 2;                       // Byte count
-    resp[1] = ctrl->rpm & 0xFF;        // Fan speed LSB
-    resp[2] = (ctrl->rpm >> 8) & 0xFF; // Fan speed MSB
-    LOG_DBG("Fan %d status rpm: %d", fan_id, ctrl->rpm);
+    resp[1] = rpm & 0xFF;        // Fan speed LSB
+    resp[2] = (rpm >> 8) & 0xFF; // Fan speed MSB
+    LOG_DBG("Fan %d status rpm: %d", fan_id, rpm);
 
     return 0;
 }
@@ -307,6 +327,7 @@ static int acpi_ec_fan_profile(const acpi_cmd_t *cmd_info, uint8_t *cmd,
         }
 
         ctrl->profile = profile;
+        fan_blk_lut_load(ctrl, profile);
         sci_enque(SCI_FAN_PROFILE_SW);
         k_event_post(&event, FAN_CFG_UPDATE);
 
@@ -383,14 +404,14 @@ static int acpi_ec_fan_profile_num(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     fan_id_t fan_id = cmd[1];
 
     // Validate the requested fan exists before reporting capabilities.
-    fan_ctrl_t *ctrl = fan_blk_get(fan_id);
-    if (ctrl == NULL) {
-        LOG_ERR("Invalid fan_id=%d", fan_id);
-        return -EINVAL;
-    }
+    // fan_ctrl_t *ctrl = fan_blk_get(fan_id);
+    // if (ctrl == NULL) {
+    //     LOG_ERR("Invalid fan_id=%d", fan_id);
+    //     return -EINVAL;
+    // }
 
-    resp[0] = ctrl->profile;
-    LOG_DBG("Fan %d profile: %d", fan_id, ctrl->profile);
+    resp[0] = FAN_PROFILE_BEST_PERFORMANCE_CHG_OUT;
+    LOG_DBG("Fan %d profile: %d", fan_id, FAN_PROFILE_BEST_PERFORMANCE_CHG_OUT);
 
     return 0;
 }
@@ -453,18 +474,29 @@ static int acpi_ec_fan_lut_num(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     int ret = 0;
     fan_id_t fan_id = cmd[1] & 0x0f;
     fan_id_t profile = (cmd[1] >> 4) & 0x0f;
-    fan_lut_t *lut = NULL;
+    uint8_t lut_num = 0;
 
-    // fan id = temp_src
-    ret = fan_lut_get(profile, fan_id, fan_id, &lut);
-    if (ret < 0) {
-        LOG_ERR("Failed to get fan lookup table for fan_id=%d: %d", fan_id,
-                ret);
-        return ret;
+    // Number of LUTs = number of temperature sources with a LUT defined
+    for (fan_id_t tmp_src = THERM_SRC_CPU; tmp_src < THERM_SRC_MAX;
+         tmp_src++) {
+        fan_lut_t *lut = NULL;
+
+        ret = fan_lut_get(profile, fan_id, tmp_src, &lut);
+        if (ret < 0) {
+            LOG_ERR("Failed to get fan lookup table for fan_id=%d: %d",
+                    fan_id, ret);
+            return ret;
+        }
+
+        if (lut->tbl_size > 0) {
+            lut_num++;
+        }
     }
 
     resp[0] = lut->tbl_size; // Number of entries in the LUT
-    LOG_DBG("Fan %d lookup table length: %d", fan_id, lut->tbl_size);
+
+    resp[0] = lut_num;
+    LOG_DBG("Fan %d profile %d LUT number: %d", fan_id, profile, lut_num);
 
     return 0;
 }
@@ -570,12 +602,18 @@ static void dump_fan_info(const struct shell *sh, fan_ctrl_t *fan_blk) {
     shell_info(sh, "Fan trip_high: %d rpm", fan_blk->trip_high);
     shell_info(sh, "Fan profile: %d", fan_blk->profile);
 
-    fan_lut_t *lut = fan_blk->lut;
-    shell_info(sh, "Fan tbl_size: %d", lut->tbl_size);
-    for (size_t j = 0; j < lut->tbl_size; j++) {
-        shell_info(sh, "\ttbl[%d]: rpm: %d, high: %d, low: %d", (int)j,
-                   lut->tbl[j].rpm * 100, lut->tbl[j].temp_high,
-                   lut->tbl[j].temp_low);
+    for (size_t n = 0; n < ARRAY_SIZE(fan_blk->lut); n++) {
+        fan_lut_t *lut = fan_blk->lut[n];
+        if (lut == NULL) {
+            continue;
+        }
+        shell_info(sh, "Fan lut[%d] temp_src: %d, tbl_size: %d", (int)n,
+                   (int)(THERM_SRC_CPU + n), lut->tbl_size);
+        for (size_t j = 0; j < lut->tbl_size; j++) {
+            shell_info(sh, "\ttbl[%d]: rpm: %d, high: %d, low: %d", (int)j,
+                       lut->tbl[j].rpm * 100, lut->tbl[j].temp_high,
+                       lut->tbl[j].temp_low);
+        }
     }
 
     bool fan_allow_on = false;
@@ -585,6 +623,7 @@ static void dump_fan_info(const struct shell *sh, fan_ctrl_t *fan_blk) {
     shell_info(sh, "Fan dbg_mode: 0x%02x", fan_blk->dbg_mode);
     shell_info(sh, "Fan dbg_rpm: %d", fan_blk->dbg_rpm);
     shell_info(sh, "Fan dbg_pwm: %d", fan_blk->dbg_pwm);
+    shell_info(sh, "temp[1]: %d, temp[2]: %d", temps[1], temps[2]);
 }
 
 static int cmd_fan_get(const struct shell *sh, size_t argc, char **argv) {
@@ -637,8 +676,7 @@ static int cmd_fan_profile(const struct shell *sh, size_t argc, char **argv) {
 
     fan_ctrl_t *fan_blk = &fan_blks[id];
     fan_blk->profile = (uint8_t)profile;
-    // fan id = temp_src
-    fan_lut_get(profile, id, id, &fan_blk->lut);
+    fan_blk_lut_load(fan_blk, profile);
 
     k_event_post(&event, FAN_CFG_UPDATE);
     shell_info(sh, "Fan %d profile updated to %d", id, profile);

@@ -92,7 +92,7 @@ typedef struct fan_ctrl_t{
                       // 0x06: Best performance with charger plugged in
                       // 0x07: Best performance with charger plugged out
 
-    fan_lut_t *lut;
+    fan_lut_t *lut[THERM_SRC_MAX - THERM_SRC_CPU]; // [0]: SoC Tj, [1]: Tskin
 
     uint8_t dbg_mode; // BIT0: 0-Normal, 1-Debug mode
                       // BIT1: 0-Fan off, 1-Fan on
