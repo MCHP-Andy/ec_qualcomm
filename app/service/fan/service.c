@@ -332,9 +332,12 @@ static int acpi_ec_fan_profile(const acpi_cmd_t *cmd_info, uint8_t *cmd,
         profile = cmd[1] & 0x0F;
         fan_id = (cmd[1] >> 4) & 0x0F;
 
+        fan_id = (fan_id == 0)? 1:fan_id;
+
         ctrl = fan_blk_get(fan_id);
         if (ctrl == NULL) {
-            LOG_ERR("Invalid fan_id=%d", fan_id);
+            LOG_ERR("cmd[1] = 0x%02x", cmd[1]);
+            LOG_ERR("[%d] Invalid fan_id=%d", __LINE__, fan_id);
             return -EINVAL;
         }
 
@@ -348,12 +351,13 @@ static int acpi_ec_fan_profile(const acpi_cmd_t *cmd_info, uint8_t *cmd,
 
     ctrl = fan_blk_get(fan_id);
     if (ctrl == NULL) {
-        LOG_ERR("Invalid fan_id=%d", fan_id);
+        LOG_ERR("[%d] Invalid fan_id=%d", __LINE__, fan_id);
         return -EINVAL;
     }
 
     profile = ctrl->profile;
-    resp[0] = (fan_id << 4) | (profile & 0x0F);
+    // resp[0] = (fan_id << 4) | (profile & 0x0F);
+    resp[0] = (profile & 0x0F);
     LOG_DBG("Fan %d profile: %d", fan_id, profile);
 
     return 0;
@@ -505,7 +509,7 @@ static int acpi_ec_fan_lut_num(const acpi_cmd_t *cmd_info, uint8_t *cmd,
         }
     }
 
-    resp[0] = lut->tbl_size; // Number of entries in the LUT
+    lut_num = (lut_num > 0)? lut_num - 1 : 0;
 
     resp[0] = lut_num;
     LOG_DBG("Fan %d profile %d LUT number: %d", fan_id, profile, lut_num);
