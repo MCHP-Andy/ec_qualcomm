@@ -259,8 +259,12 @@ int acpi_resp_set(uint8_t *pdata, uint16_t len) {
     return 0;
 }
 
-int acpi_int_pulse(void) {
-    LOG_INF("[SIM] ACPI int pin pulsed");
+int acpi_int_set(uint8_t val) {
+    if (val > 1) {
+        return -EINVAL;
+    }
+
+    LOG_INF("[SIM] ACPI int pin set to %u", val);
 
     return 0;
 }

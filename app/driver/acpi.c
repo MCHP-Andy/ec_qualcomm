@@ -38,9 +38,6 @@ static const struct device *bus = DEVICE_DT_GET_OR_NULL(DT_ALIAS(acpi_i2c));
 #define ACPI_INT_NODE DT_PATH(zephyr_user)
 #define ACPI_INT_AVAILABLE DT_NODE_HAS_PROP(ACPI_INT_NODE, acpi_int_gpios)
 
-// Width of the notification pulse, wide enough for the host edge detection
-#define ACPI_INT_PULSE_US (100)
-
 #if ACPI_INT_AVAILABLE
 static const struct gpio_dt_spec acpi_int =
     GPIO_DT_SPEC_GET(ACPI_INT_NODE, acpi_int_gpios);
@@ -63,33 +60,30 @@ int soccp_resp_set(uint8_t *pdata, uint16_t len) {
     return 0;
 }
 
-int acpi_int_pulse(void) {
+int acpi_int_set(uint8_t val) {
 #if ACPI_INT_AVAILABLE
     int ret;
+
+    if (val > 1) {
+        return -EINVAL;
+    }
 
     if (!gpio_is_ready_dt(&acpi_int)) {
         LOG_ERR("ACPI int pin not ready");
         return -ENODEV;
     }
 
-    ret = gpio_pin_set_dt(&acpi_int, 1);
+    ret = gpio_pin_set_dt(&acpi_int, val);
     if (ret < 0) {
-        LOG_ERR("Failed to assert ACPI int pin: %d", ret);
+        LOG_ERR("Failed to set ACPI int pin to %u: %d", val, ret);
         return ret;
     }
 
-    k_busy_wait(ACPI_INT_PULSE_US);
-
-    ret = gpio_pin_set_dt(&acpi_int, 0);
-    if (ret < 0) {
-        LOG_ERR("Failed to release ACPI int pin: %d", ret);
-        return ret;
-    }
-
-    LOG_DBG("ACPI int pin pulsed %d us", ACPI_INT_PULSE_US);
+    LOG_DBG("ACPI int pin set to %u", val);
 
     return 0;
 #else
+    ARG_UNUSED(val);
     return -ENOTSUP;
 #endif
 }
@@ -220,7 +214,7 @@ static int init_config(void) {
     }
 
 #if ACPI_INT_AVAILABLE
-    // Host interrupt line idles low, SCI service pulses it per event
+    // Host interrupt line idles low until the SCI service notifies the host.
     if (gpio_pin_configure_dt(&acpi_int, GPIO_OUTPUT_INACTIVE) < 0) {
         LOG_ERR("Failed to configure ACPI int pin");
         return -1;

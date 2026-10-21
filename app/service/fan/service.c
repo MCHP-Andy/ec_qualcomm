@@ -14,6 +14,7 @@
 #include <interface/power.h>
 #include <interface/fan.h>
 #include <interface/acpi.h>
+#include <interface/sci.h>
 
 #include <service/acpi/acpi_tbl.h> // ACPI_CHECK_IN/OUT macros for fan handlers
 
