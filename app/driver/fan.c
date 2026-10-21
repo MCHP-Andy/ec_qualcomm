@@ -57,6 +57,22 @@ static struct fan_profile_t {
                     {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
                 },
             },
+            [FAN_ID_1][THERM_SRC_SKIN] = {
+                .temp_src = THERM_SRC_SKIN,
+                .tbl_size = 10,
+                .tbl = {
+                    {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
+                    {.rpm = 0x23, .temp_high = 0x4D, .temp_low = 0x47},
+                    {.rpm = 0x2D, .temp_high = 0x50, .temp_low = 0x4A},
+                    {.rpm = 0x37, .temp_high = 0x53, .temp_low = 0x4D},
+                    {.rpm = 0x41, .temp_high = 0x55, .temp_low = 0x50},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0x53},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                },
+            },
             [FAN_ID_2][THERM_SRC_SKIN] = {
                 .temp_src = THERM_SRC_SKIN,
                 .tbl_size = 10,
@@ -79,6 +95,22 @@ static struct fan_profile_t {
         .lut = {
             [FAN_ID_1][THERM_SRC_CPU] = {
                 .temp_src = THERM_SRC_CPU,
+                .tbl_size = 10,
+                .tbl = {
+                    {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
+                    {.rpm = 0x23, .temp_high = 0x4D, .temp_low = 0x47},
+                    {.rpm = 0x2D, .temp_high = 0x50, .temp_low = 0x4A},
+                    {.rpm = 0x37, .temp_high = 0x53, .temp_low = 0x4D},
+                    {.rpm = 0x41, .temp_high = 0x55, .temp_low = 0x50},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0x53},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                },
+            },
+            [FAN_ID_1][THERM_SRC_SKIN] = {
+                .temp_src = THERM_SRC_SKIN,
                 .tbl_size = 10,
                 .tbl = {
                     {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
@@ -129,6 +161,22 @@ static struct fan_profile_t {
                     {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
                 },
             },
+            [FAN_ID_1][THERM_SRC_SKIN] = {
+                .temp_src = THERM_SRC_SKIN,
+                .tbl_size = 10,
+                .tbl = {
+                    {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
+                    {.rpm = 0x23, .temp_high = 0x4D, .temp_low = 0x47},
+                    {.rpm = 0x2D, .temp_high = 0x50, .temp_low = 0x4A},
+                    {.rpm = 0x37, .temp_high = 0x53, .temp_low = 0x4D},
+                    {.rpm = 0x41, .temp_high = 0x55, .temp_low = 0x50},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0x53},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                },
+            },
             [FAN_ID_2][THERM_SRC_SKIN] = {
                 .temp_src = THERM_SRC_SKIN,
                 .tbl_size = 10,
@@ -151,6 +199,22 @@ static struct fan_profile_t {
         .lut = {
             [FAN_ID_1][THERM_SRC_CPU] = {
                 .temp_src = THERM_SRC_CPU,
+                .tbl_size = 10,
+                .tbl = {
+                    {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
+                    {.rpm = 0x23, .temp_high = 0x4D, .temp_low = 0x47},
+                    {.rpm = 0x2D, .temp_high = 0x50, .temp_low = 0x4A},
+                    {.rpm = 0x37, .temp_high = 0x53, .temp_low = 0x4D},
+                    {.rpm = 0x41, .temp_high = 0x55, .temp_low = 0x50},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0x53},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                },
+            },
+            [FAN_ID_1][THERM_SRC_SKIN] = {
+                .temp_src = THERM_SRC_SKIN,
                 .tbl_size = 10,
                 .tbl = {
                     {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
