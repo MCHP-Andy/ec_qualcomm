@@ -115,9 +115,9 @@ static int acpi_cmd_hdl(void) {
                     LOG_ERR("Failed to handle ACPI cmd 0x%02x: %d", rece_cmd[0],
                             ret);
                 } else {
-                    LOG_INF("Handled ACPI cmd 0x%02x successfully",
-                            rece_cmd[0]);
                     acpi_resp_set(resp_buf, p->resp_len);
+                    LOG_DBG("Handled ACPI cmd 0x%02x successfully",
+                            rece_cmd[0]);
                 }
             } else if (p->cmd_hdl == NULL) {
                 LOG_WRN("No handler for ACPI cmd 0x%02x", rece_cmd[0]);
@@ -144,7 +144,7 @@ static void service(void) {
     }
 }
 
-K_THREAD_DEFINE(acpi_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M,
+K_THREAD_DEFINE(acpi_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_H,
                 0, 0);
 
 #ifdef CONFIG_ACPI_SHELL
