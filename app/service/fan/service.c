@@ -297,6 +297,18 @@ static int acpi_ec_fan_rpm(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     }
     rpm = ctrl->rpm;
 
+#if 1
+    ctrl = fan_blk_get(1);
+    bool fan_allow_on = false;
+    fan_constraint_get(&fan_allow_on);
+
+    if (fan_allow_on) {
+        check_fan_rpm(ctrl, &rpm);
+    } else {
+        rpm = 0;
+    }
+#endif
+
     resp[0] = 2;                       // Byte count
     resp[1] = rpm & 0xFF;        // Fan speed LSB
     resp[2] = (rpm >> 8) & 0xFF; // Fan speed MSB
