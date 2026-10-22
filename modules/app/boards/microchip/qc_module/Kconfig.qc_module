@@ -4,6 +4,7 @@
 config BOARD_QC_MODULE
 	select SOC_MEC172X_NSZ
 	select HAS_PM
+	select HAS_SEGGER_RTT
 
 # For zephyr 3.7
 if RTOS_TIMER
