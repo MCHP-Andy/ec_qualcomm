@@ -18,9 +18,17 @@ tools\script\setup.bat
 
 ## Build
 ```
+# Local test
 west build -p -b qual_module/mec172x_nsz app
 
-west build -p -b qual_module/mec172x_nsz app -- -DOVERLAY_CONFIG=release.conf
+# Local debug
+west build -p -b qual_module/mec172x_nsz app -- -DEXTRA_CONF_FILE="debug.conf"
+
+# Release debug
+west build -p -b qual_module/mec172x_nsz app -- -DEXTRA_CONF_FILE="debug.conf;release.conf"
+
+# Release
+west build -p -b qual_module/mec172x_nsz app -- -DEXTRA_CONF_FILE="release.conf"
 
 west build -p -b qual_module/mec172x_nsz --sysbuild app -- -DOVERLAY_CONFIG=release.conf
 source tools/script/release.sh
@@ -33,10 +41,17 @@ export PATH=$PATH:/c/Program\ Files/qemu
 
 qemu-system-arm --version
 
-west build -p -b qemu_cortex_m3 app
-west build -t run
+# Local test
+west build -p -b qemu_cortex_m3 app -t run 
 
-west build -p -b qemu_cortex_m3 app -t run
+# Local debug
+west build -p -b qemu_cortex_m3 app -t run -- -DEXTRA_CONF_FILE="debug.conf"
+
+# Release debug
+west build -p -b qemu_cortex_m3 app -t run -- -DEXTRA_CONF_FILE="debug.conf;release.conf"
+
+# Release
+west build -p -b qemu_cortex_m3 app -- -DEXTRA_CONF_FILE="release.conf"
 
 west build -p -b qemu_cortex_m3 --sysbuild app -- -DOVERLAY_CONFIG=release.conf
 source tools/script/release.sh

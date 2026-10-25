@@ -2,7 +2,7 @@
 if(CONFIG_QEMU_TARGET)
     target_sources(app PRIVATE simulator.c)
 else()
-    target_sources(app PRIVATE btn.c)
+    # target_sources(app PRIVATE btn.c)
     target_sources(app PRIVATE fan.c)
     target_sources(app PRIVATE thermal.c)
     target_sources(app PRIVATE aoss.c)
