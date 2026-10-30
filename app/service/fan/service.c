@@ -297,7 +297,7 @@ static int acpi_ec_fan_rpm(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     }
     rpm = ctrl->rpm;
 
-#if 1
+#if 0
     ctrl = fan_blk_get(1);
     bool fan_allow_on = false;
     fan_constraint_get(&fan_allow_on);

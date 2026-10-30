@@ -325,27 +325,75 @@ int fan_pwm_set(fan_id_t id, uint16_t pwm) {
     return ret;
 }
 
+typedef struct {
+    uint32_t pwm;
+    uint32_t rpm;
+} FanDataPoint;
+
+
+#define FAN_DATA_SIZE 11
+
+// Fan 1 map
+static const FanDataPoint fan1_table[FAN_DATA_SIZE] = {
+    {0, 1935},     {6553, 1936},  {13107, 1962}, {19660, 3009},
+    {26214, 4034}, {32767, 4995}, {39321, 5982}, {45874, 6920},
+    {52428, 7772}, {58981, 8620}, {65535, 9389},
+};
+
+// Fan 2 map
+static const FanDataPoint fan2_table[FAN_DATA_SIZE] = {
+    {0, 3103},     {6553, 4332},   {13107, 5338},  {19660, 6204},
+    {26214, 7067}, {32767, 7853},  {39321, 8633},  {45874, 9287},
+    {52428, 9677}, {58981, 10101}, {65535, 10327},
+};
+
+
+static uint32_t calculate_multi_fan_pwm(int fan_id, uint32_t target_rpm) {
+    const FanDataPoint *table;
+    
+    // 依據 fan_id 選擇對應的對照表
+    if (fan_id == 1) {
+        table = fan1_table;
+    } else if (fan_id == 2) {
+        table = fan2_table;
+    } else {
+        return 0; // 錯誤的風扇 ID
+    }
+
+    // 邊界處理：低於最低轉速
+    if (target_rpm <= table[0].rpm) {
+        return table[0].pwm;
+    }
+    // 邊界處理：高於最高轉速
+    if (target_rpm >= table[FAN_DATA_SIZE - 1].rpm) {
+        return table[FAN_DATA_SIZE - 1].pwm;
+    }
+
+    // 區間內線性插值計算
+    for (int i = 0; i < FAN_DATA_SIZE - 1; i++) {
+        if (target_rpm >= table[i].rpm && target_rpm <= table[i+1].rpm) {
+            uint32_t rpm_low  = table[i].rpm;
+            uint32_t rpm_high = table[i+1].rpm;
+            uint32_t pwm_low  = table[i].pwm;
+            uint32_t pwm_high = table[i+1].pwm;
+
+            // 防止整數溢位的高精度安全運算
+            uint64_t numerator = (uint64_t)(target_rpm - rpm_low) * (pwm_high - pwm_low);
+            uint32_t denominator = rpm_high - rpm_low;
+            
+            return pwm_low + (uint32_t)(numerator / denominator);
+        }
+    }
+    return 0;
+}
+
 int fan_rpm_set(fan_id_t id, uint16_t rpm) {
     uint16_t pwm = 0;
 
     switch (id) {
         case FAN_ID_1:
-            if (rpm < 3000) {
-                pwm = 0;
-            } else if (rpm > 10327) {
-                pwm = 65535;
-            } else {
-                pwm = (uint16_t)((rpm - 3000.0f) * 65535.0f / 7327.0f);
-            }
-            break;
         case FAN_ID_2:
-            if (rpm < 2000) {
-                pwm = 0;
-            } else if (rpm > 9500) {
-                pwm = 65535;
-            } else {
-                pwm = (uint16_t)(rpm - 1931) * 65535.0f / 7488.0f;
-            }
+            pwm = calculate_multi_fan_pwm(id, rpm);
             break;
         default:
             LOG_ERR("Invalid fan ID: %d", id);
