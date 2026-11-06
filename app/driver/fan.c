@@ -16,24 +16,62 @@
 
 LOG_MODULE_REGISTER(fan_dev, LOG_LEVEL_INF);
 
+#define FAN_TRACK_SIZE 11
+
 static const struct gpio_dt_spec fan_en =
     GPIO_DT_SPEC_GET(DT_PATH(zephyr_user), fan_12v_enable_gpios);
 
+typedef struct {
+    uint16_t pwm;
+    uint16_t rpm;
+} fan_track_t;
+
+// clang-format off
 static const struct fan_dev_t {
     const struct pwm_dt_spec fan;
     const struct device *tach;
+    fan_track_t track[FAN_TRACK_SIZE];
 } dev_list[] = {
     [FAN_ID_1] =
         {
             .fan = PWM_DT_SPEC_GET(DT_ALIAS(cpu_fan)),
             .tach = DEVICE_DT_GET(DT_ALIAS(cpu_tach)),
+            .track =
+                {
+                    {.pwm =     0, .rpm = 1935},
+                    {.pwm =  6553, .rpm = 1936},
+                    {.pwm = 13107, .rpm = 1962},
+                    {.pwm = 19660, .rpm = 3009},
+                    {.pwm = 26214, .rpm = 4034},
+                    {.pwm = 32767, .rpm = 4995},
+                    {.pwm = 39321, .rpm = 5982},
+                    {.pwm = 45874, .rpm = 6920},
+                    {.pwm = 52428, .rpm = 7772},
+                    {.pwm = 58981, .rpm = 8620},
+                    {.pwm = 65535, .rpm = 9389},
+                },
         },
     [FAN_ID_2] =
         {
             .fan = PWM_DT_SPEC_GET(DT_ALIAS(base_fan)),
             .tach = DEVICE_DT_GET(DT_ALIAS(base_tach)),
+            .track =
+                {
+                    {.pwm =     0, .rpm =  3103},
+                    {.pwm =  6553, .rpm =  4332},
+                    {.pwm = 13107, .rpm =  5338},
+                    {.pwm = 19660, .rpm =  6204},
+                    {.pwm = 26214, .rpm =  7067},
+                    {.pwm = 32767, .rpm =  7853},
+                    {.pwm = 39321, .rpm =  8633},
+                    {.pwm = 45874, .rpm =  9287},
+                    {.pwm = 52428, .rpm =  9677},
+                    {.pwm = 58981, .rpm = 10101},
+                    {.pwm = 65535, .rpm = 10327},
+                },
         },
 };
+// clang-format on
 
 // clang-format off
 static struct fan_profile_t {
@@ -71,6 +109,22 @@ static struct fan_profile_t {
                     {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
                     {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
                     {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                },
+            },
+            [FAN_ID_2][THERM_SRC_CPU] = {
+                .temp_src = THERM_SRC_SKIN,
+                .tbl_size = 10,
+                .tbl = {
+                    {.rpm = 0x2D, .temp_high = 0x36, .temp_low = 0x00},
+                    {.rpm = 0x32, .temp_high = 0x39, .temp_low = 0x34},
+                    {.rpm = 0x37, .temp_high = 0x3B, .temp_low = 0x36},
+                    {.rpm = 0x3C, .temp_high = 0x3D, .temp_low = 0x38},
+                    {.rpm = 0x46, .temp_high = 0x3F, .temp_low = 0x3A},
+                    {.rpm = 0x50, .temp_high = 0x41, .temp_low = 0x3C},
+                    {.rpm = 0x5A, .temp_high = 0x43, .temp_low = 0x3E},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0x40},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
                 },
             },
             [FAN_ID_2][THERM_SRC_SKIN] = {
@@ -125,6 +179,22 @@ static struct fan_profile_t {
                     {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
                 },
             },
+            [FAN_ID_2][THERM_SRC_CPU] = {
+                .temp_src = THERM_SRC_SKIN,
+                .tbl_size = 10,
+                .tbl = {
+                    {.rpm = 0x2D, .temp_high = 0x36, .temp_low = 0x00},
+                    {.rpm = 0x32, .temp_high = 0x39, .temp_low = 0x34},
+                    {.rpm = 0x37, .temp_high = 0x3B, .temp_low = 0x36},
+                    {.rpm = 0x3C, .temp_high = 0x3D, .temp_low = 0x38},
+                    {.rpm = 0x46, .temp_high = 0x3F, .temp_low = 0x3A},
+                    {.rpm = 0x50, .temp_high = 0x41, .temp_low = 0x3C},
+                    {.rpm = 0x5A, .temp_high = 0x43, .temp_low = 0x3E},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0x40},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                },
+            },
             [FAN_ID_2][THERM_SRC_SKIN] = {
                 .temp_src = THERM_SRC_SKIN,
                 .tbl_size = 10,
@@ -177,6 +247,22 @@ static struct fan_profile_t {
                     {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
                 },
             },
+            [FAN_ID_2][THERM_SRC_CPU] = {
+                .temp_src = THERM_SRC_SKIN,
+                .tbl_size = 10,
+                .tbl = {
+                    {.rpm = 0x2D, .temp_high = 0x36, .temp_low = 0x00},
+                    {.rpm = 0x32, .temp_high = 0x39, .temp_low = 0x34},
+                    {.rpm = 0x37, .temp_high = 0x3B, .temp_low = 0x36},
+                    {.rpm = 0x3C, .temp_high = 0x3D, .temp_low = 0x38},
+                    {.rpm = 0x46, .temp_high = 0x3F, .temp_low = 0x3A},
+                    {.rpm = 0x50, .temp_high = 0x41, .temp_low = 0x3C},
+                    {.rpm = 0x5A, .temp_high = 0x43, .temp_low = 0x3E},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0x40},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                },
+            },
             [FAN_ID_2][THERM_SRC_SKIN] = {
                 .temp_src = THERM_SRC_SKIN,
                 .tbl_size = 10,
@@ -227,6 +313,22 @@ static struct fan_profile_t {
                     {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
                     {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
                     {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                },
+            },
+            [FAN_ID_2][THERM_SRC_CPU] = {
+                .temp_src = THERM_SRC_SKIN,
+                .tbl_size = 10,
+                .tbl = {
+                    {.rpm = 0x2D, .temp_high = 0x36, .temp_low = 0x00},
+                    {.rpm = 0x32, .temp_high = 0x39, .temp_low = 0x34},
+                    {.rpm = 0x37, .temp_high = 0x3B, .temp_low = 0x36},
+                    {.rpm = 0x3C, .temp_high = 0x3D, .temp_low = 0x38},
+                    {.rpm = 0x46, .temp_high = 0x3F, .temp_low = 0x3A},
+                    {.rpm = 0x50, .temp_high = 0x41, .temp_low = 0x3C},
+                    {.rpm = 0x5A, .temp_high = 0x43, .temp_low = 0x3E},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0x40},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
                 },
             },
             [FAN_ID_2][THERM_SRC_SKIN] = {
@@ -325,27 +427,55 @@ int fan_pwm_set(fan_id_t id, uint16_t pwm) {
     return ret;
 }
 
+static uint16_t cal_fan_pwm(fan_id_t id, uint32_t target_rpm) {
+    const fan_track_t *table;
+
+    switch (id) {
+    case FAN_ID_1:
+    case FAN_ID_2:
+        table = dev_list[id].track;
+        break;
+
+    default:
+        LOG_ERR("Invalid fan ID: %d", id);
+        return 0;
+        break;
+    }
+
+    // 邊界處理：低於最低轉速
+    if (target_rpm <= table[0].rpm) {
+        return table[0].pwm;
+    }
+    // 邊界處理：高於最高轉速
+    if (target_rpm >= table[FAN_TRACK_SIZE - 1].rpm) {
+        return table[FAN_TRACK_SIZE - 1].pwm;
+    }
+
+    // 區間內線性插值計算
+    for (int i = 0; i < FAN_TRACK_SIZE - 1; i++) {
+        if (target_rpm >= table[i].rpm && target_rpm <= table[i+1].rpm) {
+            uint16_t rpm_low  = table[i].rpm;
+            uint16_t rpm_high = table[i+1].rpm;
+            uint16_t pwm_low  = table[i].pwm;
+            uint16_t pwm_high = table[i+1].pwm;
+
+            // 防止整數溢位的高精度安全運算
+            uint32_t numerator = (uint32_t)(target_rpm - rpm_low) * (pwm_high - pwm_low);
+            uint32_t denominator = rpm_high - rpm_low;
+            
+            return pwm_low + (uint32_t)(numerator / denominator);
+        }
+    }
+    return 0;
+}
+
 int fan_rpm_set(fan_id_t id, uint16_t rpm) {
     uint16_t pwm = 0;
 
     switch (id) {
         case FAN_ID_1:
-            if (rpm < 3000) {
-                pwm = 0;
-            } else if (rpm > 10327) {
-                pwm = 65535;
-            } else {
-                pwm = (uint16_t)((rpm - 3000.0f) * 65535.0f / 7327.0f);
-            }
-            break;
         case FAN_ID_2:
-            if (rpm < 2000) {
-                pwm = 0;
-            } else if (rpm > 9500) {
-                pwm = 65535;
-            } else {
-                pwm = (uint16_t)(rpm - 1931) * 65535.0f / 7488.0f;
-            }
+            pwm = cal_fan_pwm(id, rpm);
             break;
         default:
             LOG_ERR("Invalid fan ID: %d", id);
