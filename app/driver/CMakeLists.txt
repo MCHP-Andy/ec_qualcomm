@@ -10,5 +10,8 @@ else()
 endif()
 
 target_sources_ifdef(CONFIG_PM app PRIVATE power.c)
+if(NOT CONFIG_QEMU_TARGET)
+    target_sources_ifdef(CONFIG_PM app PRIVATE i2c_pm.c)
+endif()
 target_sources(app PRIVATE storage.c)
 target_sources_ifdef(CONFIG_SHELL app PRIVATE aoss_shell.c)
