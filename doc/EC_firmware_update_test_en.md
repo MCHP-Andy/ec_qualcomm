@@ -1,7 +1,7 @@
 # EC firmware update test
 
-Related files: [bootloader/service/acpi/ec_fw_update.c](../bootloader/service/acpi/ec_fw_update.c) /
-[bootloader/service/flash/service.c](../bootloader/service/flash/service.c)
+Related files: [service/acpi/ec_fw_update_bootloader.c](../service/acpi/ec_fw_update_bootloader.c) /
+[service/flash/service.c](../service/flash/service.c)
 
 Specification: 80-35782-87 Rev. AC (Windows Mobile Compute EC Interface Specification)
 
@@ -73,7 +73,7 @@ The host log, however, reports success:
 [WOS-EC W] [EcEraseNVFlashRegion 1477] NV blk(4KB) 1 / 1 erased
 ```
 
-- Likely cause: [acpi_ec_erase_designated_region()](../bootloader/service/acpi/ec_fw_update.c#L177) always adds `0x9000` to the host address. The host sends the NV address as `0x0F0000`, which becomes `0x0F9000` after the offset. That is outside the MEC172x internal eFlash range, so `flash_erase()` returns `-EINVAL`.
+- Likely cause: [acpi_ec_erase_designated_region()](../service/acpi/ec_fw_update_bootloader.c#L177) always adds `0x9000` to the host address. The host sends the NV address as `0x0F0000`, which becomes `0x0F9000` after the offset. That is outside the MEC172x internal eFlash range, so `flash_erase()` returns `-EINVAL`.
 - Second problem: the EC fails the command, but the host only checks that the I2C write succeeded. The EC status then goes back to Idle, so the host assumes the erase completed. The EC should report the error in its status or response.
 - Impact: the NV region was not erased in this test, but the Main Block update and boot were both normal.
 

@@ -1,12 +1,13 @@
-
 #pragma once
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <stddef.h>
-#include <sys/types.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/toolchain.h>
+
+#if defined(CONFIG_APP_BOOTLOADER)
+#include <stddef.h>
+#include <sys/types.h>
 
 #define EC_FW_HEADER_SIZE               (32)
 
@@ -104,6 +105,7 @@ int ec_cal_image_crc(off_t addr, size_t size, uint32_t *crc);
  * @return 0 成功，負數表示錯誤碼
  */
 int ec_cal_image_checksum(off_t addr, size_t size, uint32_t *checksum);
+#endif /* CONFIG_APP_BOOTLOADER */
 
 /* -------------------------------------------------------------------------
  * App <-> Bootloader 資料交換 (存放於 retention boot_info0 區域)

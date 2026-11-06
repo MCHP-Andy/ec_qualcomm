@@ -24,7 +24,7 @@ enum {
 
 static K_EVENT_DEFINE(event);
 
-static uint8_t cmd_idx = 0;
+static uint16_t cmd_idx = 0;
 static uint8_t rece_cmd[ACPI_RECE_LEN];
 static uint8_t resp_buf[ACPI_RESP_LEN];
 
@@ -115,7 +115,10 @@ static int acpi_cmd_hdl(void) {
                     LOG_ERR("Failed to handle ACPI cmd 0x%02x: %d", rece_cmd[0],
                             ret);
                 } else {
+#if !defined(CONFIG_APP_BOOTLOADER)
+                    // Bootloader handlers set their own response length
                     acpi_resp_set(resp_buf, p->resp_len);
+#endif
                     LOG_DBG("Handled ACPI cmd 0x%02x successfully",
                             rece_cmd[0]);
                 }

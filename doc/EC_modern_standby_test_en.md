@@ -1,9 +1,9 @@
 # EC modern standby test
 
-Related files: [app/service/power/service.c](../app/service/power/service.c) /
-[app/driver/power.c](../app/driver/power.c) /
-[app/service/fan/service.c](../app/service/fan/service.c) /
-[app/service/sci/service.c](../app/service/sci/service.c)
+Related files: [service/power/service.c](../service/power/service.c) /
+[driver/power.c](../driver/power.c) /
+[service/fan/service.c](../service/fan/service.c) /
+[service/sci/service.c](../service/sci/service.c)
 
 Specification:
 
@@ -44,7 +44,7 @@ Specification:
 | 2 | Read Profile7 Fan1 LUT_T1, set T1 = 74 °C, target RPM = 3500 | Drives Fan1 from the LUT | Succeeded |
 | 3 | Read Profile7 Fan2 LUT_T2, set T2 = 54 °C, target RPM = 5000 | Drives Fan2 from the LUT | Succeeded |
 | 4 | Read Fan1 / Fan2 status / speed | Fans spinning | Spinning, succeeded |
-| 5 | Send MS Entry (`0x23`, status=1) | [acpi_soc_to_ec_modern_standby_notifi()](../app/service/power/service.c#L109) → S0 → Modern Standby; [pwr_state_chg()](../app/driver/power.c#L261) enables heavy sleep; fan constraint set to OFF | Succeeded |
+| 5 | Send MS Entry (`0x23`, status=1) | [acpi_soc_to_ec_modern_standby_notifi()](../service/power/service.c#L109) → S0 → Modern Standby; [pwr_state_chg()](../driver/power.c#L261) enables heavy sleep; fan constraint set to OFF | Succeeded |
 | 6 | Read pending SCI | Sends SCI `0x30` / `0x31` when a fan's RPM drops to 0 | Detected Fan1 and Fan2 SCIs |
 | 7 | Read Fan1 / Fan2 status / speed | Fans stopped | Stopped, succeeded |
 | 8 | Check that no SCI is issued during MS | No SCI issued | Succeeded |
@@ -61,9 +61,9 @@ The temperatures the host set match the EC LUTs:
 
 ### How the EC handles it
 
-- [acpi_soc_to_ec_modern_standby_notifi()](../app/service/power/service.c#L121) turns `0x23` into `pwr_state_set(PWR_STA_MS / PWR_STA_S0)`. The power service thread performs the state change and then posts `SYS_PWR_STA_CHG`.
-- When the fan service gets the event, it sets the fan constraint from the power state at [service.c:225](../app/service/fan/service.c#L225): outside S0 it cuts fan power (`fan_en` GPIO), and back in S0 it turns it on again.
-- The fan service reads RPM every 1 s (`rpm_update`). When RPM switches between 0 and non-zero, it sends SCI `0x30` / `0x31` ([service.c:198](../app/service/fan/service.c#L198)).
+- [acpi_soc_to_ec_modern_standby_notifi()](../service/power/service.c#L121) turns `0x23` into `pwr_state_set(PWR_STA_MS / PWR_STA_S0)`. The power service thread performs the state change and then posts `SYS_PWR_STA_CHG`.
+- When the fan service gets the event, it sets the fan constraint from the power state at [service.c:225](../service/fan/service.c#L225): outside S0 it cuts fan power (`fan_en` GPIO), and back in S0 it turns it on again.
+- The fan service reads RPM every 1 s (`rpm_update`). When RPM switches between 0 and non-zero, it sends SCI `0x30` / `0x31` ([service.c:198](../service/fan/service.c#L198)).
 
 ---
 

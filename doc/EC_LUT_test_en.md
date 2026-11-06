@@ -1,7 +1,7 @@
 # EC fan LUT test
 
-Related files: [app/service/fan/service.c](../app/service/fan/service.c) /
-[app/driver/fan.c](../app/driver/fan.c)
+Related files: [service/fan/service.c](../service/fan/service.c) /
+[driver/fan.c](../driver/fan.c)
 
 Specification:
 
@@ -42,10 +42,10 @@ Specification:
 
 | # | Host action | EC behavior | Result |
 |---|-------------|-------------|--------|
-| 1 | Read number of supported profiles (`0x26`) | [acpi_ec_fan_profile_num()](../app/service/fan/service.c#L418) returns 7 | Total Profile Numbers = 7 |
-| 2 | Read LUT count for profiles 1–7 (`0x27`) | [acpi_ec_fan_lut_num()](../app/service/fan/service.c#L488) | Profiles 1–3 have no LUT; profiles 4–7 have LUT1 and LUT2 |
-| 3 | Switch profile (`0x24`) and read the LUT (`0x28`) | Returns the table from [fan_profiles](../app/driver/fan.c#L77) | Succeeded |
-| 4 | Step up: set the temperature level by level, check RPM rises | [check_fan_rpm()](../app/service/fan/service.c#L132) looks up RPM by temperature and uses the higher of SoC Tj / Tskin | PASS (max Level 5) |
+| 1 | Read number of supported profiles (`0x26`) | [acpi_ec_fan_profile_num()](../service/fan/service.c#L418) returns 7 | Total Profile Numbers = 7 |
+| 2 | Read LUT count for profiles 1–7 (`0x27`) | [acpi_ec_fan_lut_num()](../service/fan/service.c#L488) | Profiles 1–3 have no LUT; profiles 4–7 have LUT1 and LUT2 |
+| 3 | Switch profile (`0x24`) and read the LUT (`0x28`) | Returns the table from [fan_profiles](../driver/fan.c#L77) | Succeeded |
+| 4 | Step up: set the temperature level by level, check RPM rises | [check_fan_rpm()](../service/fan/service.c#L132) looks up RPM by temperature and uses the higher of SoC Tj / Tskin | PASS (max Level 5) |
 | 5 | Step down: lower the temperature level by level, check RPM falls | Same as above | PASS |
 
 ### LUT in the EC
@@ -66,7 +66,7 @@ Entries after Lv05 are `0xFF` padding, so the highest valid level is Lv05. This 
 
 The Fan2 LUTs (SoC Tj and Tskin are identical) are valid up to Lv07 (`0x64` = 10000 RPM, TmpD 64 °C). The host only tests Fan1, so the Fan2 LUTs were not verified in this run.
 
-Profiles 1–3 (Battery saver, Better battery AC/DC) have no LUT defined in [app/driver/fan.c](../app/driver/fan.c#L77). This is the current design and matches the behavior in the spec's sample output.
+Profiles 1–3 (Battery saver, Better battery AC/DC) have no LUT defined in [driver/fan.c](../driver/fan.c#L77). This is the current design and matches the behavior in the spec's sample output.
 
 ## Notes
 

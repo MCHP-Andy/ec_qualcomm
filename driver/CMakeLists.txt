@@ -1,0 +1,26 @@
+
+if(CONFIG_QEMU_TARGET)
+    target_sources(app PRIVATE simulator.c)
+else()
+    target_sources(app PRIVATE acpi.c)
+endif()
+
+if(CONFIG_APP_BOOTLOADER)
+    if(NOT CONFIG_QEMU_TARGET)
+        target_sources(app PRIVATE flash.c)
+    endif()
+
+    target_sources(app PRIVATE storage_bootloader.c)
+else()
+    if(NOT CONFIG_QEMU_TARGET)
+        target_sources(app PRIVATE btn.c)
+        target_sources(app PRIVATE fan.c)
+        target_sources(app PRIVATE thermal.c)
+        target_sources(app PRIVATE aoss.c)
+        target_sources_ifdef(CONFIG_PM app PRIVATE i2c_pm.c)
+    endif()
+
+    target_sources_ifdef(CONFIG_PM app PRIVATE power.c)
+    target_sources(app PRIVATE storage.c)
+    target_sources_ifdef(CONFIG_SHELL app PRIVATE aoss_shell.c)
+endif()

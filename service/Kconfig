@@ -1,0 +1,18 @@
+
+config APP_BOOTLOADER
+	bool "EC bootloader"
+	default n
+	help
+	  Build the shared drivers and services for the EC bootloader. Enables
+	  bootloader-only components (flash service, image validation, firmware
+	  update commands) and leaves out app-only services.
+
+orsource "acpi/Kconfig"
+
+if !APP_BOOTLOADER
+orsource "sci/Kconfig"
+orsource "fan/Kconfig"
+orsource "power/Kconfig"
+orsource "soccp/Kconfig"
+orsource "thermal/Kconfig"
+endif

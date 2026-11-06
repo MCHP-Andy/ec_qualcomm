@@ -1,6 +1,6 @@
 # ACPI 介面測試指令腳本
 
-對應檔案:[app/service/acpi/service.c](../app/service/acpi/service.c)
+對應檔案:[service/acpi/service.c](../service/acpi/service.c)
 規格參考:80-35782-87 Rev. AC (Windows Mobile Compute EC Interface Specification)
 
 ## Shell 使用方式
@@ -371,7 +371,7 @@ acpi write 05
 
 ## 三、SCI 事件測試
 
-對照 [app/interface/acpi.h](../app/interface/acpi.h) 的 `sci_t` 定義:
+對照 [interface/acpi.h](../interface/acpi.h) 的 `sci_t` 定義:
 
 | SCI 值 | 事件 |
 |--------|------|

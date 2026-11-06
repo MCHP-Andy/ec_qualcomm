@@ -1,7 +1,7 @@
 # EC fan LUT test
 
-對應檔案:[app/service/fan/service.c](../app/service/fan/service.c) /
-[app/driver/fan.c](../app/driver/fan.c)
+對應檔案:[service/fan/service.c](../service/fan/service.c) /
+[driver/fan.c](../driver/fan.c)
 
 規格參考:
 
@@ -42,10 +42,10 @@
 
 | # | Host 動作 | EC 行為 | 結果 |
 |---|-----------|---------|------|
-| 1 | 讀取支援的 Profile 數量(`0x26`) | [acpi_ec_fan_profile_num()](../app/service/fan/service.c#L418) 回 7 | Total Profile Numbers = 7 |
-| 2 | 對 Profile 1–7 逐一讀取 LUT 數量(`0x27`) | [acpi_ec_fan_lut_num()](../app/service/fan/service.c#L488) | Profile 1–3 無 LUT,Profile 4–7 有 LUT1、LUT2 |
-| 3 | 切換 Profile(`0x24`)並讀取 LUT(`0x28`) | 回傳 [fan_profiles](../app/driver/fan.c#L77) 中的表 | 成功 |
-| 4 | Step up:依 LUT 逐級設定溫度,確認 RPM 跟著上升 | [check_fan_rpm()](../app/service/fan/service.c#L132) 依溫度查表,取 SoC Tj / Tskin 兩者中較高的 RPM | PASS(max Level 5) |
+| 1 | 讀取支援的 Profile 數量(`0x26`) | [acpi_ec_fan_profile_num()](../service/fan/service.c#L418) 回 7 | Total Profile Numbers = 7 |
+| 2 | 對 Profile 1–7 逐一讀取 LUT 數量(`0x27`) | [acpi_ec_fan_lut_num()](../service/fan/service.c#L488) | Profile 1–3 無 LUT,Profile 4–7 有 LUT1、LUT2 |
+| 3 | 切換 Profile(`0x24`)並讀取 LUT(`0x28`) | 回傳 [fan_profiles](../driver/fan.c#L77) 中的表 | 成功 |
+| 4 | Step up:依 LUT 逐級設定溫度,確認 RPM 跟著上升 | [check_fan_rpm()](../service/fan/service.c#L132) 依溫度查表,取 SoC Tj / Tskin 兩者中較高的 RPM | PASS(max Level 5) |
 | 5 | Step down:逐級降溫,確認 RPM 跟著下降 | 同上 | PASS |
 
 ### EC 中的 LUT
@@ -66,7 +66,7 @@ Lv05 之後的 entry 都是 `0xFF` 填充,有效的最高 Level 是 Lv05,與 Hos
 
 Fan2 的 LUT(SoC Tj 與 Tskin 相同)有效到 Lv07(`0x64` = 10000 RPM,TmpD 64 °C)。Host 只測 Fan1,所以這次沒有驗證 Fan2 的 LUT。
 
-Profile 1–3(Battery saver、Better battery AC/DC)在 [app/driver/fan.c](../app/driver/fan.c#L77) 中沒有定義 LUT,屬於目前的設計,與規格 sample output 的行為相同。
+Profile 1–3(Battery saver、Better battery AC/DC)在 [driver/fan.c](../driver/fan.c#L77) 中沒有定義 LUT,屬於目前的設計,與規格 sample output 的行為相同。
 
 ## 備註
 
