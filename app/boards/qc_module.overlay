@@ -1,0 +1,18 @@
+/*
+ * Copyright (c) 2023 Microchip Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+    chosen {
+        zephyr,code-partition = &app_partition;
+    };
+
+    tst_clk_out: tst_clk_out {
+        compatible = "vnd,pinctrl-device";
+        pinctrl-0 = <&tst_clk_out_gpio060>;
+        pinctrl-names = "default";
+        status = "okay";
+    };
+};

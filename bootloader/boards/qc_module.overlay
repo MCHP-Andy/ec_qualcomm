@@ -1,0 +1,27 @@
+/*
+ * Copyright (c) 2023 Microchip Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+    chosen {
+        zephyr,code-partition = &boot_partition;
+    };
+};
+
+&i2c_smb_0 {
+    status = "disabled";
+};
+
+&i2c_smb_2 {
+    status = "disabled";
+};
+
+&adc0 {
+    status = "disabled";
+};
+
+&aoss {
+    status = "disabled";
+};

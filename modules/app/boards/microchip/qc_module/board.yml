@@ -1,9 +1,8 @@
 board:
-  name: qual_module
+  name: qc_module
   # For zephyr 3.7
   # full_name: Microchip EC Card
   # For zephyr 3.7 end
   vendor: microchip
   socs:
-  - name: mec1753_qsz
   - name: mec172x_nsz

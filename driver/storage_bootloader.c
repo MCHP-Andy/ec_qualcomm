@@ -30,7 +30,7 @@ LOG_MODULE_REGISTER(header, LOG_LEVEL_INF);
 #if defined(CONFIG_BOARD_QEMU_CORTEX_M3)
 #define HDR_ADDR (DT_REG_ADDR(DT_NODELABEL(flash0))+DT_REG_ADDR(DT_NODELABEL(hdr_partition)))
 #define IMG_ADDR (DT_REG_ADDR(DT_NODELABEL(flash0))+DT_REG_ADDR(DT_NODELABEL(app_partition)))
-#elif defined(CONFIG_BOARD_QUAL_MODULE)
+#elif defined(CONFIG_BOARD_QC_MODULE)
 #define HDR_ADDR (DT_REG_ADDR(DT_NODELABEL(int_flash))+DT_REG_ADDR(DT_NODELABEL(hdr_partition)))
 #define IMG_ADDR (DT_REG_ADDR(DT_NODELABEL(int_flash))+DT_REG_ADDR(DT_NODELABEL(img_partition)))
 /* App 執行位址 (RAM) */
@@ -56,7 +56,7 @@ static int read_flash(off_t addr, uint8_t *data, size_t len) {
 #if defined(CONFIG_BOARD_QEMU_CORTEX_M3)
     memcpy(data, (const uint8_t *)addr, len);
     return 0;
-#elif defined(CONFIG_BOARD_QUAL_MODULE)
+#elif defined(CONFIG_BOARD_QC_MODULE)
     int ret = qc_flash_read(addr, data, len);
     if (ret < 0) {
         LOG_ERR("Flash read failed at 0x%08X: %d", (uint32_t)addr, ret);
@@ -118,7 +118,7 @@ int ec_cal_image_checksum(off_t addr, size_t size, uint32_t *checksum) {
     return 0;
 }
 
-#if defined(CONFIG_BOARD_QUAL_MODULE)
+#if defined(CONFIG_BOARD_QC_MODULE)
 /* 重讀 Flash image 並寫入 RAM 執行位址 */
 static int load_image_to_ram(off_t addr, size_t size) {
     uint8_t *img_addr = (uint8_t *)RAM_ADDR;
@@ -249,7 +249,7 @@ bool ec_validate_image_header(const fw_hdr_t *hdr)
     }
 
     /* 5. 校驗通過後才重讀 Flash image 並寫入 RAM */
-#if defined(CONFIG_BOARD_QUAL_MODULE)
+#if defined(CONFIG_BOARD_QC_MODULE)
     if (load_image_to_ram((off_t)IMG_ADDR, hdr->fw_size) < 0) {
         LOG_ERR("Failed to load EC FW image to RAM");
         boot_info_mark_fail();
