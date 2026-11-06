@@ -35,7 +35,7 @@ graph LR
 ## SCI service
 
 SCI event queuing and host notification are handled independently by
-`app/service/sci/service.c`. The ACPI interrupt line is asserted while an SCI
+`service/sci/service.c`. The ACPI interrupt line is asserted while an SCI
 is pending, then deasserted when the host reads command `0x05`. If the read
 timeout expires, the line is deasserted but the pending SCI is retained for a
 later host read.

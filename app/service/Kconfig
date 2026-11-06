@@ -1,7 +1,0 @@
-
-orsource "acpi/Kconfig"
-orsource "sci/Kconfig"
-orsource "fan/Kconfig"
-orsource "power/Kconfig"
-orsource "soccp/Kconfig"
-orsource "thermal/Kconfig"

@@ -17,8 +17,13 @@ tools\script\setup.bat
 ```
 
 ## Build
+App 與 bootloader 共用根目錄下的 `interface/`、`driver/`、`service/`。
+`bootloader/prj.conf` 設定 `CONFIG_APP_BOOTLOADER=y` 以啟用 bootloader 專屬功能
+(flash service、image 驗證、FW update 指令)，app 預設不啟用。
+
 ```
 west build -p -b qual_module/mec172x_nsz app
+west build -p -b qual_module/mec172x_nsz bootloader
 
 west build -p -b qual_module/mec172x_nsz app -- -DOVERLAY_CONFIG=release.conf
 
@@ -33,10 +38,11 @@ export PATH=$PATH:/c/Program\ Files/qemu
 
 qemu-system-arm --version
 
-west build -p -b qemu_cortex_m3 app
+# App 單獨執行時需關閉 DT code partition，否則 image 被放在 app_partition，QEMU 無法開機
+west build -p -b qemu_cortex_m3 app -- -DCONFIG_USE_DT_CODE_PARTITION=n
 west build -t run
 
-west build -p -b qemu_cortex_m3 app -t run
+west build -p -b qemu_cortex_m3 app -t run -- -DCONFIG_USE_DT_CODE_PARTITION=n
 
 west build -p -b qemu_cortex_m3 --sysbuild app -- -DOVERLAY_CONFIG=release.conf
 source tools/script/release.sh

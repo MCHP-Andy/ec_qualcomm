@@ -43,7 +43,7 @@ jobs:
             --library=std \
             --suppress=missingIncludeSystem \
             --suppress=unusedFunction \
-            --template='{file}:{line}:{column}: [{severity}] {message}' ./app 2> cppcheck_raw.txt
+            --template='{file}:{line}:{column}: [{severity}] {message}' ./app ./bootloader ./driver ./interface ./service 2> cppcheck_raw.txt
           
           # 2. 核心修正：使用 grep -v 過濾掉不含真實路徑的 nofile 系統噪音，產出乾淨的 txt
           cat cppcheck_raw.txt | grep -v "nofile" > cppcheck.txt
@@ -59,7 +59,7 @@ jobs:
           REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |          
           # 透過 Reviewdog 讀取 xml 並進行精準的行內留言 (Inline Comment)
-          # %f = 檔案 (app/service/power/service.c)
+          # %f = 檔案 (service/power/service.c)
           # %l = 行號 (110)
           # %c = 欄位 (9)
           # %t = 嚴重級別 (error)

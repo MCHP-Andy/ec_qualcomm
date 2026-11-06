@@ -13,10 +13,12 @@ project(qualcomm)
 # FILE(GLOB app_sources src/*.c)
 # target_sources(app PRIVATE ${app_sources})
 
-include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 target_sources(app PRIVATE main.c)
 add_subdirectory(linker)
 
-add_subdirectory(driver)
-add_subdirectory(service)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../driver
+                 ${CMAKE_CURRENT_BINARY_DIR}/shared_driver)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../service
+                 ${CMAKE_CURRENT_BINARY_DIR}/shared_service)

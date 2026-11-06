@@ -6,20 +6,38 @@
  */
 
 /*
- * @Description: Simulator driver for Fan and Thermal sensors
+ * @Description: Simulator driver for QEMU target
+ *  - App: Fan, Thermal, AOSS, Power and ACPI/SoCCP host interface
+ *  - Bootloader: ACPI host interface and Flash (RAM backed)
  */
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/shell/shell.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <interface/acpi.h>
+
+LOG_MODULE_REGISTER(sim_dev, LOG_LEVEL_DBG);
+
+/* --- ACPI Simulator APIs --- */
+
+int acpi_resp_set(uint8_t *pdata, uint16_t len) {
+    LOG_INF("[SIM] ACPI data len: %d", len);
+
+    // Dump acpi data
+    LOG_HEXDUMP_INF(pdata, len, "[SIM] ACPI data :");
+
+    return 0;
+}
+
+#if !defined(CONFIG_APP_BOOTLOADER)
+#include <zephyr/shell/shell.h>
+
 #include <interface/fan.h>
 #include <interface/thermal.h>
 #include <interface/aoss.h>
-
-LOG_MODULE_REGISTER(sim_dev, LOG_LEVEL_DBG);
+#include <interface/power.h>
 
 /* 模擬變數儲存空間 */
 static uint16_t sim_fan_rpm[FAN_ID_MAX] = {
@@ -250,15 +268,6 @@ int therm_sample_get(therm_id_t id, int16_t *temp) {
     return 0;
 }
 
-int acpi_resp_set(uint8_t *pdata, uint16_t len) {
-    LOG_INF("[SIM] ACPI data len: %d", len);
-
-    // Dump acpi data
-    LOG_HEXDUMP_INF(pdata, len, "[SIM] ACPI data :");
-
-    return 0;
-}
-
 int acpi_int_set(uint8_t val) {
     if (val > 1) {
         return -EINVAL;
@@ -293,6 +302,16 @@ int aoss_temp_get(int16_t *temp_c, int16_t *temp_dc) {
     if (temp_c) *temp_c = aoss_dc_to_c(dc);
     return 0;
 }
+
+/* --- Power Simulator APIs --- */
+
+#if !defined(CONFIG_PM)
+// driver/power.c is only built with CONFIG_PM, which QEMU target does not have
+int pwr_state_chg(pwr_sta_t cur, pwr_sta_t next) {
+    LOG_INF("[SIM] Power transition request: %d -> %d", cur, next);
+    return 0;
+}
+#endif
 
 /* --- Shell Interface --- */
 
@@ -362,3 +381,60 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_sim,
 );
 
 SHELL_CMD_REGISTER(sim, &sub_sim, "Simulator control commands", NULL);
+
+#else /* CONFIG_APP_BOOTLOADER */
+#include <zephyr/device.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/flash.h>
+
+#include <interface/flash.h>
+
+/* --- Flash Simulator APIs --- */
+
+#if 0
+static const struct device *flash_dev = DEVICE_DT_GET(DT_NODELABEL(flash0));
+
+int qc_flash_write(off_t offset, const void *data, size_t len) {
+    if (!device_is_ready(flash_dev)) {
+        return -ENODEV;
+    }
+    return flash_write(flash_dev, offset, data, len);
+}
+
+int qc_flash_read(off_t offset, void *data, size_t len) {
+    if (!device_is_ready(flash_dev)) {
+        return -ENODEV;
+    }
+    return flash_read(flash_dev, offset, data, len);
+}
+
+int qc_flash_erase(off_t offset, size_t size) {
+    if (!device_is_ready(flash_dev)) {
+        return -ENODEV;
+    }
+    return flash_erase(flash_dev, offset, size);
+}
+
+#else
+static uint8_t f_data[0x2000];
+
+int qc_flash_write(off_t offset, const void *data, size_t len) {
+    LOG_INF("Flash write: offset=%ld, len=%ld", (long)offset, (long)len);
+    memcpy(&f_data[offset%0x2000], data, len);
+    return 0;
+}
+
+int qc_flash_read(off_t offset, void *data, size_t len) {
+    LOG_INF("Flash read: offset=%ld, len=%ld", (long)offset, (long)len);
+    memcpy(data, &f_data[offset%0x2000], len);
+    return 0;
+}
+
+int qc_flash_erase(off_t offset, size_t size) {
+    LOG_INF("Flash erase: offset=%ld, len=%ld", (long)offset, (long)size);
+    memset(&f_data[offset%0x2000], 0xFF, size);
+    return 0;
+}
+#endif
+
+#endif /* CONFIG_APP_BOOTLOADER */

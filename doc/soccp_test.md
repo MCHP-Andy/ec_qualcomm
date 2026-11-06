@@ -1,7 +1,7 @@
 # SoCCP-EC 介面測試指令腳本
 
-對應檔案:[app/service/soccp/service.c](../app/service/soccp/service.c) /
-[app/service/soccp/soccp_handler.c](../app/service/soccp/soccp_handler.c)
+對應檔案:[service/soccp/service.c](../service/soccp/service.c) /
+[service/soccp/soccp_handler.c](../service/soccp/soccp_handler.c)
 規格參考:80-35782-87 Rev. AC (SoCCP-EC Interface Specification, Page 52-57)
 
 ## Shell 使用方式

@@ -1,9 +1,9 @@
 # EC modern standby test
 
-對應檔案:[app/service/power/service.c](../app/service/power/service.c) /
-[app/driver/power.c](../app/driver/power.c) /
-[app/service/fan/service.c](../app/service/fan/service.c) /
-[app/service/sci/service.c](../app/service/sci/service.c)
+對應檔案:[service/power/service.c](../service/power/service.c) /
+[driver/power.c](../driver/power.c) /
+[service/fan/service.c](../service/fan/service.c) /
+[service/sci/service.c](../service/sci/service.c)
 
 規格參考:
 
@@ -44,7 +44,7 @@
 | 2 | 讀 Profile7 Fan1 LUT_T1,設定 T1 = 74 °C,目標 RPM = 3500 | 依 LUT 驅動 Fan1 | 成功 |
 | 3 | 讀 Profile7 Fan2 LUT_T2,設定 T2 = 54 °C,目標 RPM = 5000 | 依 LUT 驅動 Fan2 | 成功 |
 | 4 | 讀 Fan1 / Fan2 Status / Speed | Fan 轉動中 | spinning,成功 |
-| 5 | 送 MS Entry(`0x23`, status=1) | [acpi_soc_to_ec_modern_standby_notifi()](../app/service/power/service.c#L109) → S0 → Modern Standby;[pwr_state_chg()](../app/driver/power.c#L261) 開啟 heavy sleep;Fan constraint 設為 OFF | 成功 |
+| 5 | 送 MS Entry(`0x23`, status=1) | [acpi_soc_to_ec_modern_standby_notifi()](../service/power/service.c#L109) → S0 → Modern Standby;[pwr_state_chg()](../driver/power.c#L261) 開啟 heavy sleep;Fan constraint 設為 OFF | 成功 |
 | 6 | 讀 pending SCI | Fan RPM 變 0 時送出 SCI `0x30` / `0x31` | 偵測到 Fan1、Fan2 SCI |
 | 7 | 讀 Fan1 / Fan2 Status / Speed | Fan 已停止 | stop,成功 |
 | 8 | 確認 MS 期間沒有 SCI | 沒有 SCI 發出 | 成功 |
@@ -61,9 +61,9 @@ Host 設定的溫度與 EC 的 LUT 一致:
 
 ### EC 處理方式
 
-- `0x23` 由 [acpi_soc_to_ec_modern_standby_notifi()](../app/service/power/service.c#L121) 轉成 `pwr_state_set(PWR_STA_MS / PWR_STA_S0)`,power service thread 處理狀態切換,再送出 `SYS_PWR_STA_CHG`。
-- Fan service 收到事件後,在 [service.c:225](../app/service/fan/service.c#L225) 依電源狀態設定 Fan constraint:非 S0 時關閉 Fan 電源(`fan_en` GPIO),回到 S0 時再打開。
-- Fan service 每 1 秒(`rpm_update`)讀一次 RPM,RPM 在 0 與非 0 之間切換時送出 SCI `0x30` / `0x31`([service.c:198](../app/service/fan/service.c#L198))。
+- `0x23` 由 [acpi_soc_to_ec_modern_standby_notifi()](../service/power/service.c#L121) 轉成 `pwr_state_set(PWR_STA_MS / PWR_STA_S0)`,power service thread 處理狀態切換,再送出 `SYS_PWR_STA_CHG`。
+- Fan service 收到事件後,在 [service.c:225](../service/fan/service.c#L225) 依電源狀態設定 Fan constraint:非 S0 時關閉 Fan 電源(`fan_en` GPIO),回到 S0 時再打開。
+- Fan service 每 1 秒(`rpm_update`)讀一次 RPM,RPM 在 0 與非 0 之間切換時送出 SCI `0x30` / `0x31`([service.c:198](../service/fan/service.c#L198))。
 
 ---
 

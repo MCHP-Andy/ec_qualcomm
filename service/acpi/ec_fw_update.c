@@ -57,10 +57,6 @@ static K_WORK_DELAYABLE_DEFINE(enter_bootloader_work, enter_bootloader_work_hdl)
 
 /* 內部狀態變數 */
 #define EC_FLASH_PATH_INT                   0x4F
-#define EC_STATE_BOOTLOADER_IDLE_WP_OFF     0x0B
-#define EC_STATE_BOOTLOADER_IDLE_WP_ON      0x1B
-#define EC_STATE_MAIN_IDLE_WP_OFF           0x0C
-#define EC_STATE_MAIN_IDLE_WP_ON            0x1C
 static bool     in_bootloader_mode = false;
 static bool     flash_wp_enabled   = false;
 static uint8_t  active_control_path = EC_FLASH_PATH_INT;
