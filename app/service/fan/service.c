@@ -47,7 +47,7 @@ static fan_ctrl_t fan_blks[FAN_ID_MAX] = {
             .id = FAN_ID_2,
             .state = FAN_STA_OFF,
             .trip_low = 0,
-            .trip_high = 10000,
+            .trip_high = 12000,
         },
 };
 
@@ -204,8 +204,8 @@ static void service(void) {
             // Check RPM with trip point
             if ((fan_blk->rpm < fan_blk->trip_low) |
                 (fan_blk->rpm > fan_blk->trip_high)) {
-                LOG_WRN("Fan%d RPM %d below trip low %d", fan, fan_blk->rpm,
-                        fan_blk->trip_low);
+                LOG_WRN("Fan%d RPM %d cross trip, low: %d, high: %d", fan, fan_blk->rpm,
+                        fan_blk->trip_low, fan_blk->trip_high);
                 sci_enque(SCI_FAN1_RPM_CROSS + (fan-FAN_ID_1));
             }
 
@@ -223,9 +223,13 @@ static void service(void) {
             // }
 
             // Check power state
-            if (state != PWR_STA_S0) {
-                fan_rpm_set(fan_blk->id, 0);
+            bool fan_allow_on = false;
+            fan_constraint_get(&fan_allow_on);
+            if ((state != PWR_STA_S0) && (fan_allow_on == true)) {
+                fan_constraint_set(false);
                 continue;
+            } else if ((state == PWR_STA_S0) && (fan_allow_on == false)) {
+                fan_constraint_set(true);
             }
 
             // Get RPM from LUT
@@ -614,7 +618,7 @@ static void dump_fan_info(const struct shell *sh, fan_ctrl_t *fan_blk) {
         shell_info(sh, "Fan lut[%d] temp_src: %d, tbl_size: %d", (int)n,
                    (int)(THERM_SRC_CPU + n), lut->tbl_size);
         for (size_t j = 0; j < lut->tbl_size; j++) {
-            shell_info(sh, "\ttbl[%d]: rpm: %d, high: %d, low: %d", (int)j,
+            shell_info(sh, "\ttbl[%d]: rpm: %5d, high: %3d, low: %3d", (int)j,
                        lut->tbl[j].rpm * 100, lut->tbl[j].temp_high,
                        lut->tbl[j].temp_low);
         }
