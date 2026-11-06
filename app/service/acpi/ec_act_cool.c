@@ -9,21 +9,6 @@
 
 LOG_MODULE_DECLARE(acpi, CONFIG_ACPI_LOG_LEVEL);
 
-static int acpi_soc_to_ec_modern_standby_notifi(const acpi_cmd_t *cmd_info,
-                                                uint8_t *cmd, uint16_t cmd_len,
-                                                uint8_t *resp,
-                                                uint16_t resp_len) {
-    ARG_UNUSED(cmd_info);
-    ARG_UNUSED(resp);
-    ARG_UNUSED(resp_len);
-    ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
-
-    uint8_t standby_status = cmd[1];
-    LOG_DBG("SoC Modern Standby notification: %d", standby_status);
-    // TODO: Implement actual handling for modern standby notification
-    return 0;
-}
-
 static int acpi_func_flag(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                           uint16_t cmd_len, uint8_t *resp, uint16_t resp_len) {
     uint64_t flags = 0;
@@ -53,6 +38,5 @@ static int acpi_func_flag(const acpi_cmd_t *cmd_info, uint8_t *cmd,
 }
 
 // clang-format off
-ACPI_CMD_SUBSCRIBE(fan, SOC_TO_EC_MODERN_STANDBY_NOTIFI,           acpi_soc_to_ec_modern_standby_notifi, 2, 0, 0); // Page 19 (Status)
 ACPI_CMD_SUBSCRIBE(fan, EC_FUNC_FLAG,                              acpi_func_flag, 1, 9, 9); // Page 35/36 (Optional ByteCount + Flag(8))
 // clang-format on

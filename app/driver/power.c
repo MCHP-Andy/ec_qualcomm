@@ -12,8 +12,8 @@
 #include <soc.h>
 #include <zephyr/arch/cpu.h>
 #include <cmsis_core.h>
-// #include "device_power.h"
 
+#include "interface/power.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(app_pm, LOG_LEVEL_INF);
@@ -185,6 +185,107 @@ void pm_state_exit_post_ops(enum pm_state state, uint8_t substate_id)
 	__enable_irq();
 	__ISB();
 	irq_unlock(0);
+}
+
+#if CONFIG_PM_POLICY_CUSTOM
+#include <zephyr/pm/policy.h>
+
+static const struct pm_state_info residency_info[] =
+	PM_STATE_INFO_LIST_FROM_DT_CPU(DT_NODELABEL(cpu0));
+
+static volatile bool dp_en = false;
+
+const struct pm_state_info *pm_policy_next_state(uint8_t cpu, int32_t ticks)
+{
+	ARG_UNUSED(cpu);
+
+	if (dp_en) {
+		for (int i = ARRAY_SIZE(residency_info) - 1; i >= 0; i--) {
+			if (pm_policy_state_lock_is_active(
+				    residency_info[i].state,
+				    PM_ALL_SUBSTATES)) {
+				continue;
+			}
+
+			/* Find suitable power state by residency time */
+			if (ticks == K_TICKS_FOREVER ||
+			    ticks >= k_us_to_ticks_ceil32(
+					     residency_info[i]
+						     .min_residency_us)) {
+				return &residency_info[i];
+			}
+		}
+	}
+
+	return NULL;
+}
+
+#if CONFIG_SHELL
+#include <stdlib.h>
+#include <zephyr/shell/shell.h>
+
+static void dp_timeout_handler(struct k_work *work) {
+    dp_en = false;
+    LOG_INF("Deep sleep timeout, disabled");
+}
+
+static K_WORK_DELAYABLE_DEFINE(dp_timeout_work, dp_timeout_handler);
+
+static int cmd_pwr_dp(const struct shell *sh, size_t argc, char **argv) {
+    uint32_t timeout_ms = (argc > 2) ? strtoul(argv[2], NULL, 0) : 0;
+
+    k_work_cancel_delayable(&dp_timeout_work);
+
+    dp_en = (bool)strtoul(argv[1], NULL, 0);
+    shell_info(sh, "Deep sleep enabled: %s", dp_en ? "true" : "false");
+
+    // timeout 0: keep dp_en, otherwise revert to false after timeout_ms
+    if (dp_en && timeout_ms) {
+        k_work_schedule(&dp_timeout_work, K_MSEC(timeout_ms));
+        shell_info(sh, "Deep sleep auto disable after %u ms", timeout_ms);
+    }
+    return 0;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_pwr,
+    SHELL_CMD_ARG(dp, NULL, "Set deep sleep enable <val> [timeout_ms, 0: no timeout]",
+        cmd_pwr_dp, 2, 1),
+    SHELL_SUBCMD_SET_END
+);
+
+SHELL_CMD_REGISTER(pwr, &sub_pwr, "Power commands", NULL);
+#endif /* CONFIG_SHELL */
+
+#endif /* CONFIG_PM_POLICY_CUSTOM */
+
+int pwr_state_chg(pwr_sta_t cur, pwr_sta_t next) {
+    LOG_INF("Power transition request: %d -> %d", cur, next);
+#if CONFIG_PM_POLICY_CUSTOM
+    switch (cur) {
+    case PWR_STA_S0:
+        switch (next) {
+        case PWR_STA_MS:
+            dp_en = true;
+			LOG_INF("Try to enter heavy sleep");
+        default:
+            break;
+        }
+        break;
+	
+	case PWR_STA_MS:
+        switch (next) {
+        case PWR_STA_S0:
+            dp_en = false;
+        default:
+            break;
+        }
+        break;
+
+    default:
+        break;
+    }
+#endif // CONFIG_PM_POLICY_CUSTOM
+    return 0;
 }
 
 #include <zephyr/init.h>

@@ -24,3 +24,5 @@ typedef enum {
 int pwr_state_get(pwr_sta_t *state);
 
 int pwr_state_set(pwr_sta_t state);
+
+int pwr_state_chg(pwr_sta_t cur, pwr_sta_t next);

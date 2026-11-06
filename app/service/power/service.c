@@ -86,8 +86,8 @@ static void service(void) {
             LOG_INF("Prepare to change power state: %s -> %s",
                     pwr_state_to_str(state), pwr_state_to_str(next_pwr_state));
 
-            // TODO: power process depend on platform
-            // ...
+            // Power process depend on platform
+            pwr_state_chg(state, next_pwr_state);
 
             pwr_state = next_pwr_state;
             pwr_state_get(&state);
@@ -101,6 +101,31 @@ static void service(void) {
 
 K_THREAD_DEFINE(pwr_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M, 0,
                 0);
+
+#ifdef CONFIG_ACPI_SERVICE
+#include <interface/acpi.h>
+#include <service/acpi/acpi_tbl.h> // ACPI_CHECK_IN/OUT macros for fan handlers
+
+static int acpi_soc_to_ec_modern_standby_notifi(const acpi_cmd_t *cmd_info,
+                                                uint8_t *cmd, uint16_t cmd_len,
+                                                uint8_t *resp,
+                                                uint16_t resp_len) {
+    ARG_UNUSED(cmd_info);
+    ARG_UNUSED(resp);
+    ARG_UNUSED(resp_len);
+    ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
+
+    uint8_t standby_status = cmd[1];
+    LOG_DBG("SoC Modern Standby notification: %d", standby_status);
+    // Handling for modern standby notification
+    pwr_state_set((standby_status) ? PWR_STA_MS : PWR_STA_S0);
+    return 0;
+}
+
+// clang-format off
+ACPI_CMD_SUBSCRIBE(fan, SOC_TO_EC_MODERN_STANDBY_NOTIFI,           acpi_soc_to_ec_modern_standby_notifi, 2, 0, 0); // Page 19 (Status)
+// clang-format on
+#endif // CONFIG_ACPI_SERVICE
 
 #ifdef CONFIG_POWER_SHELL
 #include <zephyr/shell/shell.h>
