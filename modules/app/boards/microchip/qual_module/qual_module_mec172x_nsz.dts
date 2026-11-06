@@ -29,10 +29,10 @@
 	};
 
 	aliases {
-		cpu-fan = &fan0;
-		cpu-tach = &tach1;
-		base-fan = &fan1;
-		base-tach = &tach0;
+		cpu-fan = &fan1;
+		cpu-tach = &tach0;
+		base-fan = &fan0;
+		base-tach = &tach1;
 	};
 
 	leds {
