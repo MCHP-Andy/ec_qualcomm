@@ -17,7 +17,7 @@ jobs:
       matrix:
         # 使用 include 語法，為各個板子量身打造設定
         include:
-          - board: qual_module/mec172x_nsz
+          - board: qc_module
             upload-spi: true   # 這個板子要上傳特殊 bin 檔
           - board: qemu_cortex_m3
             upload-spi: false  # 這個板子不需要
@@ -114,13 +114,13 @@ jobs:
         source .venv/bin/activate
         west build -p -b ${{ matrix.board }} app
 
-    # 情況 A：如果是 qual_module/mec172x_nsz (upload-spi 為 true)，上傳包含特殊 bin 檔的完整結果
+    # 情況 A：如果是 qc_module (upload-spi 為 true)，上傳包含特殊 bin 檔的完整結果
     - name: Upload Full Results (with SPI & Primary Binaries)
       if: matrix.upload-spi == true
       uses: actions/upload-artifact@v6
       with:
         # name: compiled-result-${{ matrix.board }}
-        name: compiled-result-qual_module_mec172x_nsz
+        name: compiled-result-qc_module
         retention-days: 7
         include-hidden-files: true
         path: |

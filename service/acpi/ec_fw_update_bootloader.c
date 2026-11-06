@@ -17,7 +17,7 @@ LOG_MODULE_DECLARE(acpi);
 /* Image 位址 (Get from DTS) */
 #if defined(CONFIG_BOARD_QEMU_CORTEX_M3)
 #define IMG_ADDR (DT_REG_ADDR(DT_NODELABEL(flash0))+DT_REG_ADDR(DT_NODELABEL(app_partition)))
-#elif defined(CONFIG_BOARD_QUAL_MODULE)
+#elif defined(CONFIG_BOARD_QC_MODULE)
 #define IMG_ADDR (DT_REG_ADDR(DT_NODELABEL(int_flash))+DT_REG_ADDR(DT_NODELABEL(img_partition)))
 #endif
 
@@ -222,7 +222,7 @@ static int acpi_ec_erase_partition(const acpi_cmd_t *cmd_info, uint8_t *cmd,
         case 0x21: // Quick Erase Backup Main
             info->corruption_status &= ~FW_CORRUPT_BK_MAIN_INTACT;
 
-#if defined(CONFIG_BOARD_QUAL_MODULE)
+#if defined(CONFIG_BOARD_QC_MODULE)
             // Erase Main partition header + image
             LOG_INF("Erase App Main Partition, addr:0x%08X, size: 0x%08X",
                     DT_REG_ADDR(DT_NODELABEL(int_flash)) +

@@ -6,7 +6,7 @@ export APP_PATH=build/app/zephyr
 export MERGE_PATH=build/zephyr
 
 # export BOARD_NAME=qemu_cortex_m3
-export BOARD_NAME=qual_module/mec172x_nsz
+export BOARD_NAME=qc_module
 
 # Build project
 echo "Board: ${BOARD_NAME}"

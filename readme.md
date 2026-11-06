@@ -22,12 +22,12 @@ App 與 bootloader 共用根目錄下的 `interface/`、`driver/`、`service/`�
 (flash service、image 驗證、FW update 指令)，app 預設不啟用。
 
 ```
-west build -p -b qual_module/mec172x_nsz app
-west build -p -b qual_module/mec172x_nsz bootloader
+west build -p -b qc_module app
+west build -p -b qc_module bootloader
 
-west build -p -b qual_module/mec172x_nsz app -- -DOVERLAY_CONFIG=release.conf
+west build -p -b qc_module app -- -DOVERLAY_CONFIG=release.conf
 
-west build -p -b qual_module/mec172x_nsz --sysbuild app -- -DOVERLAY_CONFIG=release.conf
+west build -p -b qc_module --sysbuild app -- -DOVERLAY_CONFIG=release.conf
 source tools/script/release.sh
 ```
 
