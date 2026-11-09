@@ -31,6 +31,10 @@ static const gpio_lst_t gpio_lst[] = {
         QC_GPIO_GET(fan_12v_enable),
         GPIO_OUTPUT_INACTIVE,
     },
+    {
+        QC_GPIO_GET(acpi_int),
+        GPIO_OUTPUT_INACTIVE,
+    },
 };
 
 #include <zephyr/init.h>

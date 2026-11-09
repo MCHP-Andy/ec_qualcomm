@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2026-04-16 15:22:05 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-11-10 02:51:36
+ * @Last Modified time: 2026-11-10 02:55:59
  */
 
 #include <zephyr/drivers/gpio.h>
@@ -17,6 +17,8 @@
 #endif
 
 #include <zephyr/logging/log.h>
+
+#include "gpio_hub.h"
 
 LOG_MODULE_REGISTER(acpi_i2c, LOG_LEVEL_INF);
 
@@ -45,8 +47,7 @@ static const struct device *bus = DEVICE_DT_GET_OR_NULL(DT_ALIAS(acpi_i2c));
 #define ACPI_INT_AVAILABLE DT_NODE_HAS_PROP(ACPI_INT_NODE, acpi_int_gpios)
 
 #if ACPI_INT_AVAILABLE
-static const struct gpio_dt_spec acpi_int =
-    GPIO_DT_SPEC_GET(ACPI_INT_NODE, acpi_int_gpios);
+QC_GPIO_DEF(acpi_int);
 #endif
 #endif
 
@@ -240,11 +241,6 @@ static int init_config(void) {
 
 #if !defined(CONFIG_APP_BOOTLOADER)
 #if ACPI_INT_AVAILABLE
-    // Host interrupt line idles low until the SCI service notifies the host.
-    if (gpio_pin_configure_dt(&acpi_int, GPIO_OUTPUT_INACTIVE) < 0) {
-        LOG_ERR("Failed to configure ACPI int pin");
-        return -1;
-    }
 #else
     LOG_WRN("No acpi-int-gpios in DT, SCI cannot notify host");
 #endif
