@@ -73,7 +73,32 @@ static const struct fan_dev_t {
 };
 // clang-format on
 
-// clang-format off
+// clang-format off             
+#define FAN1_DEFAULT_LUT_SIZE 10
+#define FAN1_DEFAULT_LUT                                                       \
+        {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},                    \
+        {.rpm = 0x23, .temp_high = 0x4D, .temp_low = 0x47},                    \
+        {.rpm = 0x2D, .temp_high = 0x50, .temp_low = 0x4A},                    \
+        {.rpm = 0x37, .temp_high = 0x53, .temp_low = 0x4D},                    \
+        {.rpm = 0x41, .temp_high = 0x55, .temp_low = 0x50},                    \
+        {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0x53},                    \
+        {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},                    \
+        {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},                    \
+        {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},                    \
+        {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF}
+
+#define FAN2_DEFAULT_LUT_SIZE 10
+#define FAN2_DEFAULT_LUT                                                       \
+        {.rpm = 0x2D, .temp_high = 0x36, .temp_low = 0x00},                    \
+        {.rpm = 0x32, .temp_high = 0x39, .temp_low = 0x34},                    \
+        {.rpm = 0x37, .temp_high = 0x3B, .temp_low = 0x36},                    \
+        {.rpm = 0x3C, .temp_high = 0x3D, .temp_low = 0x38},                    \
+        {.rpm = 0x46, .temp_high = 0x3F, .temp_low = 0x3A},                    \
+        {.rpm = 0x50, .temp_high = 0x41, .temp_low = 0x3C},                    \
+        {.rpm = 0x5A, .temp_high = 0x43, .temp_low = 0x3E},                    \
+        {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0x40},                    \
+        {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},                    \
+        {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF}
 static struct fan_profile_t {
     fan_lut_t lut[FAN_ID_MAX][THERM_SRC_MAX];
 } fan_profiles[FAN_PROFILE_MAX] = {
@@ -81,66 +106,30 @@ static struct fan_profile_t {
         .lut = {
             [FAN_ID_1][THERM_SRC_CPU] = {
                 .temp_src = THERM_SRC_CPU,
-                .tbl_size = 10,
+                .tbl_size = FAN1_DEFAULT_LUT_SIZE,
                 .tbl = {
-                    {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
-                    {.rpm = 0x23, .temp_high = 0x4D, .temp_low = 0x47},
-                    {.rpm = 0x2D, .temp_high = 0x50, .temp_low = 0x4A},
-                    {.rpm = 0x37, .temp_high = 0x53, .temp_low = 0x4D},
-                    {.rpm = 0x41, .temp_high = 0x55, .temp_low = 0x50},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0x53},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    FAN1_DEFAULT_LUT,
                 },
             },
             [FAN_ID_1][THERM_SRC_SKIN] = {
                 .temp_src = THERM_SRC_SKIN,
-                .tbl_size = 10,
+                .tbl_size = FAN1_DEFAULT_LUT_SIZE,
                 .tbl = {
-                    {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
-                    {.rpm = 0x23, .temp_high = 0x4D, .temp_low = 0x47},
-                    {.rpm = 0x2D, .temp_high = 0x50, .temp_low = 0x4A},
-                    {.rpm = 0x37, .temp_high = 0x53, .temp_low = 0x4D},
-                    {.rpm = 0x41, .temp_high = 0x55, .temp_low = 0x50},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0x53},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    FAN1_DEFAULT_LUT,
                 },
             },
             [FAN_ID_2][THERM_SRC_CPU] = {
                 .temp_src = THERM_SRC_SKIN,
-                .tbl_size = 10,
+                .tbl_size = FAN2_DEFAULT_LUT_SIZE,
                 .tbl = {
-                    {.rpm = 0x2D, .temp_high = 0x36, .temp_low = 0x00},
-                    {.rpm = 0x32, .temp_high = 0x39, .temp_low = 0x34},
-                    {.rpm = 0x37, .temp_high = 0x3B, .temp_low = 0x36},
-                    {.rpm = 0x3C, .temp_high = 0x3D, .temp_low = 0x38},
-                    {.rpm = 0x46, .temp_high = 0x3F, .temp_low = 0x3A},
-                    {.rpm = 0x50, .temp_high = 0x41, .temp_low = 0x3C},
-                    {.rpm = 0x5A, .temp_high = 0x43, .temp_low = 0x3E},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0x40},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                    FAN2_DEFAULT_LUT,
                 },
             },
             [FAN_ID_2][THERM_SRC_SKIN] = {
                 .temp_src = THERM_SRC_SKIN,
-                .tbl_size = 10,
+                .tbl_size = FAN2_DEFAULT_LUT_SIZE,
                 .tbl = {
-                    {.rpm = 0x2D, .temp_high = 0x36, .temp_low = 0x00},
-                    {.rpm = 0x32, .temp_high = 0x39, .temp_low = 0x34},
-                    {.rpm = 0x37, .temp_high = 0x3B, .temp_low = 0x36},
-                    {.rpm = 0x3C, .temp_high = 0x3D, .temp_low = 0x38},
-                    {.rpm = 0x46, .temp_high = 0x3F, .temp_low = 0x3A},
-                    {.rpm = 0x50, .temp_high = 0x41, .temp_low = 0x3C},
-                    {.rpm = 0x5A, .temp_high = 0x43, .temp_low = 0x3E},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0x40},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                    FAN2_DEFAULT_LUT,
                 },
             },
         },
@@ -149,66 +138,30 @@ static struct fan_profile_t {
         .lut = {
             [FAN_ID_1][THERM_SRC_CPU] = {
                 .temp_src = THERM_SRC_CPU,
-                .tbl_size = 10,
+                .tbl_size = FAN1_DEFAULT_LUT_SIZE,
                 .tbl = {
-                    {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
-                    {.rpm = 0x23, .temp_high = 0x4D, .temp_low = 0x47},
-                    {.rpm = 0x2D, .temp_high = 0x50, .temp_low = 0x4A},
-                    {.rpm = 0x37, .temp_high = 0x53, .temp_low = 0x4D},
-                    {.rpm = 0x41, .temp_high = 0x55, .temp_low = 0x50},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0x53},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    FAN1_DEFAULT_LUT,
                 },
             },
             [FAN_ID_1][THERM_SRC_SKIN] = {
                 .temp_src = THERM_SRC_SKIN,
-                .tbl_size = 10,
+                .tbl_size = FAN1_DEFAULT_LUT_SIZE,
                 .tbl = {
-                    {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
-                    {.rpm = 0x23, .temp_high = 0x4D, .temp_low = 0x47},
-                    {.rpm = 0x2D, .temp_high = 0x50, .temp_low = 0x4A},
-                    {.rpm = 0x37, .temp_high = 0x53, .temp_low = 0x4D},
-                    {.rpm = 0x41, .temp_high = 0x55, .temp_low = 0x50},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0x53},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    FAN1_DEFAULT_LUT,
                 },
             },
             [FAN_ID_2][THERM_SRC_CPU] = {
                 .temp_src = THERM_SRC_SKIN,
-                .tbl_size = 10,
+                .tbl_size = FAN2_DEFAULT_LUT_SIZE,
                 .tbl = {
-                    {.rpm = 0x2D, .temp_high = 0x36, .temp_low = 0x00},
-                    {.rpm = 0x32, .temp_high = 0x39, .temp_low = 0x34},
-                    {.rpm = 0x37, .temp_high = 0x3B, .temp_low = 0x36},
-                    {.rpm = 0x3C, .temp_high = 0x3D, .temp_low = 0x38},
-                    {.rpm = 0x46, .temp_high = 0x3F, .temp_low = 0x3A},
-                    {.rpm = 0x50, .temp_high = 0x41, .temp_low = 0x3C},
-                    {.rpm = 0x5A, .temp_high = 0x43, .temp_low = 0x3E},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0x40},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                    FAN2_DEFAULT_LUT,
                 },
             },
             [FAN_ID_2][THERM_SRC_SKIN] = {
                 .temp_src = THERM_SRC_SKIN,
-                .tbl_size = 10,
+                .tbl_size = FAN2_DEFAULT_LUT_SIZE,
                 .tbl = {
-                    {.rpm = 0x2D, .temp_high = 0x36, .temp_low = 0x00},
-                    {.rpm = 0x32, .temp_high = 0x39, .temp_low = 0x34},
-                    {.rpm = 0x37, .temp_high = 0x3B, .temp_low = 0x36},
-                    {.rpm = 0x3C, .temp_high = 0x3D, .temp_low = 0x38},
-                    {.rpm = 0x46, .temp_high = 0x3F, .temp_low = 0x3A},
-                    {.rpm = 0x50, .temp_high = 0x41, .temp_low = 0x3C},
-                    {.rpm = 0x5A, .temp_high = 0x43, .temp_low = 0x3E},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0x40},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                    FAN2_DEFAULT_LUT,
                 },
             },
         },
@@ -217,66 +170,30 @@ static struct fan_profile_t {
         .lut = {
             [FAN_ID_1][THERM_SRC_CPU] = {
                 .temp_src = THERM_SRC_CPU,
-                .tbl_size = 10,
+                .tbl_size = FAN1_DEFAULT_LUT_SIZE,
                 .tbl = {
-                    {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
-                    {.rpm = 0x23, .temp_high = 0x4D, .temp_low = 0x47},
-                    {.rpm = 0x2D, .temp_high = 0x50, .temp_low = 0x4A},
-                    {.rpm = 0x37, .temp_high = 0x53, .temp_low = 0x4D},
-                    {.rpm = 0x41, .temp_high = 0x55, .temp_low = 0x50},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0x53},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    FAN1_DEFAULT_LUT,
                 },
             },
             [FAN_ID_1][THERM_SRC_SKIN] = {
                 .temp_src = THERM_SRC_SKIN,
-                .tbl_size = 10,
+                .tbl_size = FAN1_DEFAULT_LUT_SIZE,
                 .tbl = {
-                    {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
-                    {.rpm = 0x23, .temp_high = 0x4D, .temp_low = 0x47},
-                    {.rpm = 0x2D, .temp_high = 0x50, .temp_low = 0x4A},
-                    {.rpm = 0x37, .temp_high = 0x53, .temp_low = 0x4D},
-                    {.rpm = 0x41, .temp_high = 0x55, .temp_low = 0x50},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0x53},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    FAN1_DEFAULT_LUT,
                 },
             },
             [FAN_ID_2][THERM_SRC_CPU] = {
                 .temp_src = THERM_SRC_SKIN,
-                .tbl_size = 10,
+                .tbl_size = FAN2_DEFAULT_LUT_SIZE,
                 .tbl = {
-                    {.rpm = 0x2D, .temp_high = 0x36, .temp_low = 0x00},
-                    {.rpm = 0x32, .temp_high = 0x39, .temp_low = 0x34},
-                    {.rpm = 0x37, .temp_high = 0x3B, .temp_low = 0x36},
-                    {.rpm = 0x3C, .temp_high = 0x3D, .temp_low = 0x38},
-                    {.rpm = 0x46, .temp_high = 0x3F, .temp_low = 0x3A},
-                    {.rpm = 0x50, .temp_high = 0x41, .temp_low = 0x3C},
-                    {.rpm = 0x5A, .temp_high = 0x43, .temp_low = 0x3E},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0x40},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                    FAN2_DEFAULT_LUT,
                 },
             },
             [FAN_ID_2][THERM_SRC_SKIN] = {
                 .temp_src = THERM_SRC_SKIN,
-                .tbl_size = 10,
+                .tbl_size = FAN2_DEFAULT_LUT_SIZE,
                 .tbl = {
-                    {.rpm = 0x2D, .temp_high = 0x36, .temp_low = 0x00},
-                    {.rpm = 0x32, .temp_high = 0x39, .temp_low = 0x34},
-                    {.rpm = 0x37, .temp_high = 0x3B, .temp_low = 0x36},
-                    {.rpm = 0x3C, .temp_high = 0x3D, .temp_low = 0x38},
-                    {.rpm = 0x46, .temp_high = 0x3F, .temp_low = 0x3A},
-                    {.rpm = 0x50, .temp_high = 0x41, .temp_low = 0x3C},
-                    {.rpm = 0x5A, .temp_high = 0x43, .temp_low = 0x3E},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0x40},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                    FAN2_DEFAULT_LUT,
                 },
             },
         },
@@ -285,66 +202,30 @@ static struct fan_profile_t {
         .lut = {
             [FAN_ID_1][THERM_SRC_CPU] = {
                 .temp_src = THERM_SRC_CPU,
-                .tbl_size = 10,
+                .tbl_size = FAN1_DEFAULT_LUT_SIZE,
                 .tbl = {
-                    {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
-                    {.rpm = 0x23, .temp_high = 0x4D, .temp_low = 0x47},
-                    {.rpm = 0x2D, .temp_high = 0x50, .temp_low = 0x4A},
-                    {.rpm = 0x37, .temp_high = 0x53, .temp_low = 0x4D},
-                    {.rpm = 0x41, .temp_high = 0x55, .temp_low = 0x50},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0x53},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    FAN1_DEFAULT_LUT,
                 },
             },
             [FAN_ID_1][THERM_SRC_SKIN] = {
                 .temp_src = THERM_SRC_SKIN,
-                .tbl_size = 10,
+                .tbl_size = FAN1_DEFAULT_LUT_SIZE,
                 .tbl = {
-                    {.rpm = 0x19, .temp_high = 0x4A, .temp_low = 0x00},
-                    {.rpm = 0x23, .temp_high = 0x4D, .temp_low = 0x47},
-                    {.rpm = 0x2D, .temp_high = 0x50, .temp_low = 0x4A},
-                    {.rpm = 0x37, .temp_high = 0x53, .temp_low = 0x4D},
-                    {.rpm = 0x41, .temp_high = 0x55, .temp_low = 0x50},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0x53},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x4B, .temp_high = 0xFF, .temp_low = 0xFF},
+                    FAN1_DEFAULT_LUT,
                 },
             },
             [FAN_ID_2][THERM_SRC_CPU] = {
                 .temp_src = THERM_SRC_SKIN,
-                .tbl_size = 10,
+                .tbl_size = FAN2_DEFAULT_LUT_SIZE,
                 .tbl = {
-                    {.rpm = 0x2D, .temp_high = 0x36, .temp_low = 0x00},
-                    {.rpm = 0x32, .temp_high = 0x39, .temp_low = 0x34},
-                    {.rpm = 0x37, .temp_high = 0x3B, .temp_low = 0x36},
-                    {.rpm = 0x3C, .temp_high = 0x3D, .temp_low = 0x38},
-                    {.rpm = 0x46, .temp_high = 0x3F, .temp_low = 0x3A},
-                    {.rpm = 0x50, .temp_high = 0x41, .temp_low = 0x3C},
-                    {.rpm = 0x5A, .temp_high = 0x43, .temp_low = 0x3E},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0x40},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                    FAN2_DEFAULT_LUT,
                 },
             },
             [FAN_ID_2][THERM_SRC_SKIN] = {
                 .temp_src = THERM_SRC_SKIN,
-                .tbl_size = 10,
+                .tbl_size = FAN2_DEFAULT_LUT_SIZE,
                 .tbl = {
-                    {.rpm = 0x2D, .temp_high = 0x36, .temp_low = 0x00},
-                    {.rpm = 0x32, .temp_high = 0x39, .temp_low = 0x34},
-                    {.rpm = 0x37, .temp_high = 0x3B, .temp_low = 0x36},
-                    {.rpm = 0x3C, .temp_high = 0x3D, .temp_low = 0x38},
-                    {.rpm = 0x46, .temp_high = 0x3F, .temp_low = 0x3A},
-                    {.rpm = 0x50, .temp_high = 0x41, .temp_low = 0x3C},
-                    {.rpm = 0x5A, .temp_high = 0x43, .temp_low = 0x3E},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0x40},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
-                    {.rpm = 0x64, .temp_high = 0xFF, .temp_low = 0xFF},
+                    FAN2_DEFAULT_LUT,
                 },
             },
         },

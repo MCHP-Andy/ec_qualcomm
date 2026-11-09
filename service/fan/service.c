@@ -214,24 +214,6 @@ static void service(void) {
                 continue;
             }
 
-            // TODO: Implement in driver layer
-            // Check SoC-CP fan power constraint
-            // if (!fan_allow_on) {
-            //     LOG_DBG("Fan%d forced OFF by SoC-CP fan constraint", fan);
-            //     fan_rpm_set(fan_blk->id, 0);
-            //     continue;
-            // }
-
-            // Check power state
-            bool fan_allow_on = false;
-            fan_constraint_get(&fan_allow_on);
-            if ((state != PWR_STA_S0) && (fan_allow_on == true)) {
-                fan_constraint_set(false);
-                continue;
-            } else if ((state == PWR_STA_S0) && (fan_allow_on == false)) {
-                fan_constraint_set(true);
-            }
-
             // Get RPM from LUT
             do {
                 ret = check_fan_rpm(fan_blk, &rpm);
@@ -242,8 +224,6 @@ static void service(void) {
                 LOG_DBG("Fan: %d, rpm: %d", fan, rpm);
                 fan_rpm_set(fan_blk->id, rpm);
             } while (0);
-
-            // TODO: RPM control for Fan
         }
     }
 }
