@@ -41,7 +41,7 @@ static int aoss_reg_read(uint32_t addr, uint32_t *val) {
     }
 
     req[0] = AOSS_CMD_READ_4B;
-    sys_put_le32(addr, &req[1]);
+    sys_put_le16(addr, &req[1]);
 
     k_mutex_lock(&aoss_lock, K_FOREVER);
     ret = i2c_write_read_dt(&aoss, req, sizeof(req), resp, sizeof(resp));

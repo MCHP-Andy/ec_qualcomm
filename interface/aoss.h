@@ -26,7 +26,7 @@
 #define AOSS_CMD_BYTE_CNT(n)   ((((n) - 1U) & 0x1FU) << 3)
 #define AOSS_CMD_READ_4B       (AOSS_CMD_DIR_READ | AOSS_CMD_BYTE_CNT(4)) // 0x19
 
-#define AOSS_REQ_LEN  5 // Command (1 byte) + Address (4 bytes, LSB first)
+#define AOSS_REQ_LEN  3 // Command (1 byte) + Address (2 bytes, LSB first)
 #define AOSS_RESP_LEN 4 // Register value (4 bytes, LSB first)
 
 /* AOSS register address */
