@@ -14,6 +14,7 @@
 #include <interface/power.h>
 #include <interface/thermal.h>
 #include <interface/acpi.h>
+#include <interface/sci.h>
 
 #include <service/acpi/acpi_tbl.h> // ACPI_CHECK_IN/OUT macros for therm handlers
 
@@ -101,22 +102,31 @@ static void service(void) {
 
             /* temp is in 0.1C, thresholds (psv, cr3, hot, crt) are in 1C. 
              * Convert thresholds to 0.1C for correct comparison. */
+            bool cross = false;
+
             if (temp > (uint16_t)therm_dev->psv * 10) {
                 LOG_WRN("Thermal %d: PSV", i);
+                cross = true;
             }
 
             if (temp > (uint16_t)therm_dev->cr3 * 10) {
                 LOG_WRN("Thermal %d: CR3", i);
+                cross = true;
             }
 
             if (temp > (uint16_t)therm_dev->hot * 10) {
                 LOG_WRN("Thermal %d: HOT", i);
+                cross = true;
             }
 
             if (temp > (uint16_t)therm_dev->crt * 10) {
                 LOG_WRN("Thermal %d: CRT", i);
+                cross = true;
             }
-            
+
+            if (cross) {
+                sci_enque(SCI_EC_THERM1_CROSS + (i - THERM_DEV_1));
+            }
         }
 
         adc_wait = K_MSEC(therm_ctrl.sample_ms);

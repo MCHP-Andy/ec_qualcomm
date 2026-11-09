@@ -2,8 +2,8 @@
 
 [中文](readme.md) | English
 
-Periodically samples the EC thermistors while in S0, checks the PSV / CR3 / HOT / CRT thresholds, and
-exposes the temperatures, thresholds and sampling period over ACPI. App only.
+Periodically samples the EC thermistors while in S0, checks the PSV / CR3 / HOT / CRT thresholds, notifies the
+Host via SCI, and exposes the temperatures, thresholds and sampling period over ACPI. App only.
 
 ## Kconfig
 | Option | Default | Description |
@@ -30,6 +30,7 @@ graph LR
 
     DRV[driver<br/>therm_sample_get]
     LOG[LOG_WRN]
+    SCI[SCI service]
 
     TMR --> LOOP
     PWR --> LOOP
@@ -37,6 +38,7 @@ graph LR
     DRV -.->|0.1 C| DEV
     DEV --> CHK
     CHK --> LOG
+    CHK -->|0x36 ~ 0x38| SCI
     ACPI <--> DEV
     SHELL <--> DEV
 ```
@@ -45,8 +47,9 @@ graph LR
 1. Waits for a system event or the `sample_ms` timeout (default 1000 ms).
 2. Outside S0, sampling stops until the next power state change.
 3. Calls `therm_sample_get` for thermistors 1 ~ 3 and stores the temperature (0.1 °C) in `therm_devs`.
-4. Logs a warning when the temperature exceeds PSV / CR3 / HOT / CRT. This is log only for now; no SCI
-   is sent yet (`0x36` ~ `0x38` are reserved in [interface/sci.h](../../interface/sci.h)).
+4. Logs a warning and sends SCI `0x36` / `0x37` / `0x38` (thermistor 1 / 2 / 3) when the temperature
+   exceeds PSV / CR3 / HOT / CRT. Only one SCI is sent even if several thresholds are crossed; it is sent
+   on every sample while the temperature stays above a threshold.
 
 Thresholds are in 1 °C and all default to 80 °C. A new sampling period takes effect after the current
 wait ends.
@@ -88,7 +91,7 @@ Sample Rate: 1000 ms
 
 uart:~$ therm set 1 30 40 50 60
 Updated Thermal 1 thresholds
-# Once above the threshold, every sample logs:
+# Once above the threshold, every sample logs and sends SCI 0x36:
 # <wrn> thermal: Thermal 1: PSV
 
 uart:~$ therm sample 500
