@@ -18,8 +18,10 @@
 #include <zephyr/init.h>
 #include <zephyr/sys/sys_io.h>
 #include <zephyr/drivers/interrupt_controller/intc_mchp_xec_ecia.h>
-
 #include <zephyr/logging/log.h>
+
+#include <interface/system.h>
+
 LOG_MODULE_REGISTER(i2c_pm, LOG_LEVEL_INF);
 
 #define XEC_I2C_SMB_WK_GIRQ   22U
@@ -64,4 +66,4 @@ static int i2c_pm_init(void) {
     return 0;
 }
 
-SYS_INIT(i2c_pm_init, APPLICATION, 0);
+SYS_INIT(i2c_pm_init, APPLICATION, SYS_INIT_NORMAL);

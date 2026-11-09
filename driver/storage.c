@@ -8,6 +8,7 @@
 #include <zephyr/retention/retention.h>
 #include <zephyr/logging/log.h>
 
+#include <interface/system.h>
 #include <interface/storage.h>
 
 LOG_MODULE_REGISTER(storage, LOG_LEVEL_INF);
@@ -69,7 +70,7 @@ static int init_config(void) {
     return 0;
 }
 
-SYS_INIT(init_config, APPLICATION, 0);
+SYS_INIT(init_config, APPLICATION, SYS_INIT_NORMAL);
 
 #else /* 此 board 未配置 boot_info0 retention 區域 */
 

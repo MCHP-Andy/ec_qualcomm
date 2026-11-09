@@ -13,6 +13,7 @@
 #include <zephyr/arch/cpu.h>
 #include <cmsis_core.h>
 
+#include <interface/system.h>
 #include "interface/power.h"
 
 #include <zephyr/logging/log.h>
@@ -305,4 +306,4 @@ static int pwr_clk_init(void) {
     return 0;
 }
 
-SYS_INIT(pwr_clk_init, APPLICATION, 0);
+SYS_INIT(pwr_clk_init, APPLICATION, SYS_INIT_NORMAL);

@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include <interface/system.h>
 #include <interface/flash.h>
 #include <interface/flash_service.h>
 #include <interface/storage.h>
@@ -307,4 +308,4 @@ static int init_config(void) {
     return 0;
 }
 
-SYS_INIT(init_config, APPLICATION, 0);
+SYS_INIT(init_config, APPLICATION, SYS_INIT_NORMAL);

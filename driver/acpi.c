@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2026-04-16 15:22:05 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-23 23:44:13
+ * @Last Modified time: 2026-11-10 02:51:36
  */
 
 #include <zephyr/drivers/gpio.h>
@@ -10,6 +10,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 
+#include <interface/system.h>
 #include <interface/acpi.h>
 #if !defined(CONFIG_APP_BOOTLOADER)
 #include <interface/soccp.h>
@@ -252,4 +253,4 @@ static int init_config(void) {
     return 0;
 }
 
-SYS_INIT(init_config, APPLICATION, 0);
+SYS_INIT(init_config, APPLICATION, SYS_INIT_NORMAL);
