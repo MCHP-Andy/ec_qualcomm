@@ -23,6 +23,14 @@ typedef struct gpio_lst_t {
 } gpio_lst_t;
 
 static const gpio_lst_t gpio_lst[] = {
+    {
+        QC_GPIO_GET(fan_max_rpm),
+        GPIO_INPUT,
+    },
+    {
+        QC_GPIO_GET(fan_12v_enable),
+        GPIO_OUTPUT_INACTIVE,
+    },
 };
 
 #include <zephyr/init.h>

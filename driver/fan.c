@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2026-04-18 11:29:06 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-23 00:36:37
+ * @Last Modified time: 2026-11-10 02:43:04
  */
 
 #include <errno.h>
@@ -13,13 +13,16 @@
 #include <zephyr/logging/log.h>
 
 #include <interface/fan.h>
+#include "gpio_hub.h"
 
 LOG_MODULE_REGISTER(fan_dev, LOG_LEVEL_INF);
 
 #define FAN_TRACK_SIZE 11
 
-static const struct gpio_dt_spec fan_en =
-    GPIO_DT_SPEC_GET(DT_PATH(zephyr_user), fan_12v_enable_gpios);
+QC_GPIO_DEF(fan_12v_enable);
+
+static bool fan_rpm_max = false;
+static bool fan_thro_mira = false;
 
 typedef struct {
     uint16_t pwm;
@@ -243,7 +246,7 @@ static bool fan_allow_on = false;
 int fan_constraint_set(bool allow_on) {
 
     fan_allow_on = allow_on;
-    gpio_pin_set_dt(&fan_en, fan_allow_on);
+    gpio_pin_set_dt(&fan_12v_enable, fan_allow_on);
     LOG_INF("Fan constraint: FAN(s) can %s", allow_on ? "turn ON" : "only stay OFF");
 
     return 0;
@@ -291,6 +294,11 @@ int fan_pwm_set(fan_id_t id, uint16_t pwm) {
     if (dev_list[id].fan.dev == NULL) {
         LOG_WRN("Invalid fan device");
         return -EINVAL;
+    }
+
+    // Set to max PWM if fan_rpm_max or fan_thro_mira is true
+    if (fan_rpm_max || fan_thro_mira) {
+        pwm = 0xFFFF;
     }
     
     // dev_list[id].fan.period = 40000ns
@@ -406,6 +414,81 @@ int fan_rpm_get(fan_id_t id, uint16_t *prpm) {
     return ret;
 }
 
+enum {
+    FAN_MAX_GPIO = 0,
+    THRO_MIRA_GPIO,
+};
+
+static gpio_cb_t gpio_lst[] = {
+    [FAN_MAX_GPIO] = {
+        .spec = QC_GPIO_GET(fan_max_rpm),
+        .flags = GPIO_INT_EDGE_BOTH,
+        .name = "FAN_MAX",
+    },
+    [THRO_MIRA_GPIO] = {
+        .spec = QC_GPIO_GET(thro_mira),
+        .flags = GPIO_INT_EDGE_BOTH,
+        .name = "THRO_MIRA",
+    },
+};
+
+static void gpio_callback(const struct device *dev, struct gpio_callback *cb,
+                          uint32_t pins) {
+    bool level = 0;
+    gpio_cb_t *pgpio = CONTAINER_OF(cb, gpio_cb_t, cb_data);
+
+    level = gpio_pin_get_dt(&pgpio->spec);
+    LOG_WRN("%s: %d !", pgpio->name, level);
+
+    if (pgpio == &gpio_lst[FAN_MAX_GPIO]) {
+        if (level) {
+            // Set fan RPM to max and force enable fan
+            fan_rpm_max = true;
+            gpio_pin_set_dt(&fan_12v_enable, true);
+            fan_pwm_set(FAN_ID_1, 0xFFFF);
+            fan_pwm_set(FAN_ID_2, 0xFFFF);
+        } else {
+            // Set fan RPM to normal
+            fan_rpm_max = false;
+            // Reload constraint
+            bool allow_on = false;
+            fan_constraint_get(&allow_on);
+            fan_constraint_set(allow_on);
+        }
+    } else if (pgpio == &gpio_lst[THRO_MIRA_GPIO]) {
+        if (level) {
+            // Set fan RPM to max
+            fan_thro_mira = true;
+            fan_pwm_set(FAN_ID_1, 0xFFFF);
+            fan_pwm_set(FAN_ID_2, 0xFFFF);
+        } else {
+            // Set fan RPM to normal
+            fan_thro_mira = false;
+        }
+    }
+}
+
+#if CONFIG_PM
+#include <zephyr/pm/pm.h>
+static void fan_pm_state_entry(enum pm_state state) {
+    // Force fan off
+    if (fan_rpm_max == 0 && fan_thro_mira == 0) {
+        gpio_pin_set_dt(&fan_12v_enable, false);
+    }
+}
+
+static void fan_pm_state_exit(enum pm_state state) {
+    // Reload constraint
+    bool allow_on = false;
+    fan_constraint_get(&allow_on);
+    fan_constraint_set(allow_on);
+}
+
+static struct pm_notifier fan_pm_notifier = {
+    .state_entry = fan_pm_state_entry,
+    .state_exit = fan_pm_state_exit,
+};
+#endif // CONFIG_PM
 
 #include <zephyr/init.h>
 
@@ -414,15 +497,23 @@ static int init_config(void) {
 
     LOG_INF("Initializing fan...");
 
-    if (!gpio_is_ready_dt(&fan_en)) {
-        LOG_ERR("Fan enable pin not ready");
-        return -ENODEV;
-    }
+    for (size_t i = 0; i < ARRAY_SIZE(gpio_lst); i++) {
+        gpio_cb_t *pgpio = &gpio_lst[i];
 
-    if (gpio_pin_configure_dt(&fan_en, GPIO_OUTPUT_INACTIVE) < 0) {
-        LOG_ERR("Failed to configure FAN enable pin");
-        return -1;
+        ret = gpio_pin_interrupt_configure_dt(&pgpio->spec, pgpio->flags);
+        if (ret != 0) {
+            LOG_ERR("Error %d: failed to configure interrupt on %s pin %d", ret,
+                    pgpio->spec.port->name, pgpio->spec.pin);
+            continue;
+        }
+        gpio_init_callback(&pgpio->cb_data, gpio_callback,
+                           BIT(pgpio->spec.pin));
+        gpio_add_callback(pgpio->spec.port, &pgpio->cb_data);
+        LOG_DBG("Set up %s at %s pin %d, level: %d", pgpio->name,
+                pgpio->spec.port->name, pgpio->spec.pin,
+                gpio_pin_get_dt(&pgpio->spec));
     }
+    
     fan_constraint_set(fan_allow_on);
 
     for (size_t i = 0; i < ARRAY_SIZE(dev_list); i++) {
@@ -442,6 +533,10 @@ static int init_config(void) {
             ret = -ENODEV;
         }
     }
+
+#if CONFIG_PM
+    pm_notifier_register(&fan_pm_notifier);
+#endif // CONFIG_PM
 
     return ret;
 }
