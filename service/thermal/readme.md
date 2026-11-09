@@ -2,7 +2,7 @@
 
 中文 | [English](readme_en.md)
 
-在 S0 時週期性讀取 EC thermistor 溫度，檢查 PSV / CR3 / HOT / CRT 門檻，
+在 S0 時週期性讀取 EC thermistor 溫度，檢查 PSV / CR3 / HOT / CRT 門檻並送出 SCI 通知 Host，
 並透過 ACPI 提供溫度、門檻與取樣週期的讀寫。僅編入 app。
 
 ## Kconfig
@@ -30,6 +30,7 @@ graph LR
 
     DRV[driver<br/>therm_sample_get]
     LOG[LOG_WRN]
+    SCI[SCI service]
 
     TMR --> LOOP
     PWR --> LOOP
@@ -37,6 +38,7 @@ graph LR
     DRV -.->|0.1 C| DEV
     DEV --> CHK
     CHK --> LOG
+    CHK -->|0x36 ~ 0x38| SCI
     ACPI <--> DEV
     SHELL <--> DEV
 ```
@@ -45,8 +47,8 @@ graph LR
 1. 等待系統事件或 `sample_ms` (預設 1000 ms) 逾時。
 2. Power state 不是 S0 時停止取樣，直到下一次 power state 改變才再檢查。
 3. 對 thermistor 1 ~ 3 呼叫 `therm_sample_get` 取得溫度 (0.1 °C)，存入 `therm_devs`。
-4. 溫度超過 PSV / CR3 / HOT / CRT 時印出 warning。目前只有 log，尚未送 SCI
-   ([interface/sci.h](../../interface/sci.h) 已預留 `0x36` ~ `0x38`)。
+4. 溫度超過 PSV / CR3 / HOT / CRT 時印出 warning，並送 SCI `0x36` / `0x37` / `0x38`
+   (thermistor 1 / 2 / 3)。同時超過多個門檻也只送一次；在門檻之上期間每次取樣都會送。
 
 門檻單位為 1 °C，預設全部為 80 °C。新的取樣週期在目前這次等待結束後生效。
 
@@ -86,7 +88,7 @@ Sample Rate: 1000 ms
 
 uart:~$ therm set 1 30 40 50 60
 Updated Thermal 1 thresholds
-# 溫度超過門檻後每次取樣都會印出:
+# 溫度超過門檻後每次取樣都會印出並送 SCI 0x36:
 # <wrn> thermal: Thermal 1: PSV
 
 uart:~$ therm sample 500
