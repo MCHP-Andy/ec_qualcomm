@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2026-04-18 11:29:06 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-23 00:37:00
+ * @Last Modified time: 2026-11-10 02:50:11
  */
 
 #include <errno.h>
@@ -11,6 +11,7 @@
 #include <zephyr/drivers/adc.h>
 #include <zephyr/logging/log.h>
 
+#include <interface/system.h>
 #include <interface/thermal.h>
 
 LOG_MODULE_REGISTER(therm_dev, LOG_LEVEL_INF);
@@ -89,7 +90,7 @@ static int init_config(void) {
     return ret;
 }
 
-SYS_INIT(init_config, APPLICATION, 0);
+SYS_INIT(init_config, APPLICATION, SYS_INIT_NORMAL);
 
 #ifdef CONFIG_SHELL
 #include <zephyr/shell/shell.h>

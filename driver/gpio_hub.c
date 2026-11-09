@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2026-11-10 01:47:41 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-11-10 02:33:48
+ * @Last Modified time: 2026-11-10 02:46:24
  */
 
 #include <errno.h>
@@ -47,4 +47,4 @@ static int gpio_hub_init(void) {
     return 0;
 }
 
-SYS_INIT(gpio_hub_init, APPLICATION, 0);
+SYS_INIT(gpio_hub_init, APPLICATION, SYS_INIT_EARLY);

@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2026-04-18 11:29:06 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-11-10 02:43:04
+ * @Last Modified time: 2026-11-10 02:51:22
  */
 
 #include <errno.h>
@@ -12,7 +12,9 @@
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
 
+#include <interface/system.h>
 #include <interface/fan.h>
+
 #include "gpio_hub.h"
 
 LOG_MODULE_REGISTER(fan_dev, LOG_LEVEL_INF);
@@ -541,7 +543,7 @@ static int init_config(void) {
     return ret;
 }
 
-SYS_INIT(init_config, APPLICATION, 0);
+SYS_INIT(init_config, APPLICATION, SYS_INIT_NORMAL);
 
 #ifdef CONFIG_SHELL
 #include <zephyr/shell/shell.h>

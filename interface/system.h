@@ -2,7 +2,7 @@
  * @Author: andy.chang 
  * @Date: 2026-04-18 18:01:20 
  * @Last Modified by: andy.chang
- * @Last Modified time: 2026-04-21 16:16:55
+ * @Last Modified time: 2026-11-10 02:44:49
  */
 
 #pragma once
@@ -10,9 +10,9 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#define SYS_INIT_EARLY (0)
-#define SYS_INIT_NORMAL (5)
-#define SYS_INIT_LATE (10)
+#define SYS_INIT_EARLY  3
+#define SYS_INIT_NORMAL 6
+#define SYS_INIT_LATE   9
 
 #define APP_STACK_MIN (512)
 #define APP_STACK_NML (1024)
