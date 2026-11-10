@@ -46,7 +46,10 @@ void jump_to_app(uint32_t address) {
     app_entry();
 }
 
-static char hdr_str[] __attribute__((aligned(16))) = {'B', 'B', 'K', ' ', 'V', '\0'};
+/* BBK version tag: const keeps it in .rodata (load address == run address),
+ * so the 16-byte alignment also holds for its offset in the flash image.
+ * A non-const variable lives in .data, whose flash copy is not aligned. */
+static const char hdr_str[] __attribute__((aligned(16), used)) = {'B', 'B', 'K', ' ', 'V', '\0'};
 
 int main(void) {
     LOG_INF("Hello from bootloader: %s", hdr_str);

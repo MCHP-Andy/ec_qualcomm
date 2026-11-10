@@ -17,7 +17,7 @@ LOG_MODULE_REGISTER(header, LOG_LEVEL_INF);
 /* -------------------------------------------------------------------------
  * Constants and macro definitions
  * ------------------------------------------------------------------------- */
-#define EC_FW_MAGIC_VALUE               (0x57464345) // 'E', 'C', 'F', 'W' (Little-Endian)
+// #define EC_FW_MAGIC_VALUE               (0x57464345) // 'E', 'C', 'F', 'W' (Little-Endian)
 #define EC_FW_MAGIC_BYTE0               'E'          // 0x45
 #define EC_FW_MAGIC_BYTE1               'C'          // 0x43
 #define EC_FW_MAGIC_BYTE2               'F'          // 0x46
@@ -84,7 +84,8 @@ int ec_cal_image_crc(off_t addr, size_t size, uint32_t *crc) {
 
     *crc = 0;
 
-    // Read image and calculate CRC32
+    // Read image and calculate CRC8 (CCITT, poly 0x07, init 0x00)
+    uint8_t crc8 = 0;
     for (size_t a = 0; a < size; a += sizeof(crc_buf)) {
         size_t chunk_size = MIN(size - a, sizeof(crc_buf));
         int ret = read_flash(addr + a, crc_buf, chunk_size);
@@ -92,8 +93,11 @@ int ec_cal_image_crc(off_t addr, size_t size, uint32_t *crc) {
             return ret;
         }
 
-        *crc = crc32_ieee_update(*crc, crc_buf, chunk_size);
+        crc8 = crc8_ccitt(crc8, crc_buf, chunk_size);
     }
+
+    // CRC8 is stored zero-extended in the 4-byte field
+    *crc = crc8;
 
     return 0;
 }
@@ -183,7 +187,13 @@ bool ec_validate_image_header(const fw_hdr_t *hdr)
     }
 
     /* 1. Check Magic Value ('E', 'C', 'F', 'W') */
-    if (hdr->magic.u32 != EC_FW_MAGIC_VALUE) {
+    /* Compare byte by byte: a 32-bit compare against EC_FW_MAGIC_VALUE puts
+     * the literal "ECFW" into the bootloader binary, which tools scanning the
+     * image for the main FW header would mistake for the real header. */
+    if (hdr->magic.bytes[0] != EC_FW_MAGIC_BYTE0 ||
+        hdr->magic.bytes[1] != EC_FW_MAGIC_BYTE1 ||
+        hdr->magic.bytes[2] != EC_FW_MAGIC_BYTE2 ||
+        hdr->magic.bytes[3] != EC_FW_MAGIC_BYTE3) {
         LOG_ERR("Invalid EC FW Header Magic Value: 0x%08X", hdr->magic.u32);
         boot_info_mark_fail();
         return false;
@@ -208,7 +218,7 @@ bool ec_validate_image_header(const fw_hdr_t *hdr)
     LOG_INF("Flash Address: 0x%08X", (uint32_t)IMG_ADDR);
     if (hdr->validation_ctrl != EC_FW_VALIDATION_NONE) {
         bool use_checksum = (hdr->validation_ctrl & EC_FW_VALIDATION_CHECKSUM);
-        uint32_t expected = use_checksum ? hdr->check.checksum : hdr->check.crc32;
+        uint32_t expected = use_checksum ? hdr->check.checksum : hdr->check.crc;
         uint32_t value = 0;
         int ret = use_checksum
                       ? ec_cal_image_checksum((off_t)IMG_ADDR, hdr->fw_size,

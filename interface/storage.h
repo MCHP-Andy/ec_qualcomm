@@ -58,10 +58,11 @@ typedef struct __attribute__((packed)) fw_hdr_t {
     /* Offset 0x13: Reserved field 1 */
     uint8_t  reserved_1;
 
-    /* Offset 0x14 - 0x17: CRC32 / Checksum of the firmware body */
+    /* Offset 0x14 - 0x17: CRC8 / Checksum of the firmware body
+     * (CRC8 is stored in the LSB, upper 3 bytes are 0) */
     union {
         uint32_t checksum;
-        uint32_t crc32;
+        uint32_t crc;
     } check;
 
     /* Offset 0x18 - 0x19: Appended data size (e.g. size of Fan LUT following the firmware) */
@@ -82,7 +83,7 @@ BUILD_ASSERT(sizeof(fw_hdr_t) == EC_FW_HEADER_SIZE,
 /**
  * @brief Validate the Active Main image and jump to the App if it is valid.
  *
- * Checks magic, image size and validation control, then verifies CRC32 or
+ * Checks magic, image size and validation control, then verifies CRC8 or
  * Checksum on Flash and records the result in boot info. On success (and
  * when not in EC_BOOT_MODE_STAY_IN_BBK) the image is loaded to RAM and the
  * function jumps to the App without returning. Each failure increments the
@@ -111,14 +112,14 @@ bool ec_validate_image_header(const fw_hdr_t *hdr);
 int ec_get_image_header(fw_hdr_t *hdr);
 
 /**
- * @brief Calculate CRC32 over the specified Flash region
+ * @brief Calculate CRC8 (CCITT, poly 0x07, init 0x00) over the specified Flash region
  *
  * @note Implemented in driver (driver/storage_bootloader.c), called by
  *       service (service/flash).
  *
  * @param addr Flash start address
  * @param size Length to calculate (bytes)
- * @param crc Output CRC32 value
+ * @param crc Output CRC8 value, zero-extended to 32 bits
  * @return 0 on success, negative error code on failure
  */
 int ec_cal_image_crc(off_t addr, size_t size, uint32_t *crc);
@@ -184,7 +185,7 @@ typedef struct ec_boot_info_t {
     uint8_t  corruption_status; /**< 0xEB Corruption Status flags */
     uint8_t  last_crc_status;   /**< 0xA2 last CRC status */
     volatile uint8_t status;    /**< 0xEC EC status; BUSY during Flash operations */
-    uint32_t last_crc_value;    /**< 0xA2 last CRC32 / Checksum value */
+    uint32_t last_crc_value;    /**< 0xA2 last CRC8 / Checksum value */
 } ec_boot_info_t;
 
 #if defined(BUILD_ASSERT)

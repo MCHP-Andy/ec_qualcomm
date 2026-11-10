@@ -60,7 +60,7 @@ int flash_service_request(flash_service_command_t command,
 | `FLASH_SERVICE_WRITE` | `data_pointer` | Write flash from `data_pointer` |
 | `FLASH_SERVICE_READ` | `data_pointer` | Read into `data_pointer` |
 | `FLASH_SERVICE_ERASE` | - | Erase `size` bytes starting at `flash_address` |
-| `FLASH_SERVICE_CRC` | `crc_result` | Compute CRC32 |
+| `FLASH_SERVICE_CRC` | `crc_result` | Compute CRC8 (stored in 4 bytes, upper 3 bytes are 0) |
 | `FLASH_SERVICE_LOAD_TO_RAM` | `ram_address` | Read into `ram_address` |
 
 Every command requires `flash_address >= 0` and `size > 0`, otherwise it returns `-EINVAL`. Returns 0 on
