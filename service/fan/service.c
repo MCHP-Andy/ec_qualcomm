@@ -176,8 +176,23 @@ static void service(void) {
             (SYS_EVT_MASK | FAN_TEMP_CHG | FAN_CFG_UPDATE | FAN_RPM_UPDATE),
             true, rpm_update);
 
-        pwr_sta_t state;
-        pwr_state_get(&state);
+        if (evt & SYS_PWR_STA_CHG) {
+            static bool allow_on = false;
+            static pwr_sta_t pre_state;
+            pwr_sta_t state;
+
+            pwr_state_get(&state);
+
+            // backup allow_on when S0 -> MS, and restore it when MS -> S0
+            if (pre_state == PWR_STA_S0 && state == PWR_STA_MS) {
+                fan_constraint_get(&allow_on);
+                fan_constraint_set(false);
+            } else if (pre_state == PWR_STA_MS && state == PWR_STA_S0) {
+                fan_constraint_set(allow_on);
+            }
+
+            pre_state = state;
+        }
 
         for (fan_id_t fan = FAN_ID_1; fan < ARRAY_SIZE(fan_blks); fan++) {
             uint16_t rpm = 0;

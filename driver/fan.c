@@ -249,7 +249,7 @@ int fan_constraint_set(bool allow_on) {
 
     fan_allow_on = allow_on;
     gpio_pin_set_dt(&fan_12v_enable, fan_allow_on);
-    LOG_INF("Fan constraint: FAN(s) can %s", allow_on ? "turn ON" : "only stay OFF");
+    LOG_DBG("Fan constraint: FAN(s) can %s", allow_on ? "turn ON" : "only stay OFF");
 
     return 0;
 }
@@ -470,28 +470,6 @@ static void gpio_callback(const struct device *dev, struct gpio_callback *cb,
     }
 }
 
-#if CONFIG_PM
-#include <zephyr/pm/pm.h>
-static void fan_pm_state_entry(enum pm_state state) {
-    // Force fan off
-    if (fan_rpm_max == 0 && fan_thro_mira == 0) {
-        gpio_pin_set_dt(&fan_12v_enable, false);
-    }
-}
-
-static void fan_pm_state_exit(enum pm_state state) {
-    // Reload constraint
-    bool allow_on = false;
-    fan_constraint_get(&allow_on);
-    fan_constraint_set(allow_on);
-}
-
-static struct pm_notifier fan_pm_notifier = {
-    .state_entry = fan_pm_state_entry,
-    .state_exit = fan_pm_state_exit,
-};
-#endif // CONFIG_PM
-
 #include <zephyr/init.h>
 
 static int init_config(void) {
@@ -535,11 +513,6 @@ static int init_config(void) {
             ret = -ENODEV;
         }
     }
-
-#if CONFIG_PM
-    pm_notifier_register(&fan_pm_notifier);
-#endif // CONFIG_PM
-
     return ret;
 }
 
