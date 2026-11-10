@@ -32,6 +32,8 @@ void jump_to_app(uint32_t address) {
 
 int main(void)
 {
+    LOG_INF("FW version : %d.%d.%d", CONFIG_APP_FW_VERSION_MAJOR,
+            CONFIG_APP_FW_VERSION_MINOR, CONFIG_APP_FW_VERSION_PATCH);
     LOG_INF("Build time : %s %s", __DATE__, __TIME__);
     LOG_INF("Hello: %s", CONFIG_BOARD_TARGET);
 

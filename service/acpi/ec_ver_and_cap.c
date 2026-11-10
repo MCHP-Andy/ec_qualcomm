@@ -16,9 +16,9 @@ static int acpi_dev_fw_ver(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cm
     ACPI_CHECK_OUT(cmd_info, resp, resp_len);
 
     resp[0] = 3; // Byte count
-    resp[1] = 1; // Test Version
-    resp[2] = 1; // Sub Version
-    resp[3] = 1; // Major Version
+    resp[1] = CONFIG_APP_FW_VERSION_PATCH; // Test Version
+    resp[2] = CONFIG_APP_FW_VERSION_MINOR; // Sub Version
+    resp[3] = CONFIG_APP_FW_VERSION_MAJOR; // Major Version
 
     return 0;
 }
@@ -33,9 +33,9 @@ static int acpi_dev_fw_ver_and_lowest_supported(const acpi_cmd_t *cmd_info,
     ACPI_CHECK_OUT(cmd_info, resp, resp_len);
 
     resp[0] = 7; // Byte count (Offset 0x01)
-    resp[1] = 1; // Test Version (Offset 0x02)
-    resp[2] = 1; // Sub Version (Offset 0x03)
-    resp[3] = 1; // Major Version (Offset 0x04)
+    resp[1] = CONFIG_APP_FW_VERSION_PATCH; // Test Version (Offset 0x02)
+    resp[2] = CONFIG_APP_FW_VERSION_MINOR; // Sub Version (Offset 0x03)
+    resp[3] = CONFIG_APP_FW_VERSION_MAJOR; // Major Version (Offset 0x04)
     resp[4] = 1; // Lowest Supported Test Version (Offset 0x05)
     resp[5] = 1; // Lowest Supported Sub Version (Offset 0x06)
     resp[6] = 1; // Lowest Supported Major Version (Offset 0x07)
