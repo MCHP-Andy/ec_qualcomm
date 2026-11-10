@@ -2,6 +2,25 @@
 
 mainmenu "EC firmware application"
 
+menu "EC firmware version"
+
+config APP_FW_VERSION_MAJOR
+	int "Firmware major version"
+	range 0 255
+	default 0
+
+config APP_FW_VERSION_MINOR
+	int "Firmware minor version"
+	range 0 255
+	default 0
+
+config APP_FW_VERSION_PATCH
+	int "Firmware patch (test) version"
+	range 0 255
+	default 0
+
+endmenu
+
 menu "EC optional features"
 rsource "../service/Kconfig"
 endmenu
