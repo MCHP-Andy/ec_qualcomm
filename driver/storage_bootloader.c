@@ -15,7 +15,7 @@
 LOG_MODULE_REGISTER(header, LOG_LEVEL_INF);
 
 /* -------------------------------------------------------------------------
- * 常數與巨集定義
+ * Constants and macro definitions
  * ------------------------------------------------------------------------- */
 #define EC_FW_MAGIC_VALUE               (0x57464345) // 'E', 'C', 'F', 'W' (Little-Endian)
 #define EC_FW_MAGIC_BYTE0               'E'          // 0x45
@@ -23,24 +23,24 @@ LOG_MODULE_REGISTER(header, LOG_LEVEL_INF);
 #define EC_FW_MAGIC_BYTE2               'F'          // 0x46
 #define EC_FW_MAGIC_BYTE3               'W'          // 0x57
 
-/* 連續驗證失敗達此次數時停留在 Bootloader 等待 Host 修復 */
+/* Stay in Bootloader waiting for Host recovery after this many consecutive validation failures */
 #define EC_BOOT_FAIL_LIMIT              (3)
 #define FLASH_LOAD_CHUNK_SIZE           512
 
-/* Image header / Image 位址 (Get from DTS) */
+/* Image header / Image address (Get from DTS) */
 #if defined(CONFIG_BOARD_QEMU_CORTEX_M3)
 #define HDR_ADDR (DT_REG_ADDR(DT_NODELABEL(flash0))+DT_REG_ADDR(DT_NODELABEL(hdr_partition)))
 #define IMG_ADDR (DT_REG_ADDR(DT_NODELABEL(flash0))+DT_REG_ADDR(DT_NODELABEL(app_partition)))
 #elif defined(CONFIG_BOARD_QC_MODULE)
 #define HDR_ADDR (DT_REG_ADDR(DT_NODELABEL(int_flash))+DT_REG_ADDR(DT_NODELABEL(hdr_partition)))
 #define IMG_ADDR (DT_REG_ADDR(DT_NODELABEL(int_flash))+DT_REG_ADDR(DT_NODELABEL(img_partition)))
-/* App 執行位址 (RAM) */
+/* App execution address (RAM) */
 #define RAM_ADDR (DT_REG_ADDR(DT_NODELABEL(flash0))+DT_REG_ADDR(DT_NODELABEL(app_partition)))
 #endif
 
 static const struct device *boot_info = DEVICE_DT_GET(DT_NODELABEL(boot_info0));
 static ec_boot_info_t info = {0};
-/* 載入 image 至 RAM 用緩衝區 */
+/* Buffer for loading image into RAM */
 /* ec_cal_image_crc / ec_cal_image_checksum temporary buffer */
 static uint8_t crc_buf[512] = {0};
 
@@ -52,7 +52,7 @@ static uint32_t cal_checksum(uint32_t checksum, const uint8_t *const buffer,
     return checksum;
 }
 
-/* 從 Flash 讀取一段資料 */
+/* Read a block of data from Flash */
 static int read_flash(off_t addr, uint8_t *data, size_t len) {
 #if defined(CONFIG_BOARD_QEMU_CORTEX_M3)
     memcpy(data, (const uint8_t *)addr, len);
@@ -120,7 +120,7 @@ int ec_cal_image_checksum(off_t addr, size_t size, uint32_t *checksum) {
 }
 
 #if defined(CONFIG_BOARD_QC_MODULE)
-/* 重讀 Flash image 並寫入 RAM 執行位址 */
+/* Re-read Flash image and write it to the RAM execution address */
 static int load_image_to_ram(off_t addr, size_t size) {
     uint8_t *img_addr = (uint8_t *)RAM_ADDR;
 
@@ -157,7 +157,7 @@ int ec_boot_info_set_reset_reason(uint8_t reason) {
     return ec_boot_info_save();
 }
 
-/* 記錄映像檔驗證失敗：更新 Corruption Status 與失敗計數 */
+/* Record image validation failure: update Corruption Status and failure count */
 static void boot_info_mark_fail(void) {
     info.corruption_status &= ~FW_CORRUPT_ACT_MAIN_INTACT;
     if (info.boot_fail_count < UINT8_MAX) {
@@ -172,9 +172,9 @@ static void boot_info_mark_fail(void) {
 }
 
 /**
- * @brief 驗證 EC 韌體標頭的有效性
- * @param hdr 指向 Flash 中讀出的 32B 標頭
- * @return true 標頭格式正確且合法；false 標頭損毀或不合法
+ * @brief Validate the EC firmware header
+ * @param hdr Pointer to the 32B header read from Flash
+ * @return true if header is well-formed and valid; false if corrupted or invalid
  */
 bool ec_validate_image_header(const fw_hdr_t *hdr)
 {
@@ -182,21 +182,21 @@ bool ec_validate_image_header(const fw_hdr_t *hdr)
         return false;
     }
 
-    /* 1. 檢查 Magic Value ('E', 'C', 'F', 'W') */
+    /* 1. Check Magic Value ('E', 'C', 'F', 'W') */
     if (hdr->magic.u32 != EC_FW_MAGIC_VALUE) {
         LOG_ERR("Invalid EC FW Header Magic Value: 0x%08X", hdr->magic.u32);
         boot_info_mark_fail();
         return false;
     }
 
-    /* 2. 檢查映像檔大小合法性 (例如不得為 0 或超過分區最大上限 464KB) */
+    /* 2. Check image size validity (e.g. must not be 0 or exceed the 464KB partition limit) */
     if (hdr->fw_size == 0 || hdr->fw_size > (464 * 1024)) {
         LOG_ERR("Invalid EC FW Image Size: %u bytes", hdr->fw_size);
         boot_info_mark_fail();
         return false;
     }
 
-    /* 3. 檢查校驗控制旗標 */
+    /* 3. Check validation control flag */
     if (hdr->validation_ctrl > EC_FW_VALIDATION_CHECKSUM) {
         LOG_ERR("Invalid EC FW Validation Control: 0x%02X",
                 hdr->validation_ctrl);
@@ -204,7 +204,7 @@ bool ec_validate_image_header(const fw_hdr_t *hdr)
         return false;
     }
 
-    /* 4. 先於 Flash 上計算 CRC / Checksum */
+    /* 4. Calculate CRC / Checksum on Flash first */
     LOG_INF("Flash Address: 0x%08X", (uint32_t)IMG_ADDR);
     if (hdr->validation_ctrl != EC_FW_VALIDATION_NONE) {
         bool use_checksum = (hdr->validation_ctrl & EC_FW_VALIDATION_CHECKSUM);
@@ -249,7 +249,7 @@ bool ec_validate_image_header(const fw_hdr_t *hdr)
         return false;
     }
 
-    /* 5. 校驗通過後才重讀 Flash image 並寫入 RAM */
+    /* 5. Only after validation passes, re-read Flash image and write to RAM */
 #if defined(CONFIG_BOARD_QC_MODULE)
     if (load_image_to_ram((off_t)IMG_ADDR, hdr->fw_size) < 0) {
         LOG_ERR("Failed to load EC FW image to RAM");
@@ -301,7 +301,7 @@ static int init_config(void) {
 
     info.status = EC_STATE_BOOTLOADER_IDLE_WP_OFF;
 
-    /* 未經軟體記錄的重設 (WDT / 硬體) 下次開機會讀到 UNKNOWN */
+    /* Resets not recorded by software (WDT / hardware) read as UNKNOWN on next boot */
     info.reset_reason = EC_RESET_REASON_UNKNOWN;
     ec_boot_info_save();
 

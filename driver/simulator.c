@@ -39,14 +39,14 @@ int acpi_resp_set(uint8_t *pdata, uint16_t len) {
 #include <interface/aoss.h>
 #include <interface/power.h>
 
-/* 模擬變數儲存空間 */
+/* Simulated variable storage */
 static uint16_t sim_fan_rpm[FAN_ID_MAX] = {
     [FAN_ID_1] = 3000,
     [FAN_ID_2] = 3000
 };
 
 static uint16_t sim_therm_temp[THERM_DEV_MAX] = {
-    [THERM_DEV_1] = 350, // 35.0 C (假設單位為 0.1C)
+    [THERM_DEV_1] = 350, // 35.0 C (assuming unit is 0.1C)
     [THERM_DEV_2] = 400, // 40.0 C
     [THERM_DEV_3] = 450  // 45.0 C
 };
@@ -202,9 +202,9 @@ static struct fan_profile_t {
 };
 // clang-format on
 
-/* EC-AOSS 模擬暫存器 */
+/* EC-AOSS simulated registers */
 static uint32_t sim_aoss_status = AOSS_STA_SOC_TEMP_TELEM | AOSS_STA_LMT_CAP;
-static uint32_t sim_aoss_temp = 553; // 55.3 C (單位 0.1C, 2's complement)
+static uint32_t sim_aoss_temp = 553; // 55.3 C (unit 0.1C, 2's complement)
 
 /* --- Fan Simulator APIs --- */
 

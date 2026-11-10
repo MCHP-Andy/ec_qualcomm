@@ -57,7 +57,7 @@ static int cmd_jump(const struct shell *sh, size_t argc, char **argv) {
         stay_in_bbk = strtoul(argv[2], NULL, 0) != 0;
     }
 
-    // 寫入 boot info，由 Bootloader 決定是否停留
+    // Write boot info; Bootloader decides whether to stay
     ec_boot_info_t *info = ec_boot_info_get();
     info->boot_mode = stay_in_bbk ? EC_BOOT_MODE_STAY_IN_BBK : EC_BOOT_MODE_NORMAL;
     if (stay_in_bbk) {

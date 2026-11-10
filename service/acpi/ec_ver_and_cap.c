@@ -45,37 +45,6 @@ static int acpi_dev_fw_ver_and_lowest_supported(const acpi_cmd_t *cmd_info,
     return 0;
 }
 
-// This command is currently Not Supported.
-#if 0
-static int acpi_dev_flashing_capabilities(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len, uint8_t *resp, uint16_t resp_len) {
-    (void) cmd;
-    (void) cmd_len;
-    ARG_UNUSED(cmd_info);
-
-    ACPI_CHECK_OUT(cmd_info, resp, resp_len);
-
-    // 初始化整個 Buffer
-    memset(resp, 0, cmd_info->resp_len);
-
-    resp[0] = 64;  // Byte count (Offset 0x01)
-    
-    // 以下為範例填值，實際需依平台配置填入對應的 Binary Size, Bootloader, Main FW Address 等
-    // Example values based on Page 10 of spec
-    resp[1] = 0x00; // Binary Size LSB (Offset 0x02)
-    resp[2] = 0x08; // Binary Size MSB (Offset 0x03) (e.g., 0x0800 = 2KB)
-    // ...
-    resp[20] = 0x01; // Partition support (0x21) - 1:1 partition
-    resp[21] = 0x00; // Restriction of FW update (0x22) - 0: No restrictions
-    resp[22] = 0x00; // Reserved (0x23)
-    resp[23] = 0x00; // Erase sector size in KB (0x24) - 0: Not supported
-    resp[24] = 0x00; // Partition support (0x25) - 0: No Ext memory
-    // ... Offset 0x04 to 0x41 default to 0
-    // 例如 resp[18] (Offset 0x20) 代表 Internal memory erase sector size in KB
-
-    return 0;
-}
-#endif
-
 static int acpi_dev_thermal_capabilities(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                   uint16_t cmd_len, uint8_t *resp,
                                   uint16_t resp_len) {
@@ -83,7 +52,7 @@ static int acpi_dev_thermal_capabilities(const acpi_cmd_t *cmd_info, uint8_t *cm
     ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
     ACPI_CHECK_OUT(cmd_info, resp, resp_len);
 
-    // 檢查 Sub Command 是否為 0x02
+    // Check whether Sub Command is 0x02
     if (cmd[1] != 0x02) { // Sub-command is at cmd[1]
         LOG_ERR("Invalid sub command: 0x%02X", cmd[1]);
         return -EINVAL;
@@ -92,12 +61,12 @@ static int acpi_dev_thermal_capabilities(const acpi_cmd_t *cmd_info, uint8_t *cm
     resp[0] = 2; // Byte count (Offset 0x02)
 
     // Thermal Capabilities (Offset 0x03 LSB)
-    // Bit 0-1: 數量(2 fans = 0x02), Bit 7: Data Valid (0x80) -> 0x82
+    // Bit 0-1: count (2 fans = 0x02), Bit 7: Data Valid (0x80) -> 0x82
     resp[1] = 0x82;
 
     // Thermal Capabilities (Offset 0x04 MSB)
     // Bit 8-15: Thermistor 0-7 presence (0: present, 1: absent)
-    // 例如僅存在 Thermistor 0,1，則為 0xFC (11111100)
+    // e.g. if only Thermistor 0,1 exist, value is 0xFC (11111100)
     resp[2] = 0xFC;
 
     return 0;
@@ -114,7 +83,7 @@ static int acpi_dev_active_cooling_caps(const acpi_cmd_t *cmd_info, uint8_t *cmd
     resp[0] = 5; // Byte count (Offset 0x01), this is part of the response data
 
     // Capabilities (Offset 0x02 - 0x05) 32-bit (Little Endian)
-    // 假設支援所有 14 個標準指令 (Bit 0 ~ Bit 13) -> 0x3FFF
+    // Assume all 14 standard commands are supported (Bit 0 ~ Bit 13) -> 0x3FFF
     resp[1] = 0xFF; // LSB
     resp[2] = 0x3F;
     resp[3] = 0x00;
@@ -153,7 +122,7 @@ static int acpi_dev_id(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_le
 
     // Device ID (2 Bytes)
     resp[1] = 0x34; // Device ID LSB (Offset 0x02)
-    resp[2] = 0x12; // Device ID MSB (Offset 0x03) - 例如 ID 為 0x1234
+    resp[2] = 0x12; // Device ID MSB (Offset 0x03) - e.g. ID is 0x1234
 
     return 0;
 }

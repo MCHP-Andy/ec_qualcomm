@@ -80,6 +80,8 @@ static inline int16_t aoss_dc_to_c(int16_t dc) {
 /**
  * @brief Read the SoC status register from AOSS.
  *
+ * @note Implemented in driver (driver/aoss.c), called by driver (driver/aoss_shell.c).
+ *
  * @param sta Output for the parsed status.
  * @retval 0 on success, negative errno on failure.
  */
@@ -89,6 +91,8 @@ int aoss_status_get(aoss_status_t *sta);
  * @brief Read the SoC average temperature from AOSS.
  *
  * Caller should check aoss_status_t.soc_temp_telem before polling.
+ *
+ * @note Implemented in driver (driver/aoss.c), called by driver (driver/aoss_shell.c).
  *
  * @param temp_c  Output for temperature in C (rounded), NULL to ignore.
  * @param temp_dc Output for temperature in 0.1 C (Eg: 251 => 25.1 C), NULL to ignore.

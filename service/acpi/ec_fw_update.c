@@ -14,10 +14,10 @@ LOG_MODULE_DECLARE(acpi);
 #define SPI_SUBCMD_EXIT_BOOTLOADER          0x33
 #define SPI_SUBCMD_ENTER_BOOTLOADER         0xDC
 
-/* Bootloader 位址 (Get from DTS) */
+/* Bootloader address (Get from DTS) */
 #define BOOT_START_ADDR (DT_REG_ADDR(DT_NODELABEL(flash0))+DT_REG_ADDR(DT_NODELABEL(boot_partition)))
 
-/* 延遲跳轉，讓 Host 端 I2C transaction 先完成 */
+/* Delay the jump so the Host I2C transaction completes first */
 #define EC_ENTER_BBK_JUMP_DELAY_MS          (100)
 
 typedef void (*boot_entry_t)(void);
@@ -55,7 +55,7 @@ static void enter_bootloader_work_hdl(struct k_work *work) {
 
 static K_WORK_DELAYABLE_DEFINE(enter_bootloader_work, enter_bootloader_work_hdl);
 
-/* 內部狀態變數 */
+/* Internal state variables */
 #define EC_FLASH_PATH_INT                   0x4F
 static bool     in_bootloader_mode = false;
 static bool     flash_wp_enabled   = false;
@@ -63,7 +63,7 @@ static uint8_t  active_control_path = EC_FLASH_PATH_INT;
 
 /**
  * @brief 0xEC: State of EC and Write Protection Status
- * SoC 查詢 EC 目前處於 Main 還是 Bootloader 區塊，以及 WP 狀態與 Flash 路徑
+ * SoC queries whether EC is currently in Main or Bootloader, plus WP status and Flash path
  */
 static int acpi_ec_state_wp_status(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                    uint16_t cmd_len, uint8_t *resp,
@@ -88,7 +88,7 @@ static int acpi_ec_state_wp_status(const acpi_cmd_t *cmd_info, uint8_t *cmd,
 
 /**
  * @brief 0xBB: SPI Services Multi-functional Dispatcher
- * App 端目前支援 Enter / Exit Bootloader
+ * App currently supports Enter / Exit Bootloader
  */
 static int acpi_ec_spi_services(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                 uint16_t cmd_len, uint8_t *resp,
@@ -103,7 +103,7 @@ static int acpi_ec_spi_services(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     switch (sub_cmd) {
     /* 1. Enter / Exit Bootloader */
     case SPI_SUBCMD_ENTER_BOOTLOADER: {
-        /* 寫入 boot info，跳轉後由 Bootloader 停留等待更新 */
+        /* Write boot info; after the jump, Bootloader stays and waits for update */
         ec_boot_info_t *info = ec_boot_info_get();
         info->boot_mode = EC_BOOT_MODE_STAY_IN_BBK;
         info->reset_reason = EC_RESET_REASON_ENTER_BBK;
@@ -133,13 +133,4 @@ static int acpi_ec_spi_services(const acpi_cmd_t *cmd_info, uint8_t *cmd,
 // clang-format off
 ACPI_CMD_SUBSCRIBE(fw, EC_STATE_AND_WP_STATUS,       acpi_ec_state_wp_status,              1, 0, 3);   // 0xEC (ByteCount + State + Path)
 ACPI_CMD_SUBSCRIBE(fw, EC_FW_CODE_MIRROR, acpi_ec_spi_services, 3, 0, 0); // 0xBB (Cmd + BCNT=1 + SubCmd)
-// ACPI_CMD_SUBSCRIBE(fw, EC_DEV_FW_CORRUPTION_STATUS, NULL, 1, 0, 2); // Page 39
-// ACPI_CMD_SUBSCRIBE(fw, EC_FW_CODE_MIRROR, NULL, 3, 0, 0); // Page 40 (ByteCount + CodeMirrorCmd)
-// ACPI_CMD_SUBSCRIBE(fw, EC_READ_CRC, NULL, 1, 0, 6); // Page 46
-// ACPI_CMD_SUBSCRIBE(fw, EC_ERASE_MEM_REGION, NULL, 7, 0, 0); // Page 48 (ByteCount + ECControlPath + BlockCount + Address(3))
-// ACPI_CMD_SUBSCRIBE(fw, EC_ERASE_MEM_PARTITION, NULL, 3, 0, 0); // Page 49 (ByteCount + QuickEraseCmd)
-// ACPI_CMD_SUBSCRIBE(fw, EC_READ_MEM_REGION, NULL, 6, 0, ACPI_RESP_LEN); // Page 50 (ByteCount + ECControlPath + Address(3))
-// EC_READ_MEM_REGION_BUF (0xA1) is a response command, not a top-level request command.
-// ACPI_CMD_SUBSCRIBE(fw, EC_WRITE_MEM_REGION, NULL, 1, ACPI_RECE_LEN - 1, 0); // Page 51 (Optional Data(variable))
-// ACPI_CMD_SUBSCRIBE(fw, EC_WRITE_MEM_REGION_BUF, NULL, 7, 0, 0); // Page 51 (ByteCount + ECControlPath + Size + Address(3))
 // clang-format on
