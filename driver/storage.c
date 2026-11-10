@@ -42,7 +42,7 @@ static int init_config(void) {
         return -EINVAL;
     }
 
-    /* Bootloader 已於開機時更新 boot info，App 端僅讀取 */
+    /* Bootloader has updated boot info at boot; App only reads it */
     if (retention_is_valid(boot_info) == 1 &&
         retention_read(boot_info, 0, (uint8_t *)&info, sizeof(info)) == 0 &&
         info.version == EC_BOOT_INFO_VERSION) {
@@ -72,7 +72,7 @@ static int init_config(void) {
 
 SYS_INIT(init_config, APPLICATION, SYS_INIT_NORMAL);
 
-#else /* 此 board 未配置 boot_info0 retention 區域 */
+#else /* This board has no boot_info0 retention region configured */
 
 int ec_boot_info_save(void) {
     return -ENOTSUP;

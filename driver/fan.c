@@ -333,16 +333,16 @@ static uint16_t cal_fan_pwm(fan_id_t id, uint32_t target_rpm) {
         break;
     }
 
-    // 邊界處理：低於最低轉速
+    // Boundary handling: below minimum speed
     if (target_rpm <= table[0].rpm) {
         return table[0].pwm;
     }
-    // 邊界處理：高於最高轉速
+    // Boundary handling: above maximum speed
     if (target_rpm >= table[FAN_TRACK_SIZE - 1].rpm) {
         return table[FAN_TRACK_SIZE - 1].pwm;
     }
 
-    // 區間內線性插值計算
+    // Linear interpolation within the interval
     for (int i = 0; i < FAN_TRACK_SIZE - 1; i++) {
         if (target_rpm >= table[i].rpm && target_rpm <= table[i+1].rpm) {
             uint16_t rpm_low  = table[i].rpm;
@@ -350,7 +350,7 @@ static uint16_t cal_fan_pwm(fan_id_t id, uint32_t target_rpm) {
             uint16_t pwm_low  = table[i].pwm;
             uint16_t pwm_high = table[i+1].pwm;
 
-            // 防止整數溢位的高精度安全運算
+            // High-precision arithmetic that avoids integer overflow
             uint32_t numerator = (uint32_t)(target_rpm - rpm_low) * (pwm_high - pwm_low);
             uint32_t denominator = rpm_high - rpm_low;
             

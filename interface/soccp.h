@@ -51,17 +51,37 @@ typedef enum {
 /**
  * @brief Get the latest OffMode/OOB status reported by SoC-CP.
  *
+ * @note Implemented in service (service/soccp), called by service (service/soccp).
+ *
  * @param status Output for the raw status, see SOCCP_OOB_STA_*.
  * @retval 0 on success, -EINVAL when @p status is NULL.
  */
 int soccp_oob_state_get(uint16_t *status);
 
 /**
- * 
+ * @brief Feed one byte received from SoC-CP into the SoC-CP command buffer.
+ *
+ * SOCCP_TYPE_CMD starts a new command with @p data as the opcode and
+ * SOCCP_TYPE_DATA appends an argument byte. Every byte wakes the SoC-CP
+ * service to process the command.
+ *
+ * @note Implemented in service (service/soccp), called by driver (driver/acpi.c).
+ *
+ * @param id   Byte type, see soccp_type_t.
+ * @param data Received byte.
+ * @retval 0 always.
  */
 int soccp_buf_set(soccp_type_t id, uint8_t data);
 
 /**
- * 
+ * @brief Load the response that SoC-CP reads back over I2C.
+ *
+ * Data beyond the response buffer size is truncated.
+ *
+ * @note Implemented in driver (driver/acpi.c), called by service (service/soccp).
+ *
+ * @param pdata Response data.
+ * @param len   Response length in bytes.
+ * @retval 0 always.
  */
 int soccp_resp_set(uint8_t *pdata, uint16_t len);

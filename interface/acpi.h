@@ -50,12 +50,32 @@ typedef enum {
 } acpi_type_t;
 
 /**
- * 
+ * @brief Feed one byte received from the host into the ACPI command buffer.
+ *
+ * ACPI_TYPE_CMD starts a new command with @p data as the opcode,
+ * ACPI_TYPE_DATA appends an argument byte, and ACPI_TYPE_PROCESS marks the
+ * end of the transfer. The command handler is dispatched as soon as all
+ * mandatory arguments arrive, and again at the end of the transfer if
+ * optional payload followed.
+ *
+ * @note Implemented in service (service/acpi), called by driver (driver/acpi.c).
+ *
+ * @param id   Byte type, see acpi_type_t.
+ * @param data Received byte (ignored for ACPI_TYPE_PROCESS).
+ * @retval 0 always.
  */
 int acpi_buf_set(acpi_type_t id, uint8_t data);
 
-/*
+/**
+ * @brief Load the response that the host reads back over I2C.
  *
+ * Data beyond the response buffer size (ACPI_RESP_LEN) is truncated.
+ *
+ * @note Implemented in driver (driver/acpi.c), called by service (service/acpi).
+ *
+ * @param pdata Response data.
+ * @param len   Response length in bytes.
+ * @retval 0 always.
  */
 int acpi_resp_set(uint8_t *pdata, uint16_t len);
 
@@ -63,7 +83,13 @@ int acpi_resp_set(uint8_t *pdata, uint16_t len);
 /**
  * @brief Set the ACPI interrupt (SCI alert) line.
  *
+ * @note Implemented in driver (driver/acpi.c), called by service (service/sci).
+ *
  * @param val Pin level, either 0 (deasserted) or 1 (asserted).
+ * @retval 0 on success.
+ * @retval -EINVAL @p val is greater than 1.
+ * @retval -ENODEV ACPI interrupt GPIO is not ready.
+ * @retval -ENOTSUP no ACPI interrupt pin on this board.
  */
 int acpi_int_set(uint8_t val);
 #endif

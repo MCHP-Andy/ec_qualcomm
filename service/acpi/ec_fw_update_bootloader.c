@@ -14,17 +14,17 @@
 
 LOG_MODULE_DECLARE(acpi);
 
-/* Image 位址 (Get from DTS) */
+/* Image address (Get from DTS) */
 #if defined(CONFIG_BOARD_QEMU_CORTEX_M3)
 #define IMG_ADDR (DT_REG_ADDR(DT_NODELABEL(flash0))+DT_REG_ADDR(DT_NODELABEL(app_partition)))
 #elif defined(CONFIG_BOARD_QC_MODULE)
 #define IMG_ADDR (DT_REG_ADDR(DT_NODELABEL(int_flash))+DT_REG_ADDR(DT_NODELABEL(img_partition)))
 #endif
 
-/* 映像檔大小上限，與 ec_validate_image_header 一致 */
+/* Maximum image size, consistent with ec_validate_image_header */
 #define EC_FW_IMAGE_MAX_SIZE                (464 * 1024)
 
-/* 延遲跳轉，讓 Host 端 I2C transaction 先完成 */
+/* Delay the jump so the Host I2C transaction completes first */
 #define EC_EXIT_BBK_JUMP_DELAY_MS           (100)
 // LOG_MODULE_REGISTER(fw_update, CONFIG_FW_UPDATE_LOG_LEVEL);
 
@@ -85,30 +85,30 @@ LOG_MODULE_DECLARE(acpi);
 #define SPI_SUBCMD_CRASH_ASSERT             0xC1
 #define SPI_SUBCMD_CRASH_WATCHDOG           0xC2
 
-/* 讀寫暫存緩衝區 (A0h 寫入最多 256B，A1h 讀出最多 512B) */
+/* Read/write staging buffer (A0h writes up to 256B, A1h reads up to 512B) */
 #define RAM_BUFFER_SIZE         512
 static uint8_t ram_buffer[RAM_BUFFER_SIZE];
 static uint16_t ram_buffer_data_len = 0;
 
-/* 內部狀態變數 */
-/* Corruption Status / CRC 結果存放於 retention boot info (見 interface/storage.h) */
+/* Internal state variables */
+/* Corruption Status / CRC results are stored in retention boot info (see interface/storage.h) */
 static bool     in_bootloader_mode = false;
 static uint8_t  active_control_path = EC_FLASH_PATH_INT;
 
 /* =========================================================================
- * 底層抽象驅動介面 (HAL / Flash Driver Callbacks)
+ * Low-level abstract driver interface (HAL / Flash Driver Callbacks)
  * ========================================================================= */
 // extern int hal_fw_run_crc(uint8_t partition_id, uint32_t *out_crc, uint8_t *out_status);
 // extern int hal_fw_sync(uint8_t sync_cmd);
 
 
 /* =========================================================================
- * ACPI Command Handler 實作
+ * ACPI Command Handler implementation
  * ========================================================================= */
 
 /**
  * @brief 0xEB: EC Device Firmware Corruption Status
- * SoC 查詢目前各分割區健康損毀狀況
+ * SoC queries the current health/corruption status of each partition
  */
 static int acpi_ec_fw_corruption_status(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                         uint16_t cmd_len, uint8_t *resp,
@@ -126,7 +126,7 @@ static int acpi_ec_fw_corruption_status(const acpi_cmd_t *cmd_info, uint8_t *cmd
 
 /**
  * @brief 0xEC: State of EC and Write Protection Status
- * SoC 查詢 EC 目前處於 Main 還是 Bootloader 區塊，以及 WP 狀態與 Flash 路徑
+ * SoC queries whether EC is currently in Main or Bootloader, plus WP status and Flash path
  */
 static int acpi_ec_state_wp_status(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                    uint16_t cmd_len, uint8_t *resp,
@@ -147,7 +147,7 @@ static int acpi_ec_state_wp_status(const acpi_cmd_t *cmd_info, uint8_t *cmd,
 
 /**
  * @brief 0xA2: Read CRC Result
- * 讀取前次執行 Run CRC 指令後的校驗結果與 32-bit CRC 數值
+ * Read the validation result and 32-bit CRC value from the last Run CRC command
  */
 static int acpi_ec_read_crc_result(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                    uint16_t cmd_len, uint8_t *resp,
@@ -172,7 +172,7 @@ static int acpi_ec_read_crc_result(const acpi_cmd_t *cmd_info, uint8_t *cmd,
 
 /**
  * @brief 0xAE: Erase Designated Memory Region in EC
- * 抹除指定的 Flash 區塊 (以 Sector 為單位)
+ * Erase the specified Flash region (in Sectors)
  */
 static int acpi_ec_erase_designated_region(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                            uint16_t cmd_len, uint8_t *resp,
@@ -202,7 +202,7 @@ static uint32_t flash_wr_addr = 0;
 
 /**
  * @brief 0xAF: Erase Particular Memory Partition in EC
- * 快速抹除特定功能分區 (Main / Bootloader / Active / Backup)
+ * Quick-erase a specific partition (Main / Bootloader / Active / Backup)
  */
 static int acpi_ec_erase_partition(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                    uint16_t cmd_len, uint8_t *resp,
@@ -216,7 +216,7 @@ static int acpi_ec_erase_partition(const acpi_cmd_t *cmd_info, uint8_t *cmd,
 
     int ret = 0;
 
-    /* 抹除後依分區更新健康旗標 (以 Backup Main 抹除為例) */
+    /* After erase, update health flags per partition (e.g. Backup Main erase) */
     ec_boot_info_t *info = ec_boot_info_get();
     switch (quick_erase_cmd) {
         case 0x21: // Quick Erase Backup Main
@@ -275,7 +275,7 @@ static int acpi_ec_erase_partition(const acpi_cmd_t *cmd_info, uint8_t *cmd,
 
 /**
  * @brief 0xA0: Write data to RAM buffer
- * 將資料寫入 EC 內部暫存緩衝區 (最多 256 bytes)
+ * Write data into the EC internal staging buffer (up to 256 bytes)
  */
 static int acpi_ec_write_ram_buffer(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                     uint16_t cmd_len, uint8_t *resp,
@@ -284,7 +284,7 @@ static int acpi_ec_write_ram_buffer(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     ARG_UNUSED(resp_len);
     ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
 
-    uint16_t payload_len = cmd_len - 1; // 扣除 cmd
+    uint16_t payload_len = cmd_len - 1; // Exclude cmd byte
     if (payload_len > 512) {
         LOG_ERR("Write buffer overflow: %d bytes (max 512)", payload_len);
         return -EINVAL;
@@ -299,7 +299,7 @@ static int acpi_ec_write_ram_buffer(const acpi_cmd_t *cmd_info, uint8_t *cmd,
 
 /**
  * @brief 0xAA: Write data from RAM buffer to Designated memory region
- * 將 RAM buffer 的資料燒錄寫入至實體 Flash
+ * Program the RAM buffer data into physical Flash
  */
 static int acpi_ec_write_designated_region(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                            uint16_t cmd_len, uint8_t *resp,
@@ -309,7 +309,7 @@ static int acpi_ec_write_designated_region(const acpi_cmd_t *cmd_info, uint8_t *
     ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
 
     uint8_t  path       = cmd[2];
-    uint8_t  size_unit  = cmd[3]; // 以 32 bytes 為單位
+    uint8_t  size_unit  = cmd[3]; // In units of 32 bytes
     uint32_t address    = cmd[4] | ((uint32_t)cmd[5] << 8) | ((uint32_t)cmd[6] << 16); // 24-bit
     uint16_t bytes_to_program = size_unit * 32;
 
@@ -350,7 +350,7 @@ static int acpi_ec_write_designated_region(const acpi_cmd_t *cmd_info, uint8_t *
 
 /**
  * @brief 0xA7: Read from Designated Memory Region Setup
- * 設定欲讀取之 Flash 起始位址與路徑，將資料載入至 RAM buffer
+ * Set the Flash start address and path to read, and load data into the RAM buffer
  */
 static int acpi_ec_read_designated_region_setup(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                                 uint16_t cmd_len, uint8_t *resp,
@@ -364,7 +364,7 @@ static int acpi_ec_read_designated_region_setup(const acpi_cmd_t *cmd_info, uint
 
     LOG_INF("Setup Read Flash: Path=0x%02X, Addr=0x%06X", path, address);
 
-    /* 預設讀取 512 bytes 至 ram_buffer */
+    /* Read 512 bytes into ram_buffer by default */
     int ret = flash_service_request(FLASH_SERVICE_READ, address,
                                     RAM_BUFFER_SIZE, NULL, ram_buffer, NULL);
     if (ret < 0) {
@@ -377,7 +377,7 @@ static int acpi_ec_read_designated_region_setup(const acpi_cmd_t *cmd_info, uint
 
 /**
  * @brief 0xA1: Read data from RAM buffer
- * SoC 讀出先前由 0xA7 載入之 RAM 緩衝區資料
+ * SoC reads out the RAM buffer data previously loaded by 0xA7
  */
 static int acpi_ec_read_ram_buffer(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                    uint16_t cmd_len, uint8_t *resp,
@@ -395,7 +395,7 @@ static int acpi_ec_read_ram_buffer(const acpi_cmd_t *cmd_info, uint8_t *cmd,
 
 /**
  * @brief 0xBB 0xF0: Run CRC on Internal Active Main
- * 讀取 header 取得映像檔大小，計算 CRC32 並寫入 boot info，供 0xA2 Read CRC 讀取
+ * Read header to get image size, calculate CRC32 and store it in boot info for 0xA2 Read CRC
  */
 static void ec_run_crc_int_act_main(void) {
     ec_boot_info_t *info = ec_boot_info_get();
@@ -439,11 +439,11 @@ static void exit_bootloader_work_hdl(struct k_work *work) {
     fw_hdr_t hdr = {0};
     ec_get_image_header(&hdr);
 
-    /* 驗證通過會直接跳轉 App，不會返回 */
+    /* On successful validation it jumps directly to App and does not return */
     LOG_INF("Validating Main Block before exiting Bootloader...");
     ec_validate_image_header(&hdr);
 
-    /* 驗證失敗：停留在 Bootloader 等待 Host 修復 */
+    /* Validation failed: stay in Bootloader waiting for Host recovery */
     LOG_ERR("Main Block validation failed, stay in Bootloader");
     in_bootloader_mode = true;
     ec_boot_info_get()->boot_mode = EC_BOOT_MODE_STAY_IN_BBK;
@@ -454,7 +454,7 @@ static K_WORK_DELAYABLE_DEFINE(exit_bootloader_work, exit_bootloader_work_hdl);
 
 /**
  * @brief 0xBB: SPI Services Multi-functional Dispatcher
- * 整合 Bootloader 切換、Reset、Force Crash、Code Mirror、Sync 與 Run CRC
+ * Combines Bootloader switch, Reset, Force Crash, Code Mirror, Sync and Run CRC
  */
 static int acpi_ec_spi_services(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                 uint16_t cmd_len, uint8_t *resp,
@@ -476,7 +476,7 @@ static int acpi_ec_spi_services(const acpi_cmd_t *cmd_info, uint8_t *cmd,
         break;
 
     case SPI_SUBCMD_EXIT_BOOTLOADER:
-        /* 需清除 STAY_IN_BBK，ec_validate_image_header 才會跳轉 App */
+        /* STAY_IN_BBK must be cleared for ec_validate_image_header to jump to App */
         in_bootloader_mode = false;
         ec_boot_info_get()->boot_mode = EC_BOOT_MODE_NORMAL;
         ec_boot_info_save();
@@ -491,7 +491,7 @@ static int acpi_ec_spi_services(const acpi_cmd_t *cmd_info, uint8_t *cmd,
         sys_reboot(SYS_REBOOT_COLD);
         break;
 
-    /* 3. Force Crash (除錯與測試用) */
+    /* 3. Force Crash (for debugging and testing) */
     case SPI_SUBCMD_CRASH_KERNEL_OOPS:
         LOG_INF("ACPI Induced Crash: Kernel Oops");
         ec_boot_info_set_reset_reason(EC_RESET_REASON_PANIC);
@@ -505,7 +505,7 @@ static int acpi_ec_spi_services(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     case SPI_SUBCMD_CRASH_WATCHDOG:
         LOG_INF("ACPI Induced Crash: Watchdog Hang");
         ec_boot_info_set_reset_reason(EC_RESET_REASON_WDT);
-        while (1) { /* 故意卡死進入 WDT Reset */ }
+        while (1) { /* Intentionally hang to trigger WDT Reset */ }
         break;
 
     /* 4. Code Mirror */
@@ -634,16 +634,3 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_fw,
 
 SHELL_CMD_REGISTER(fw_update, &sub_fw, "EC Firmware Update Commands", NULL);
 #endif
-
-// clang-format off
-// ACPI_CMD_SUBSCRIBE(fw, EC_DEV_FW_CORRUPTION_STATUS, NULL, 1, 0, 2); // Page 39
-// ACPI_CMD_SUBSCRIBE(fw, EC_FW_CODE_MIRROR, NULL, 3, 0, 0); // Page 40 (ByteCount + CodeMirrorCmd)
-// ACPI_CMD_SUBSCRIBE(fw, EC_READ_CRC, NULL, 1, 0, 6); // Page 46
-// ACPI_CMD_SUBSCRIBE(fw, EC_STATE_AND_WP_STATUS, NULL, 1, 0, 3); // Page 47
-// ACPI_CMD_SUBSCRIBE(fw, EC_ERASE_MEM_REGION, NULL, 7, 0, 0); // Page 48 (ByteCount + ECControlPath + BlockCount + Address(3))
-// ACPI_CMD_SUBSCRIBE(fw, EC_ERASE_MEM_PARTITION, NULL, 3, 0, 0); // Page 49 (ByteCount + QuickEraseCmd)
-// ACPI_CMD_SUBSCRIBE(fw, EC_READ_MEM_REGION, NULL, 6, 0, ACPI_RESP_LEN); // Page 50 (ByteCount + ECControlPath + Address(3))
-// EC_READ_MEM_REGION_BUF (0xA1) is a response command, not a top-level request command.
-// ACPI_CMD_SUBSCRIBE(fw, EC_WRITE_MEM_REGION, NULL, 1, ACPI_RECE_LEN - 1, 0); // Page 51 (Optional Data(variable))
-// ACPI_CMD_SUBSCRIBE(fw, EC_WRITE_MEM_REGION_BUF, NULL, 7, 0, 0); // Page 51 (ByteCount + ECControlPath + Size + Address(3))
-// clang-format on

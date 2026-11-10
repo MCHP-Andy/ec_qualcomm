@@ -37,4 +37,17 @@ typedef struct therm_ctrl_t{
     uint16_t sample_ms; // ADC sample rate in the unit of ms (Min: 100ms)
 } therm_ctrl_t;
 
+/**
+ * @brief Sample a thermistor through the ADC.
+ *
+ * @note Implemented in driver (driver/thermal.c), called by service (service/thermal).
+ * @note ADC to temperature conversion is not implemented yet (TODO), the
+ *       returned value is currently fixed at 55.0 C.
+ *
+ * @param id   Thermistor ID (THERM_DEV_1 ~ THERM_DEV_3).
+ * @param temp Output for the temperature in 0.1 C (Eg: 251 => 25.1 C).
+ * @retval 0 on success.
+ * @retval -EINVAL invalid @p id, ADC device or @p temp is NULL.
+ * @retval <0 ADC driver error.
+ */
 int therm_sample_get(therm_id_t id, int16_t *temp);

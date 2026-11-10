@@ -59,9 +59,9 @@
     };
 
     dummy_i2c: dummy_i2c {
-        /* 使用虛擬設備兼容字串，這會讓 Zephyr 生成一個空的設備實例 */
+        /* Use a dummy device compatible string so Zephyr generates an empty device instance */
         compatible = "vnd,device"; 
-        status = "disabled"; // 必須是 okay，DEVICE_DT_GET 才抓得到
+        status = "disabled"; // Must be okay for DEVICE_DT_GET to resolve it
     };
 
     aliases {

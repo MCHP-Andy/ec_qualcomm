@@ -24,7 +24,25 @@ typedef enum {
 
 #define EC_ACTIVE_COOLING_SCI_EVENT 0x05
 
+/**
+ * @brief Enable or disable SCI notification to the host (cmd 0x35 bit 0).
+ *
+ * @note Implemented in service (service/sci), called by service (service/acpi).
+ *
+ * @param en true: SCI notification enabled, false: disabled.
+ * @retval 0 always.
+ */
 int acpi_sci_enable_set(bool en);
+
+/**
+ * @brief Get whether SCI notification to the host is enabled.
+ *
+ * @note Implemented in service (service/sci), called by service (service/acpi).
+ *
+ * @param en Output, true: enabled, false: disabled.
+ * @retval 0 on success.
+ * @retval -EINVAL @p en is NULL.
+ */
 int acpi_sci_enable_get(bool *en);
 
 /**
@@ -36,6 +54,9 @@ int acpi_sci_enable_get(bool *en);
  * current power state cannot service them. If the host does not read an event
  * before the notification timeout, its interrupt line is deasserted but the
  * event remains pending.
+ *
+ * @note Implemented in service (service/sci), called by service
+ *       (service/fan, service/thermal).
  *
  * @param sci SCI notification code.
  *

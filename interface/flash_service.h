@@ -15,6 +15,10 @@ typedef enum {
 /**
  * @brief Queue a flash operation and wait for its completion.
  *
+ * @note Implemented in service (service/flash), called by service
+ *       (service/acpi/ec_fw_update_bootloader.c) and driver
+ *       (driver/storage_bootloader.c).
+ *
  * @param command Operation to execute.
  * @param flash_address Flash address used by the operation.
  * @param size Number of bytes to process.
