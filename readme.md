@@ -35,7 +35,7 @@ build 完成後會在 `zephyr/` 目錄額外產生:
 | Image | 輸出檔 | 說明 |
 |---|---|---|
 | bootloader | `zephyr/bootloader.bin` | `spi_image.bin` 的複本 |
-| app | `zephyr/app.bin` | `zephyr.bin` 經 `tools/pack_ec_image.py` 加上 32-Byte ECFW header + CRC32 |
+| app | `zephyr/app.bin` | `zephyr.bin` 經 `tools/pack_ec_image.py` 加上 32-Byte ECFW header + CRC8 |
 
 ### FW version
 版本定義於 `app/Kconfig`，數值設定於 `app/prj.conf`:
@@ -44,6 +44,9 @@ CONFIG_APP_FW_VERSION_MAJOR=0
 CONFIG_APP_FW_VERSION_MINOR=1
 CONFIG_APP_FW_VERSION_PATCH=13
 ```
+CRC: 採用 CRC8 (CCITT, poly `0x07`, init `0x00`，同 Zephyr `crc8_ccitt()`)，
+存放於 header offset `0x14` 的 4 byte 欄位 LSB，高 3 byte 為 0。
+
 同一組版本會用於: 開機 log (`FW version : 0.1.13`)、ACPI 0x0E / 0x0F 回覆、`app.bin` header。
 
 ### release.sh
@@ -142,7 +145,7 @@ Board: qc_module
 ...
 [166/167] Linking C executable zephyr/zephyr.elf
 Memory region         Used Size  Region Size  %age Used
-           FLASH:       60136 B        64 KB     91.76%
+           FLASH:       60200 B        64 KB     91.86%
              RAM:       16072 B        60 KB     26.16%
         retained:          0 GB         2 KB      0.00%
         IDT_LIST:          0 GB        32 KB      0.00%
@@ -179,8 +182,8 @@ Generating files from /home/andy/project/ec_qualcomm/build/app/zephyr/zephyr.elf
  Firmware Size     : 204768 Bytes (0x00031FE0)
  Firmware Version  : 0.1.13 (Hex: 00.01.0D)
  Lowest Version    : 0.1.0 (Hex: 00.01.00)
- Validation Mode   : CRC32 (Ctrl = 0x01)
- CRC32             : 0x67CF4D24
+ Validation Mode   : CRC8 (Ctrl = 0x01)
+ CRC8              : 0x00000030
  Aux Data Size     : 0 Bytes
 ==================================================
 [警告] build/bootloader/zephyr/bootloader.bin 大小 (0x80000) 超出 offset 0x10000 限制，將截斷多餘部分。

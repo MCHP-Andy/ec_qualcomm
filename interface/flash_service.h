@@ -24,7 +24,7 @@ typedef enum {
  * @param size Number of bytes to process.
  * @param ram_address Destination RAM address for LOAD_TO_RAM.
  * @param data_pointer Source for WRITE or destination for READ.
- * @param crc_result Receives the CRC32 result for CRC.
+ * @param crc_result Receives the CRC8 result (zero-extended) for CRC.
  * @return 0 on success, or a negative error code.
  */
 int flash_service_request(flash_service_command_t command,

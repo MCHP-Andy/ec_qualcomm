@@ -147,7 +147,8 @@ static int acpi_ec_state_wp_status(const acpi_cmd_t *cmd_info, uint8_t *cmd,
 
 /**
  * @brief 0xA2: Read CRC Result
- * Read the validation result and 32-bit CRC value from the last Run CRC command
+ * Read the validation result and CRC value (CRC8 zero-extended to 4 bytes)
+ * from the last Run CRC command
  */
 static int acpi_ec_read_crc_result(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                    uint16_t cmd_len, uint8_t *resp,
@@ -160,10 +161,10 @@ static int acpi_ec_read_crc_result(const acpi_cmd_t *cmd_info, uint8_t *cmd,
 
     resp[0] = 5;                       // Byte count = 5
     resp[1] = info->last_crc_status;   // 0xAC: Passed, 0xFA: Failed
-    resp[2] = last_crc_value & 0xFF;         // CRC32 LSB
+    resp[2] = last_crc_value & 0xFF;         // CRC8 / Checksum LSB
     resp[3] = (last_crc_value >> 8) & 0xFF;
     resp[4] = (last_crc_value >> 16) & 0xFF;
-    resp[5] = (last_crc_value >> 24) & 0xFF; // CRC32 MSB
+    resp[5] = (last_crc_value >> 24) & 0xFF; // MSB (0 for CRC8)
 
     acpi_resp_set(resp, cmd_info->resp_len);
     LOG_INF("Read CRC: Status=0x%02X, CRC=0x%08X", resp[1], last_crc_value);
@@ -395,7 +396,7 @@ static int acpi_ec_read_ram_buffer(const acpi_cmd_t *cmd_info, uint8_t *cmd,
 
 /**
  * @brief 0xBB 0xF0: Run CRC on Internal Active Main
- * Read header to get image size, calculate CRC32 and store it in boot info for 0xA2 Read CRC
+ * Read header to get image size, calculate CRC8 and store it in boot info for 0xA2 Read CRC
  */
 static void ec_run_crc_int_act_main(void) {
     ec_boot_info_t *info = ec_boot_info_get();
@@ -417,10 +418,10 @@ static void ec_run_crc_int_act_main(void) {
         } else {
             info->last_crc_value = crc;
             info->last_crc_status =
-                (crc == hdr.check.crc32) ? EC_CRC_STATUS_PASSED
+                (crc == hdr.check.crc) ? EC_CRC_STATUS_PASSED
                                          : EC_CRC_STATUS_FAILED;
             LOG_INF("Run CRC: Size=%u, Calculated 0x%08X, Expected 0x%08X",
-                    hdr.fw_size, crc, hdr.check.crc32);
+                    hdr.fw_size, crc, hdr.check.crc);
         }
     }
 

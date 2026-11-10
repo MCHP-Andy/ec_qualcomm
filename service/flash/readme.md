@@ -57,7 +57,7 @@ int flash_service_request(flash_service_command_t command,
 | `FLASH_SERVICE_WRITE` | `data_pointer` | 從 `data_pointer` 寫入 flash |
 | `FLASH_SERVICE_READ` | `data_pointer` | 讀出到 `data_pointer` |
 | `FLASH_SERVICE_ERASE` | - | 抹除 `flash_address` 起 `size` bytes |
-| `FLASH_SERVICE_CRC` | `crc_result` | 計算 CRC32 |
+| `FLASH_SERVICE_CRC` | `crc_result` | 計算 CRC8 (結果存於 4 byte，高 3 byte 為 0) |
 | `FLASH_SERVICE_LOAD_TO_RAM` | `ram_address` | 讀出到 `ram_address` |
 
 所有命令都需要 `flash_address >= 0` 且 `size > 0`，否則回傳 `-EINVAL`。成功回傳 0，失敗回傳 driver 的錯誤碼。

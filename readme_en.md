@@ -35,7 +35,7 @@ After the build, these extra files are generated in the `zephyr/` directory:
 | Image | Output | Description |
 |---|---|---|
 | bootloader | `zephyr/bootloader.bin` | Copy of `spi_image.bin` |
-| app | `zephyr/app.bin` | `zephyr.bin` with a 32-byte ECFW header + CRC32 added by `tools/pack_ec_image.py` |
+| app | `zephyr/app.bin` | `zephyr.bin` with a 32-byte ECFW header + CRC8 added by `tools/pack_ec_image.py` |
 
 ### FW version
 The version is defined in `app/Kconfig` and set in `app/prj.conf`:
@@ -44,6 +44,9 @@ CONFIG_APP_FW_VERSION_MAJOR=0
 CONFIG_APP_FW_VERSION_MINOR=1
 CONFIG_APP_FW_VERSION_PATCH=13
 ```
+CRC: CRC8 (CCITT, poly `0x07`, init `0x00`, same as Zephyr `crc8_ccitt()`),
+stored in the LSB of the 4-byte field at header offset `0x14`; the upper 3 bytes are 0.
+
 The same version is used in: the boot log (`FW version : 0.1.13`), the ACPI 0x0E / 0x0F replies, and the `app.bin` header.
 
 ### release.sh
@@ -142,7 +145,7 @@ Board: qc_module
 ...
 [166/167] Linking C executable zephyr/zephyr.elf
 Memory region         Used Size  Region Size  %age Used
-           FLASH:       60136 B        64 KB     91.76%
+           FLASH:       60200 B        64 KB     91.86%
              RAM:       16072 B        60 KB     26.16%
         retained:          0 GB         2 KB      0.00%
         IDT_LIST:          0 GB        32 KB      0.00%
@@ -179,8 +182,8 @@ Generating files from /home/andy/project/ec_qualcomm/build/app/zephyr/zephyr.elf
  Firmware Size     : 204768 Bytes (0x00031FE0)
  Firmware Version  : 0.1.13 (Hex: 00.01.0D)
  Lowest Version    : 0.1.0 (Hex: 00.01.00)
- Validation Mode   : CRC32 (Ctrl = 0x01)
- CRC32             : 0x67CF4D24
+ Validation Mode   : CRC8 (Ctrl = 0x01)
+ CRC8              : 0x00000030
  Aux Data Size     : 0 Bytes
 ==================================================
 [警告] build/bootloader/zephyr/bootloader.bin 大小 (0x80000) 超出 offset 0x10000 限制，將截斷多餘部分。

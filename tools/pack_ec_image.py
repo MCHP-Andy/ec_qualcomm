@@ -2,14 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 Qualcomm Glymur SC8480 - EC Main Firmware Image Packaging Tool
-用於將 zephyr.bin 計算 CRC32 並附加 32-Byte Qualcomm Image Header。
+用於將 zephyr.bin 計算 CRC8 並附加 32-Byte Qualcomm Image Header。
 """
 
 import argparse
 import os
 import struct
 import sys
-import zlib
 
 # ---------------------------------------------------------------------------
 # 常數與規格定義 (符合 80-79648-16 / 80-35782-87 規範)
@@ -33,11 +32,26 @@ def parse_version_str(ver_str: str) -> tuple[int, int, int]:
         raise ValueError(f"版本格式錯誤: '{ver_str}'，應為 'Major.Minor.Test' (例: 0.1.13)")
     return tuple(int(part, 0) for part in parts)
 
-def calculate_crc32(data: bytes) -> int:
+def _make_crc8_table(poly: int = 0x07) -> list[int]:
+    table = []
+    for i in range(256):
+        crc = i
+        for _ in range(8):
+            crc = ((crc << 1) ^ poly) & 0xFF if crc & 0x80 else (crc << 1) & 0xFF
+        table.append(crc)
+    return table
+
+_CRC8_TABLE = _make_crc8_table()
+
+def calculate_crc8(data: bytes, init: int = 0x00) -> int:
     """
-    計算標準 IEEE 802.3 CRC32 數值 (32-bit unsigned)
+    計算 CRC8 (CCITT: poly 0x07, init 0x00, 不反轉, 無 XOR out)
+    與 Zephyr crc8_ccitt() 相同。結果存放於 4 Byte 欄位的 LSB，高 3 Byte 為 0。
     """
-    return zlib.crc32(data) & 0xFFFFFFFF
+    crc = init
+    for b in data:
+        crc = _CRC8_TABLE[crc ^ b]
+    return crc
 
 def calculate_checksum(data: bytes) -> int:
     """
@@ -65,7 +79,7 @@ def build_header(
       15   (1B): Validation Control (0: None, 1: CRC, 2: Checksum)
       16-18(3B): Lowest Supported Version (Major, Minor, Test)
       19   (1B): Reserved 1 (0x00)
-      20-23(4B): CRC/Checksum Signature
+      20-23(4B): CRC8 (LSB, 高 3 Byte 為 0) / Checksum Signature
       24-25(2B): Aux Data Size (Fan LUT 大小)
       26-31(6B): Reserved 2 (0x00)
     """
@@ -80,7 +94,7 @@ def build_header(
         val_ctrl,                         # 15: Validation Control
         *lowest_ver,                      # 16-18: Lowest Supported Version
         0x00,                             # 19: Reserved 1
-        crc_or_csum,                      # 20-23: CRC32 / Checksum
+        crc_or_csum,                      # 20-23: CRC8 / Checksum
         aux_size,                         # 24-25: Aux Data Size
         b'\x00' * 6                       # 26-31: Reserved 2
     )
@@ -133,11 +147,11 @@ def pack_firmware(
     major, minor, test = parse_version_str(version)
     ls_major, ls_minor, ls_test = parse_version_str(lowest_ver)
 
-    # 4. 計算簽章 (CRC32 或 Checksum)
+    # 4. 計算簽章 (CRC8 或 Checksum)
     if val_mode.lower() == 'crc':
         val_ctrl = VAL_CTRL_CRC
-        signature = calculate_crc32(fw_payload)
-        sig_type_str = "CRC32"
+        signature = calculate_crc8(fw_payload)
+        sig_type_str = "CRC8"
     elif val_mode.lower() == 'checksum':
         val_ctrl = VAL_CTRL_CHECKSUM
         signature = calculate_checksum(fw_payload)
@@ -236,7 +250,7 @@ if __name__ == "__main__":
 """
 
 ```bash
-# 基本用法（使用預設值：版本 0.1.13、最低版本 0.1.0、位址 0x000D0000、計算 CRC32）
+# 基本用法（使用預設值：版本 0.1.13、最低版本 0.1.0、位址 0x000D0000、計算 CRC8）
 python pack_ec_image.py -i build/zephyr/zephyr.bin -o build/zephyr/WoS_EC_MainFirmware_Release.bin
 
 # 自訂版本號與載入位址
@@ -267,7 +281,7 @@ add_custom_command(
             -v "${EC_FW_VER}"
             -l "${EC_FW_LOWEST_VER}"
             -m "crc"
-    COMMENT "Prepend 32-Byte Qualcomm Image Header and CRC32 to zephyr.bin"
+    COMMENT "Prepend 32-Byte Qualcomm Image Header and CRC8 to zephyr.bin"
 )
 ```
 """

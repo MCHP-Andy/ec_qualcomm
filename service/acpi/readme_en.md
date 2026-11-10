@@ -112,7 +112,7 @@ On the app side, 0xBB supports only:
 | --- | --- | --- | --- |
 | 0xEB | FW corruption status | `EB` | `01 status` |
 | 0xEC | EC state & WP status | `EC` | `02 state path` |
-| 0xA2 | Read CRC result | `A2` | `05 status(AC/FA) crc32(LE)` |
+| 0xA2 | Read CRC result | `A2` | `05 status(AC/FA) crc(4B LE, CRC8 in LSB)` |
 | 0xAE | Erase region | `AE 05 path blk addr(3)` | - |
 | 0xAF | Quick erase partition | `AF 01 sub` | - |
 | 0xA0 | Write RAM buffer | `A0 data(512)` | - |
