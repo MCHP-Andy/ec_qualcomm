@@ -217,6 +217,8 @@
 &i2c_smb_1 {
     /* use customized driver: modules/app/drivers/i2c/i2c_mchp_xec_v2_custom.c */
     compatible = "microchip,xec-i2c-v2-custom";
+    /* wake from sleep on I2C START, stretch SCL until clocks resume */
+    wakeup-source;
     status = "okay";
     port_sel = <7>;
     pinctrl-0 = < &i2c07_sda_gpio012 &i2c07_scl_gpio013 >;

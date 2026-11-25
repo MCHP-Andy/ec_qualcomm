@@ -23,6 +23,10 @@
 #include <zephyr/sys/sys_io.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/irq.h>
+#ifdef CONFIG_PM
+#include <zephyr/pm/pm.h>
+#include <zephyr/init.h>
+#endif
 LOG_MODULE_REGISTER(i2c_mchp_custom, CONFIG_I2C_LOG_LEVEL);
 
 #include "i2c-priv.h"
@@ -78,6 +82,15 @@ LOG_MODULE_REGISTER(i2c_mchp_custom, CONFIG_I2C_LOG_LEVEL);
 
 #define XEC_GPIO_CTRL_BASE	DT_REG_ADDR(DT_NODELABEL(gpio_000_036))
 
+/*
+ * Wake from sleep on I2C START (custom).
+ * GIRQ22 source bit: bit 0 = SPI_ASYNC_WAKE, bits 1..5 = SMB controllers 0..4
+ */
+#define XEC_I2C_SMB_WK_GIRQ	22U
+#define XEC_I2C_SMB_INST_SIZE	0x400U
+#define XEC_I2C_WK_GIRQ_POS(base) \
+	((uint8_t)((((base) / XEC_I2C_SMB_INST_SIZE) & 0x7U) + 1U))
+
 struct xec_speed_cfg {
 	uint32_t bus_clk;
 	uint32_t data_timing;
@@ -94,6 +107,7 @@ struct i2c_xec_config {
 	uint8_t girq_pos;
 	uint8_t pcr_idx;
 	uint8_t pcr_bitpos;
+	uint8_t wk_girq_pos;
 	const struct pinctrl_dev_config *pcfg;
 	void (*irq_config_func)(void);
 };
@@ -1083,6 +1097,71 @@ static int i2c_xec_init(const struct device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+/*
+ * System PM sleep / wakeup handling (moved from driver/i2c_pm.c).
+ *
+ * Zephyr v3.7 xec-i2c-v2 has no PM device action, so hook system PM state
+ * entry/exit and drive the I2C wake registers directly for every instance
+ * marked "wakeup-source" in devicetree:
+ *   entry: arm START-bit detect (WAKE_EN) and its GIRQ22 clock-wake source.
+ *          CFG.ENAB and pinctrl stay active so the block can detect START
+ *          while clocks are gated and auto-stretch SCL until clocks return.
+ *   exit:  disarm START-bit wake. The regular GIRQ13 ISR handles the match.
+ */
+#define I2C_XEC_WAKE_DEV(n)						\
+	IF_ENABLED(DT_INST_PROP(n, wakeup_source), (DEVICE_DT_INST_GET(n),))
+
+static const struct device *const i2c_xec_wake_devs[] = {
+	DT_INST_FOREACH_STATUS_OKAY(I2C_XEC_WAKE_DEV)
+};
+
+static void i2c_xec_pm_state_entry(enum pm_state state)
+{
+	ARG_UNUSED(state);
+
+	for (size_t i = 0; i < ARRAY_SIZE(i2c_xec_wake_devs); i++) {
+		const struct i2c_xec_config *cfg = i2c_xec_wake_devs[i]->config;
+		struct i2c_smb_regs *regs = (struct i2c_smb_regs *)cfg->base_addr;
+
+		regs->WAKE_STS = MCHP_I2C_SMB_WAKE_STS_START_RWC;
+		regs->WAKE_EN = MCHP_I2C_SMB_WAKE_EN;
+		mchp_xec_ecia_girq_src_clr(XEC_I2C_SMB_WK_GIRQ, cfg->wk_girq_pos);
+		mchp_xec_ecia_girq_src_en(XEC_I2C_SMB_WK_GIRQ, cfg->wk_girq_pos);
+	}
+}
+
+static void i2c_xec_pm_state_exit(enum pm_state state)
+{
+	ARG_UNUSED(state);
+
+	for (size_t i = 0; i < ARRAY_SIZE(i2c_xec_wake_devs); i++) {
+		const struct i2c_xec_config *cfg = i2c_xec_wake_devs[i]->config;
+		struct i2c_smb_regs *regs = (struct i2c_smb_regs *)cfg->base_addr;
+
+		mchp_xec_ecia_girq_src_dis(XEC_I2C_SMB_WK_GIRQ, cfg->wk_girq_pos);
+		regs->WAKE_EN = 0;
+		regs->WAKE_STS = MCHP_I2C_SMB_WAKE_STS_START_RWC;
+		mchp_xec_ecia_girq_src_clr(XEC_I2C_SMB_WK_GIRQ, cfg->wk_girq_pos);
+	}
+}
+
+static struct pm_notifier i2c_xec_pm_notifier = {
+	.state_entry = i2c_xec_pm_state_entry,
+	.state_exit = i2c_xec_pm_state_exit,
+};
+
+static int i2c_xec_pm_init(void)
+{
+	if (ARRAY_SIZE(i2c_xec_wake_devs) > 0) {
+		pm_notifier_register(&i2c_xec_pm_notifier);
+	}
+	return 0;
+}
+
+SYS_INIT(i2c_xec_pm_init, POST_KERNEL, CONFIG_I2C_INIT_PRIORITY);
+#endif /* CONFIG_PM */
+
 #define I2C_XEC_DEVICE(n)						\
 									\
 	PINCTRL_DT_INST_DEFINE(n);					\
@@ -1099,6 +1178,7 @@ static int i2c_xec_init(const struct device *dev)
 		.girq_pos = DT_INST_PROP_BY_IDX(n, girqs, 1),		\
 		.pcr_idx = DT_INST_PROP_BY_IDX(n, pcrs, 0),		\
 		.pcr_bitpos = DT_INST_PROP_BY_IDX(n, pcrs, 1),		\
+		.wk_girq_pos = XEC_I2C_WK_GIRQ_POS(DT_INST_REG_ADDR(n)),	\
 		.irq_config_func = i2c_xec_irq_config_func_##n,		\
 		.pcfg = PINCTRL_DT_INST_DEV_CONFIG_GET(n),		\
 	};								\
