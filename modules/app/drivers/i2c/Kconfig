@@ -1,0 +1,13 @@
+# Copyright (c) 2025 Microchip Technology Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+config I2C_XEC_V2_CUSTOM
+	bool "Customized XEC Microchip I2C V2 driver"
+	default y
+	depends on I2C
+	depends on DT_HAS_MICROCHIP_XEC_I2C_V2_CUSTOM_ENABLED
+	help
+	  Enable the customized Microchip XEC I2C V2 driver located in
+	  modules/app/drivers/i2c (compatible "microchip,xec-i2c-v2-custom").
