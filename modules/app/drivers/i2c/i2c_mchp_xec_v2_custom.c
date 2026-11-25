@@ -123,6 +123,24 @@ struct i2c_xec_data {
 	uint8_t i2c_ctrl;
 	uint8_t i2c_addr;
 	uint8_t i2c_status;
+#ifdef CONFIG_I2C_TARGET
+	const struct device *dev;
+	/* Target TX clock stretch (custom) */
+	struct k_work_delayable stretch_work;
+	bool stretching;
+	uint8_t stretch_val; /* byte mode: value to send on release */
+#ifdef CONFIG_I2C_TARGET_BUFFER_MODE
+	/* Target TX buffer from buf_read_requested (custom) */
+	bool rd_buf_mode;
+	uint8_t *rd_buf;
+	uint32_t rd_len;
+	uint32_t rd_idx;
+	/* Target RX buffer for buf_write_received (custom) */
+	bool wr_buf_mode;
+	uint32_t wr_len;
+	uint8_t wr_buf[CONFIG_I2C_XEC_V2_CUSTOM_TARGET_WR_BUF_SIZE];
+#endif
+#endif
 };
 
 /* Recommended programming values based on 16MHz
@@ -819,6 +837,119 @@ static int i2c_xec_transfer(const struct device *dev, struct i2c_msg *msgs,
 	return ret;
 }
 
+#ifdef CONFIG_I2C_TARGET
+/*
+ * Target transmit clock stretch (custom).
+ *
+ * While PIN is asserted in target transmit mode this HW holds SCL low until
+ * I2CDATA is written. When the read callback returns a negative value (data
+ * not ready yet) I2CDATA is not written, so SCL stays stretched, and a delayed
+ * work writes I2CDATA after CONFIG_I2C_XEC_V2_CUSTOM_STRETCH_DELAY_MS to
+ * release SCL. The callback is NOT called again:
+ *   - buffer mode (buf_read_requested): the byte is taken from the returned
+ *     buffer at release time, so data written into it meanwhile is sent.
+ *   - byte mode (read_requested / read_processed): the value the callback
+ *     left in *val is sent.
+ *
+ * The controller GIRQ source is disabled while stretching: PIN stays
+ * asserted, so the ISR must not run again until I2CDATA has been written.
+ */
+#ifdef CONFIG_I2C_TARGET_BUFFER_MODE
+/*
+ * Buffer mode callbacks (custom). The byte mode callbacks keep priority so
+ * existing users are unchanged; a buffer callback is only used when its byte
+ * mode counterpart is not registered:
+ *   read : read_requested == NULL && buf_read_requested != NULL
+ *          buf_read_requested is called once per read transfer and the bytes
+ *          are sent from the returned buffer (dummy 0 past its end).
+ *   write: write_received == NULL && buf_write_received != NULL
+ *          received bytes are collected and passed to buf_write_received at
+ *          repeated START or STOP. write_requested is still called.
+ */
+static bool i2c_xec_target_use_buf_read(const struct i2c_target_callbacks *cb)
+{
+	return (cb->read_requested == NULL) && (cb->buf_read_requested != NULL);
+}
+
+static bool i2c_xec_target_use_buf_write(const struct i2c_target_callbacks *cb)
+{
+	return (cb->write_received == NULL) && (cb->buf_write_received != NULL);
+}
+
+/* Hand collected write data to buf_write_received */
+static void i2c_xec_target_buf_write_flush(struct i2c_xec_data *data)
+{
+	const struct i2c_target_callbacks *cb = data->target_cfg->callbacks;
+
+	if (data->wr_buf_mode && (data->wr_len > 0U)) {
+		cb->buf_write_received(data->target_cfg, data->wr_buf,
+				       data->wr_len);
+	}
+	data->wr_buf_mode = false;
+	data->wr_len = 0U;
+}
+
+/* Next byte of the buf_read_requested buffer, dummy (0) past its end */
+static uint8_t i2c_xec_target_buf_next(struct i2c_xec_data *data)
+{
+	if (data->rd_buf && (data->rd_idx < data->rd_len)) {
+		return data->rd_buf[data->rd_idx++];
+	}
+
+	return 0U;
+}
+#endif
+
+static void i2c_xec_target_stretch(const struct device *dev, uint8_t val)
+{
+	const struct i2c_xec_config *cfg = dev->config;
+	struct i2c_xec_data *data = dev->data;
+
+	mchp_xec_ecia_girq_src_dis(cfg->girq, cfg->girq_pos);
+	data->stretch_val = val;
+	data->stretching = true;
+	k_work_schedule(&data->stretch_work,
+			K_MSEC(CONFIG_I2C_XEC_V2_CUSTOM_STRETCH_DELAY_MS));
+}
+
+/* Write I2CDATA (release SCL) and re-arm the controller interrupt */
+static void i2c_xec_target_stretch_release(struct i2c_xec_data *data)
+{
+	const struct i2c_xec_config *cfg = data->dev->config;
+	struct i2c_smb_regs *regs = (struct i2c_smb_regs *)cfg->base_addr;
+	unsigned int key = irq_lock();
+
+	if (data->stretching) {
+		uint8_t val = data->stretch_val;
+
+#ifdef CONFIG_I2C_TARGET_BUFFER_MODE
+		if (data->rd_buf_mode) {
+			val = i2c_xec_target_buf_next(data);
+		}
+#endif
+		data->stretching = false;
+		/* Writing I2CDATA releases SCL; PIN de-asserts 0 -> 1 */
+		regs->I2CDATA = val;
+		/* Drop source latched while stretched, then re-arm ISR */
+		mchp_xec_ecia_girq_src_clr(cfg->girq, cfg->girq_pos);
+		if (data->target_attached) {
+			mchp_xec_ecia_girq_src_en(cfg->girq, cfg->girq_pos);
+		}
+	}
+
+	irq_unlock(key);
+}
+
+static void i2c_xec_target_stretch_work(struct k_work *work)
+{
+	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct i2c_xec_data *data =
+		CONTAINER_OF(dwork, struct i2c_xec_data, stretch_work);
+
+	i2c_xec_target_stretch_release(data);
+}
+#endif /* CONFIG_I2C_TARGET */
+
 static void i2c_xec_bus_isr(const struct device *dev)
 {
 #ifdef CONFIG_I2C_TARGET
@@ -854,6 +985,11 @@ static void i2c_xec_bus_isr(const struct device *dev)
 
 	/* Bus Error */
 	if (status & MCHP_I2C_SMB_STS_BER) {
+#ifdef CONFIG_I2C_TARGET_BUFFER_MODE
+		/* transfer broken: drop collected write data */
+		data->wr_buf_mode = false;
+		data->wr_len = 0U;
+#endif
 		if (target_cb->stop) {
 			target_cb->stop(data->target_cfg);
 		}
@@ -863,6 +999,9 @@ static void i2c_xec_bus_isr(const struct device *dev)
 
 	/* External stop */
 	if (status & MCHP_I2C_SMB_STS_EXT_STOP) {
+#ifdef CONFIG_I2C_TARGET_BUFFER_MODE
+		i2c_xec_target_buf_write_flush(data);
+#endif
 		if (target_cb->stop) {
 			target_cb->stop(data->target_cfg);
 		}
@@ -878,13 +1017,46 @@ static void i2c_xec_bus_isr(const struct device *dev)
 
 		uint8_t rx_data = regs->I2CDATA;
 
+#ifdef CONFIG_I2C_TARGET_BUFFER_MODE
+		/* repeated START: previous write segment is complete */
+		i2c_xec_target_buf_write_flush(data);
+#endif
+
 		if (rx_data & BIT(I2C_READ_WRITE_POS)) {
 			/* target transmitter mode */
 			data->target_read = true;
 			val = dummy;
+#ifdef CONFIG_I2C_TARGET_BUFFER_MODE
+			data->rd_buf_mode = i2c_xec_target_use_buf_read(target_cb);
+			if (data->rd_buf_mode) {
+				uint8_t *ptr = NULL;
+				uint32_t len = 0U;
+
+				/* Called once per read transfer */
+				ret = target_cb->buf_read_requested(
+					data->target_cfg, &ptr, &len);
+				data->rd_buf = ptr;
+				data->rd_len = ptr ? len : 0U;
+				data->rd_idx = 0U;
+				if (ret < 0) {
+					/* Data not ready: keep SCL stretched,
+					 * send rd_buf[0] on release
+					 */
+					i2c_xec_target_stretch(dev, dummy);
+					goto clear_iag;
+				}
+				regs->I2CDATA = i2c_xec_target_buf_next(data);
+				goto clear_iag; /* Exit ISR */
+			}
+#endif
 			if (target_cb->read_requested) {
-				target_cb->read_requested(
+				ret = target_cb->read_requested(
 					data->target_cfg, &val);
+				if (ret < 0) {
+					/* Data not ready: keep SCL stretched */
+					i2c_xec_target_stretch(dev, val);
+					goto clear_iag;
+				}
 
 				/* Application target transmit handler
 				 * does not have data to send. In
@@ -909,6 +1081,11 @@ static void i2c_xec_bus_isr(const struct device *dev)
 		} else {
 			/* target receiver mode */
 			data->target_read = false;
+#ifdef CONFIG_I2C_TARGET_BUFFER_MODE
+			data->rd_buf_mode = false;
+			data->wr_buf_mode = i2c_xec_target_use_buf_write(target_cb);
+			data->wr_len = 0U;
+#endif
 			if (target_cb->write_requested) {
 				ret = target_cb->write_requested(
 							data->target_cfg);
@@ -951,11 +1128,21 @@ static void i2c_xec_bus_isr(const struct device *dev)
 
 			status = regs->CTRLSTS;
 
+#ifdef CONFIG_I2C_TARGET_BUFFER_MODE
+		} else if (data->rd_buf_mode) {
+			/* Buffer mode: no per-byte callback */
+			regs->I2CDATA = i2c_xec_target_buf_next(data);
+#endif
 		} else {
 			val = dummy;
 			if (target_cb->read_processed) {
-				target_cb->read_processed(
+				ret = target_cb->read_processed(
 					data->target_cfg, &val);
+				if (ret < 0) {
+					/* Data not ready: keep SCL stretched */
+					i2c_xec_target_stretch(dev, val);
+					goto clear_iag;
+				}
 			}
 			regs->I2CDATA = val;
 		}
@@ -967,6 +1154,16 @@ static void i2c_xec_bus_isr(const struct device *dev)
 		 * Reading I2C Data register causes PIN status 0 -> 1.
 		 */
 		val = regs->I2CDATA;
+#ifdef CONFIG_I2C_TARGET_BUFFER_MODE
+		if (data->wr_buf_mode) {
+			if (data->wr_len < sizeof(data->wr_buf)) {
+				data->wr_buf[data->wr_len++] = val;
+			} else {
+				/* buffer full: NACK the next byte */
+				target_config_for_nack(dev);
+			}
+		} else
+#endif
 		if (target_cb->write_received) {
 			/*
 			 * Call back returns error if we should NACK
@@ -1046,6 +1243,10 @@ static int i2c_xec_target_unregister(const struct device *dev,
 
 	mchp_xec_ecia_girq_src_dis(cfg->girq, cfg->girq_pos);
 
+	/* Release a pending SCL stretch immediately */
+	k_work_cancel_delayable(&data->stretch_work);
+	i2c_xec_target_stretch_release(data);
+
 	return 0;
 }
 #endif
@@ -1070,6 +1271,12 @@ static int i2c_xec_init(const struct device *dev)
 	data->state = I2C_XEC_STATE_STOPPED;
 	data->target_cfg = NULL;
 	data->target_attached = false;
+#ifdef CONFIG_I2C_TARGET
+	data->dev = dev;
+	data->stretching = false;
+	k_work_init_delayable(&data->stretch_work,
+			      i2c_xec_target_stretch_work);
+#endif
 
 	ret = pinctrl_apply_state(cfg->pcfg, PINCTRL_STATE_DEFAULT);
 	if (ret != 0) {

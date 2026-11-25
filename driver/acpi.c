@@ -22,6 +22,10 @@
 
 LOG_MODULE_REGISTER(acpi_i2c, LOG_LEVEL_INF);
 
+// Read data is provided through buf_read_requested only
+BUILD_ASSERT(IS_ENABLED(CONFIG_I2C_TARGET_BUFFER_MODE),
+             "acpi.c requires CONFIG_I2C_TARGET_BUFFER_MODE=y");
+
 #define ACPI_ADDR  (0x76)
 #if !defined(CONFIG_APP_BOOTLOADER)
 #define SOCCP_ADDR (0x0C)
@@ -52,7 +56,6 @@ QC_GPIO_DEF(acpi_int);
 #endif
 
 static uint8_t i2c_state = I2C_STATE_IDLE;
-static uint16_t resp_idx = 0;
 static uint8_t resp_buf[ACPI_RESP_LEN] = {0};
 
 // Workaround for 2 slave address, check address to determine which command to process
@@ -167,32 +170,23 @@ static int acpi_target_write_received_cb(struct i2c_target_config *config,
 }
 
 /*
- * @brief Callback which is called when a read request is received from the
- * master.
+ * @brief Callback which is called once when a read request is received from
+ * the master (buffer mode). The driver sends the bytes straight from resp_buf.
+ * Always return -EAGAIN: the driver stretches SCL so the service has
+ * CONFIG_I2C_XEC_V2_CUSTOM_STRETCH_DELAY_MS to write the response, then sends
+ * from resp_buf without calling this again.
  * @param config Pointer to the target configuration.
- * @param val Pointer to the byte to be sent to the master.
+ * @param ptr Set to the buffer to be sent to the master.
+ * @param len Set to the length of the buffer.
  */
-static int acpi_target_read_processed_cb(struct i2c_target_config *config, uint8_t *val) {
-    switch (i2c_state) {
-    case I2C_STATE_READ:
-        *val = resp_buf[resp_idx++];
-        LOG_DBG("acpi target read processed: 0x%02x", *val);
-        break;
-
-    default:
-        LOG_WRN("Unexpected I2C state: %d", i2c_state);
-        break;
-    }
-
-    return 0;
-}
-
-static int acpi_target_read_requested_cb(struct i2c_target_config *config, uint8_t *val) {
-
+static int acpi_target_buf_read_requested_cb(struct i2c_target_config *config,
+                                             uint8_t **ptr, uint32_t *len) {
     i2c_state = I2C_STATE_READ;
-    resp_idx = 0;
 
-    return acpi_target_read_processed_cb(config, val);
+    *ptr = resp_buf;
+    *len = sizeof(resp_buf);
+
+    return -EAGAIN;
 }
 
 /*
@@ -202,7 +196,6 @@ static int acpi_target_read_requested_cb(struct i2c_target_config *config, uint8
 static int acpi_target_stop_cb(struct i2c_target_config *config) {
     LOG_DBG("acpi target stop callback");
 
-    resp_idx = 0;
     i2c_state = I2C_STATE_IDLE;
 
     if (i2c_addr == ACPI_ADDR) {
@@ -215,8 +208,7 @@ static int acpi_target_stop_cb(struct i2c_target_config *config) {
 static struct i2c_target_callbacks acpi_target_callbacks = {
     .write_requested = acpi_target_write_requested_cb,
     .write_received = acpi_target_write_received_cb,
-    .read_requested = acpi_target_read_requested_cb,
-    .read_processed = acpi_target_read_processed_cb,
+    .buf_read_requested = acpi_target_buf_read_requested_cb,
     .stop = acpi_target_stop_cb,
 };
 
