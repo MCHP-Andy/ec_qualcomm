@@ -12,9 +12,6 @@
 
 #include <interface/system.h>
 #include <interface/acpi.h>
-#if !defined(CONFIG_APP_BOOTLOADER)
-#include <interface/soccp.h>
-#endif
 
 #include <zephyr/logging/log.h>
 
@@ -27,21 +24,12 @@ BUILD_ASSERT(IS_ENABLED(CONFIG_I2C_TARGET_BUFFER_MODE),
              "acpi.c requires CONFIG_I2C_TARGET_BUFFER_MODE=y");
 
 #define ACPI_ADDR  (0x76)
-#if !defined(CONFIG_APP_BOOTLOADER)
-#define SOCCP_ADDR (0x0C)
-#endif
 
 enum {
 	I2C_STATE_IDLE = 0,
 	I2C_STATE_START_WRITE,
 	I2C_STATE_WRITE,
 	I2C_STATE_READ,
-};
-
-enum {
-    CMD_UNKNOWN = 0,
-    CMD_ACPI,
-    CMD_SOCCP,
 };
 
 static const struct device *bus = DEVICE_DT_GET_OR_NULL(DT_ALIAS(acpi_i2c));
@@ -63,20 +51,12 @@ static uint8_t resp_buf[ACPI_RESP_LEN] = {0};
 static uint8_t wr_buf[ACPI_RECE_LEN];
 static uint16_t wr_len = 0;
 
-// Address of the current transfer (ACPI or SoCCP target)
-static uint8_t i2c_addr = 0;
-
 int acpi_resp_set(uint8_t *pdata, uint16_t len) {
     memcpy(resp_buf, pdata, (len <= sizeof(resp_buf)) ? len : sizeof(resp_buf));
     return 0;
 }
 
 #if !defined(CONFIG_APP_BOOTLOADER)
-int soccp_resp_set(uint8_t *pdata, uint16_t len) {
-    memcpy(resp_buf, pdata, (len <= sizeof(resp_buf)) ? len : sizeof(resp_buf));
-    return 0;
-}
-
 int acpi_int_set(uint8_t val) {
 #if ACPI_INT_AVAILABLE
     int ret;
@@ -127,16 +107,13 @@ static void acpi_wr_submit(void) {
  * @param config Pointer to the target configuration.
  */
 static int acpi_target_write_requested_cb(struct i2c_target_config *config) {
+    ARG_UNUSED(config);
     LOG_DBG("acpi target write requested");
 
     // Write after write with repeated start: previous command is complete
     acpi_wr_submit();
 
     i2c_state = I2C_STATE_START_WRITE;
-
-    // Each address is registered as its own target, the driver passes the
-    // matching config
-    i2c_addr = config->address;
 
     return 0;
 }
@@ -148,6 +125,7 @@ static int acpi_target_write_requested_cb(struct i2c_target_config *config) {
  */
 static int acpi_target_write_received_cb(struct i2c_target_config *config,
                                          uint8_t val) {
+    ARG_UNUSED(config);
     LOG_DBG("acpi target write received: 0x%02x", val);
 
     if ((i2c_state != I2C_STATE_START_WRITE) && (i2c_state != I2C_STATE_WRITE)) {
@@ -155,21 +133,7 @@ static int acpi_target_write_received_cb(struct i2c_target_config *config,
         return 0;
     }
 
-#if !defined(CONFIG_APP_BOOTLOADER)
-    if (i2c_addr == SOCCP_ADDR) {
-        soccp_buf_set((i2c_state == I2C_STATE_START_WRITE) ? SOCCP_TYPE_CMD
-                                                           : SOCCP_TYPE_DATA,
-                      val);
-        i2c_state = I2C_STATE_WRITE;
-        return 0;
-    } else if (i2c_addr != ACPI_ADDR) {
-        LOG_WRN("Unknown I2C address: 0x%02x", i2c_addr);
-        i2c_state = I2C_STATE_WRITE;
-        return 0;
-    }
-#endif
-
-    // ACPI: collect, submitted at read request or stop
+    // Collect, submitted at read request or stop
     if (i2c_state == I2C_STATE_START_WRITE) {
         wr_len = 0;
     }
@@ -198,9 +162,8 @@ static int acpi_target_write_received_cb(struct i2c_target_config *config,
  */
 static int acpi_target_buf_read_requested_cb(struct i2c_target_config *config,
                                              uint8_t **ptr, uint32_t *len) {
+    ARG_UNUSED(config);
     acpi_wr_submit();
-
-    i2c_addr = config->address;
 
     i2c_state = I2C_STATE_READ;
 
@@ -215,6 +178,7 @@ static int acpi_target_buf_read_requested_cb(struct i2c_target_config *config,
  * @param config Pointer to the target configuration.
  */
 static int acpi_target_stop_cb(struct i2c_target_config *config) {
+    ARG_UNUSED(config);
     LOG_DBG("acpi target stop callback");
 
     i2c_state = I2C_STATE_IDLE;
@@ -231,18 +195,11 @@ static struct i2c_target_callbacks acpi_target_callbacks = {
     .stop = acpi_target_stop_cb,
 };
 
-// Two targets on the same bus, the driver selects one by the address byte
+// The SoC-CP target (driver/soccp.c) shares this I2C controller
 static struct i2c_target_config acpi_target_cfg = {
     .address = ACPI_ADDR,
     .callbacks = &acpi_target_callbacks,
 };
-
-#if !defined(CONFIG_APP_BOOTLOADER)
-static struct i2c_target_config soccp_target_cfg = {
-    .address = SOCCP_ADDR,
-    .callbacks = &acpi_target_callbacks,
-};
-#endif
 
 #include <zephyr/init.h>
 
@@ -252,13 +209,6 @@ static int init_config(void) {
         LOG_ERR("Failed to register ACPI target 0x%02x", ACPI_ADDR);
         return -1;
     }
-
-#if !defined(CONFIG_APP_BOOTLOADER)
-    if (i2c_target_register(bus, &soccp_target_cfg) < 0) {
-        LOG_ERR("Failed to register SoCCP target 0x%02x", SOCCP_ADDR);
-        return -1;
-    }
-#endif
 
 #if !defined(CONFIG_APP_BOOTLOADER)
 #if ACPI_INT_AVAILABLE

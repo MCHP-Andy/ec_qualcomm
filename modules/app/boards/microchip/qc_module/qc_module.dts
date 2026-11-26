@@ -38,6 +38,7 @@
 
 		aoss-i2c = &i2c_smb_0;
 		acpi-i2c = &i2c_smb_1;
+		soccp-i2c = &i2c_smb_1; /* same controller as acpi-i2c */
 		sen-i2c = &i2c_smb_2;
 	};
 

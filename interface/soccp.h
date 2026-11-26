@@ -65,7 +65,7 @@ int soccp_oob_state_get(uint16_t *status);
  * SOCCP_TYPE_DATA appends an argument byte. Every byte wakes the SoC-CP
  * service to process the command.
  *
- * @note Implemented in service (service/soccp), called by driver (driver/acpi.c).
+ * @note Implemented in service (service/soccp), called by driver (driver/soccp.c).
  *
  * @param id   Byte type, see soccp_type_t.
  * @param data Received byte.
@@ -78,7 +78,7 @@ int soccp_buf_set(soccp_type_t id, uint8_t data);
  *
  * Data beyond the response buffer size is truncated.
  *
- * @note Implemented in driver (driver/acpi.c), called by service (service/soccp).
+ * @note Implemented in driver (driver/soccp.c), called by service (service/soccp).
  *
  * @param pdata Response data.
  * @param len   Response length in bytes.
