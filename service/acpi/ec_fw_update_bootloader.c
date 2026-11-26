@@ -205,8 +205,12 @@ static int acpi_ec_erase_designated_region(const acpi_cmd_t *cmd_info, uint8_t *
     address += 0x9000; // Host lock to 0x8000, so add 0x9000 to align with actual flash address
     LOG_INF("Erase Region: Path=0x%02X, StartAddr=0x%06X, Blocks=%d", path, address, block_count);
 
-    int ret = flash_service_submit(FLASH_SERVICE_ERASE, address, block_count,
-                                   NULL, NULL, NULL, NULL);
+    flash_service_msg_t msg = {
+        .command = FLASH_SERVICE_ERASE,
+        .flash_address = address,
+        .size = block_count,
+    };
+    int ret = flash_service_submit(&msg);
     if (ret < 0) {
         LOG_ERR("Failed to queue flash erase: %d", ret);
         return ret;
@@ -247,13 +251,14 @@ static int acpi_ec_erase_partition(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                         DT_REG_ADDR(DT_NODELABEL(hdr_partition)),
                     DT_REG_SIZE(DT_NODELABEL(hdr_partition)) +
                         DT_REG_SIZE(DT_NODELABEL(img_partition)));
-            ret = flash_service_submit(
-                FLASH_SERVICE_ERASE,
-                DT_REG_ADDR(DT_NODELABEL(int_flash)) +
-                    DT_REG_ADDR(DT_NODELABEL(hdr_partition)),
-                DT_REG_SIZE(DT_NODELABEL(hdr_partition)) +
-                    DT_REG_SIZE(DT_NODELABEL(img_partition)),
-                NULL, NULL, NULL, NULL);
+            flash_service_msg_t msg = {
+                .command = FLASH_SERVICE_ERASE,
+                .flash_address = DT_REG_ADDR(DT_NODELABEL(int_flash)) +
+                                 DT_REG_ADDR(DT_NODELABEL(hdr_partition)),
+                .size = DT_REG_SIZE(DT_NODELABEL(hdr_partition)) +
+                        DT_REG_SIZE(DT_NODELABEL(img_partition)),
+            };
+            ret = flash_service_submit(&msg);
             if (ret < 0) {
                 LOG_ERR("Failed to queue APP Main partition erase: %d", ret);
             }
@@ -359,9 +364,13 @@ static int acpi_ec_write_designated_region(const acpi_cmd_t *cmd_info, uint8_t *
 
     // ram_buffer stays untouched until the write is done (0xA0 is rejected
     // while the flash is busy)
-    int ret = flash_service_submit(FLASH_SERVICE_WRITE, address,
-                                   bytes_to_program, NULL, ram_buffer, NULL,
-                                   NULL);
+    flash_service_msg_t msg = {
+        .command = FLASH_SERVICE_WRITE,
+        .flash_address = address,
+        .size = bytes_to_program,
+        .data_pointer = ram_buffer,
+    };
+    int ret = flash_service_submit(&msg);
     if (ret < 0) {
         LOG_ERR("Failed to queue flash write: %d", ret);
         return ret;
@@ -389,9 +398,13 @@ static int acpi_ec_read_designated_region_setup(const acpi_cmd_t *cmd_info, uint
     LOG_INF("Setup Read Flash: Path=0x%02X, Addr=0x%06X", path, address);
 
     /* Read 512 bytes into ram_buffer by default, 0xA1 after the flash is idle */
-    int ret = flash_service_submit(FLASH_SERVICE_READ, address,
-                                   RAM_BUFFER_SIZE, NULL, ram_buffer, NULL,
-                                   NULL);
+    flash_service_msg_t msg = {
+        .command = FLASH_SERVICE_READ,
+        .flash_address = address,
+        .size = RAM_BUFFER_SIZE,
+        .data_pointer = ram_buffer,
+    };
+    int ret = flash_service_submit(&msg);
     if (ret < 0) {
         LOG_ERR("Failed to queue flash read: %d", ret);
         return ret;
@@ -476,9 +489,13 @@ static int ec_run_crc_int_act_main(void) {
     crc_expected = hdr.check.crc;
     LOG_INF("Run CRC: Size=%u", hdr.fw_size);
 
-    int ret = flash_service_submit(FLASH_SERVICE_CRC, (off_t)IMG_ADDR,
-                                   hdr.fw_size, NULL, NULL, ec_run_crc_done,
-                                   NULL);
+    flash_service_msg_t msg = {
+        .command = FLASH_SERVICE_CRC,
+        .flash_address = (off_t)IMG_ADDR,
+        .size = hdr.fw_size,
+        .done = ec_run_crc_done,
+    };
+    int ret = flash_service_submit(&msg);
     if (ret < 0) {
         LOG_ERR("Failed to queue EC FW CRC: %d", ret);
         ec_run_crc_store(ret, 0);

@@ -13,16 +13,6 @@ LOG_MODULE_REGISTER(flash_service, LOG_LEVEL_INF);
 #define FLASH_SERVICE_STACK_SIZE 1024
 #define FLASH_SERVICE_PRIORITY 5
 
-typedef struct {
-    flash_service_command_t command;
-    off_t flash_address;
-    size_t size;
-    void *ram_address;
-    void *data_pointer;
-    flash_service_done_cb_t done;
-    void *user_data;
-} flash_service_msg_t;
-
 K_MSGQ_DEFINE(flash_service_queue, sizeof(flash_service_msg_t),
               FLASH_SERVICE_QUEUE_LEN, 4);
 
@@ -153,52 +143,38 @@ static void flash_service(void) {
 K_THREAD_DEFINE(flash_service_thread, FLASH_SERVICE_STACK_SIZE, flash_service,
                 NULL, NULL, NULL, FLASH_SERVICE_PRIORITY, 0, 0);
 
-static int flash_service_check(flash_service_command_t command,
-                               off_t flash_address, size_t size,
-                               void *ram_address, void *data_pointer) {
-    if (flash_address < 0 || size == 0) {
+static int flash_service_check(const flash_service_msg_t *msg) {
+    if (msg == NULL || msg->flash_address < 0 || msg->size == 0) {
         return -EINVAL;
     }
-    if ((command == FLASH_SERVICE_WRITE || command == FLASH_SERVICE_READ) &&
-        data_pointer == NULL) {
+    if ((msg->command == FLASH_SERVICE_WRITE ||
+         msg->command == FLASH_SERVICE_READ) &&
+        msg->data_pointer == NULL) {
         return -EINVAL;
     }
-    if (command == FLASH_SERVICE_LOAD_TO_RAM && ram_address == NULL) {
+    if (msg->command == FLASH_SERVICE_LOAD_TO_RAM && msg->ram_address == NULL) {
         return -EINVAL;
     }
-    if (command < FLASH_SERVICE_WRITE || command > FLASH_SERVICE_LOAD_TO_RAM) {
+    if (msg->command < FLASH_SERVICE_WRITE ||
+        msg->command > FLASH_SERVICE_LOAD_TO_RAM) {
         return -EINVAL;
     }
     return 0;
 }
 
-static int flash_service_queue_put(flash_service_command_t command,
-                                   off_t flash_address, size_t size,
-                                   void *ram_address, void *data_pointer,
-                                   flash_service_done_cb_t done,
-                                   void *user_data, k_timeout_t timeout) {
-    int ret = flash_service_check(command, flash_address, size, ram_address,
-                                  data_pointer);
+static int flash_service_queue_put(const flash_service_msg_t *msg,
+                                   k_timeout_t timeout) {
+    int ret = flash_service_check(msg);
     if (ret < 0) {
         return ret;
     }
 
-    flash_service_msg_t msg = {
-        .command = command,
-        .flash_address = flash_address,
-        .size = size,
-        .ram_address = ram_address,
-        .data_pointer = data_pointer,
-        .done = done,
-        .user_data = user_data,
-    };
-
     // Count before queueing, so the request cannot finish before it is counted
     flash_service_pending_inc();
 
-    ret = k_msgq_put(&flash_service_queue, &msg, timeout);
+    ret = k_msgq_put(&flash_service_queue, msg, timeout);
     if (ret < 0) {
-        LOG_ERR("Failed to queue flash command %d: %d", command, ret);
+        LOG_ERR("Failed to queue flash command %d: %d", msg->command, ret);
         // Not queued: undo its count (status IDLE again if it was the only one)
         flash_service_pending_dec(0);
         return -ENOMEM;
@@ -207,11 +183,8 @@ static int flash_service_queue_put(flash_service_command_t command,
     return 0;
 }
 
-int flash_service_submit(flash_service_command_t command, off_t flash_address,
-                         size_t size, void *ram_address, void *data_pointer,
-                         flash_service_done_cb_t done, void *user_data) {
-    return flash_service_queue_put(command, flash_address, size, ram_address,
-                                   data_pointer, done, user_data, K_NO_WAIT);
+int flash_service_submit(const flash_service_msg_t *msg) {
+    return flash_service_queue_put(msg, K_NO_WAIT);
 }
 
 /* Synchronous request: the context lives on the caller stack, which is safe
@@ -233,33 +206,35 @@ static void flash_service_sync_done(flash_service_command_t command, int result,
     k_sem_give(&sync->completion);
 }
 
-int flash_service_request(flash_service_command_t command,
-                          off_t flash_address, size_t size,
-                          void *ram_address, void *data_pointer,
-                          uint32_t *crc_result) {
+int flash_service_request(const flash_service_msg_t *msg, uint32_t *crc_result) {
     flash_service_sync_t sync = {.result = -EINPROGRESS};
 
-    if (command == FLASH_SERVICE_CRC && crc_result == NULL) {
+    if (msg == NULL) {
+        return -EINVAL;
+    }
+    if (msg->command == FLASH_SERVICE_CRC && crc_result == NULL) {
         return -EINVAL;
     }
 
     k_sem_init(&sync.completion, 0, 1);
 
-    int ret = flash_service_queue_put(command, flash_address, size,
-                                      ram_address, data_pointer,
-                                      flash_service_sync_done, &sync,
-                                      K_FOREVER);
+    // Same request, completion routed to the semaphore
+    flash_service_msg_t req = *msg;
+    req.done = flash_service_sync_done;
+    req.user_data = &sync;
+
+    int ret = flash_service_queue_put(&req, K_FOREVER);
     if (ret < 0) {
         return ret;
     }
 
     ret = k_sem_take(&sync.completion, K_FOREVER);
     if (ret < 0) {
-        LOG_ERR("Failed waiting for flash command %d: %d", command, ret);
+        LOG_ERR("Failed waiting for flash command %d: %d", msg->command, ret);
         return ret;
     }
 
-    if (command == FLASH_SERVICE_CRC && sync.result == 0) {
+    if (msg->command == FLASH_SERVICE_CRC && sync.result == 0) {
         *crc_result = sync.crc;
     }
 

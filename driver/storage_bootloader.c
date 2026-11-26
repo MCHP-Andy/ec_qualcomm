@@ -133,8 +133,13 @@ static int load_image_to_ram(off_t addr, size_t size) {
 
     for (size_t a = 0; a < size; a += FLASH_LOAD_CHUNK_SIZE) {
         size_t chunk_size = MIN(size - a, (size_t)FLASH_LOAD_CHUNK_SIZE);
-        int ret = flash_service_request(FLASH_SERVICE_LOAD_TO_RAM, addr + a,
-                                        chunk_size, img_addr + a, NULL, NULL);
+        flash_service_msg_t msg = {
+            .command = FLASH_SERVICE_LOAD_TO_RAM,
+            .flash_address = addr + a,
+            .size = chunk_size,
+            .ram_address = img_addr + a,
+        };
+        int ret = flash_service_request(&msg, NULL);
         if (ret < 0) {
             return ret;
         }
@@ -220,12 +225,15 @@ bool ec_validate_image_header(const fw_hdr_t *hdr)
         bool use_checksum = (hdr->validation_ctrl & EC_FW_VALIDATION_CHECKSUM);
         uint32_t expected = use_checksum ? hdr->check.checksum : hdr->check.crc;
         uint32_t value = 0;
+        flash_service_msg_t msg = {
+            .command = FLASH_SERVICE_CRC,
+            .flash_address = (off_t)IMG_ADDR,
+            .size = hdr->fw_size,
+        };
         int ret = use_checksum
                       ? ec_cal_image_checksum((off_t)IMG_ADDR, hdr->fw_size,
                                               &value)
-                      : flash_service_request(FLASH_SERVICE_CRC,
-                                              (off_t)IMG_ADDR, hdr->fw_size,
-                                              NULL, NULL, &value);
+                      : flash_service_request(&msg, &value);
 
         info.last_crc_value = value;
         info.last_crc_status = (ret == 0 && value == expected)

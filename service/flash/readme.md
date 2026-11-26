@@ -39,8 +39,8 @@ graph LR
 ```
 
 ### 流程
-1. `flash_service_submit()` 檢查參數，把 boot info status 設為 `EC_STATE_BUSY`，請求放進佇列
-   (`K_NO_WAIT`，滿了回傳 `-ENOMEM`) 後立即返回。請求內不含呼叫端 stack 的指標。
+1. `flash_service_submit()` 檢查呼叫端打包好的 `flash_service_msg_t`，把 boot info status 設為 `EC_STATE_BUSY`，把 msg 複製進佇列
+   (`K_NO_WAIT`，滿了回傳 `-ENOMEM`) 後立即返回，呼叫端的 msg 可以放在 stack。
 2. Thread (stack 1024，priority 5) 依序執行，完成後先呼叫 `done` callback (例如寫入 CRC 結果)，
    再更新 status：佇列中的請求全部完成後設為 `EC_STATE_BOOTLOADER_IDLE_WP_OFF`，
    其中任一失敗則設為 `EC_STATE_SPI_OP_FAILED` (下一次 submit 時清除)。
@@ -53,19 +53,18 @@ graph LR
 [interface/flash_service.h](../../interface/flash_service.h)
 
 ```c
-typedef void (*flash_service_done_cb_t)(flash_service_command_t command,
-                                        int result, uint32_t crc,
-                                        void *user_data);
+typedef struct flash_service_msg_t {
+    flash_service_command_t command;
+    off_t flash_address;
+    size_t size;
+    void *ram_address;             // LOAD_TO_RAM destination
+    void *data_pointer;            // WRITE source / READ destination
+    flash_service_done_cb_t done;  // async completion callback, may be NULL
+    void *user_data;               // passed to done
+} flash_service_msg_t;
 
-int flash_service_submit(flash_service_command_t command, off_t flash_address,
-                         size_t size, void *ram_address, void *data_pointer,
-                         flash_service_done_cb_t done, void *user_data);
-
-int flash_service_request(flash_service_command_t command,
-                          off_t flash_address, size_t size,
-                          void *ram_address, void *data_pointer,
-                          uint32_t *crc_result);
-
+int flash_service_submit(const flash_service_msg_t *msg);
+int flash_service_request(const flash_service_msg_t *msg, uint32_t *crc_result);
 bool flash_service_busy(void);
 ```
 
@@ -74,7 +73,7 @@ bool flash_service_busy(void);
 | `FLASH_SERVICE_WRITE` | `data_pointer` | 從 `data_pointer` 寫入 flash |
 | `FLASH_SERVICE_READ` | `data_pointer` | 讀出到 `data_pointer` |
 | `FLASH_SERVICE_ERASE` | - | 抹除 `flash_address` 起 `size` bytes |
-| `FLASH_SERVICE_CRC` | `crc_result` (同步) / callback 的 `crc` (非同步) | 計算 CRC8 (結果存於 4 byte，高 3 byte 為 0) |
+| `FLASH_SERVICE_CRC` | - (結果：同步為 `crc_result`，非同步為 callback 的 `crc`) | 計算 CRC8 (結果存於 4 byte，高 3 byte 為 0) |
 | `FLASH_SERVICE_LOAD_TO_RAM` | `ram_address` | 讀出到 `ram_address` |
 
 所有命令都需要 `flash_address >= 0` 且 `size > 0`，否則回傳 `-EINVAL`。
@@ -86,12 +85,17 @@ bool flash_service_busy(void);
 static void crc_done(flash_service_command_t cmd, int result, uint32_t crc, void *user) {
     // 寫入 boot info，status 在 callback 之後才離開 BUSY
 }
-flash_service_submit(FLASH_SERVICE_CRC, IMG_ADDR, hdr.fw_size, NULL, NULL, crc_done, NULL);
+flash_service_msg_t msg = {
+    .command = FLASH_SERVICE_CRC,
+    .flash_address = IMG_ADDR,
+    .size = hdr.fw_size,
+    .done = crc_done,
+};
+flash_service_submit(&msg);   // msg 會被複製進佇列，可放在 stack
 
-// 同步：等到完成
+// 同步：等到完成 (done / user_data 會被忽略)
 uint32_t crc;
-int ret = flash_service_request(FLASH_SERVICE_CRC, IMG_ADDR, hdr.fw_size,
-                                NULL, NULL, &crc);
+int ret = flash_service_request(&msg, &crc);
 ```
 
 ## Test
