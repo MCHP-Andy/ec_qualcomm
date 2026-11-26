@@ -550,6 +550,11 @@ static int acpi_ec_fan_lut(const acpi_cmd_t *cmd_info, uint8_t *cmd,
         }
         // The actual LUT data starts at cmd[4]
         // len is the max entries, data_byte_count is total bytes (N*3)
+        if ((data_byte_count % sizeof(fan_tbl_t)) != 0) {
+            LOG_ERR("LUT byte count %u is not a multiple of %u",
+                    data_byte_count, sizeof(fan_tbl_t));
+            return -EINVAL;
+        }
         uint8_t entries_to_write =
             data_byte_count / 3; // Assuming fan_tbl_t is 3 bytes
         if (entries_to_write > ARRAY_SIZE(lut->tbl)) {
@@ -560,6 +565,8 @@ static int acpi_ec_fan_lut(const acpi_cmd_t *cmd_info, uint8_t *cmd,
         }
         // LUT data starts at cmd[4]; cmd[3] is the byte count field.
         memcpy((uint8_t *)&lut->tbl, &cmd[4], entries_to_write * 3);
+        // Number of valid entries, used by the read back and fan control
+        lut->tbl_size = entries_to_write;
         sci_enque(SCI_LUT_SET);
         LOG_DBG("Fan %d, profile %d, source %d LUT updated with %u entries",
                 fan_id, profile, tmp_src,
