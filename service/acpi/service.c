@@ -65,16 +65,21 @@ static int acpi_cmd_hdl(uint8_t *cmd, uint16_t cmd_len) {
             if ((cmd_len >= p->mand) && (p->cmd_hdl != NULL)) {
                 acpi_cmd_hdl_t cmd_hdl = p->cmd_hdl;
 
+                // >0: read, response length / 0: write / <0: error
                 ret = cmd_hdl(p, cmd, cmd_len, resp_buf, sizeof(resp_buf));
                 if (ret < 0) {
                     LOG_ERR("Failed to handle ACPI cmd 0x%02x: %d", cmd[0],
                             ret);
+                } else if (ret > sizeof(resp_buf)) {
+                    LOG_ERR("ACPI cmd 0x%02x response too long: %d", cmd[0],
+                            ret);
+                    ret = -EOVERFLOW;
                 } else {
-#if !defined(CONFIG_APP_BOOTLOADER)
-                    // Bootloader handlers set their own response length
-                    acpi_resp_set(resp_buf, p->resp_len);
-#endif
-                    LOG_DBG("Handled ACPI cmd 0x%02x successfully", cmd[0]);
+                    if (ret > 0) {
+                        acpi_resp_set(resp_buf, ret);
+                    }
+                    LOG_DBG("Handled ACPI cmd 0x%02x successfully, resp %d",
+                            cmd[0], ret);
                 }
             } else if (p->cmd_hdl == NULL) {
                 LOG_WRN("No handler for ACPI cmd 0x%02x", cmd[0]);

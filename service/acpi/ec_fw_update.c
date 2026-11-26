@@ -83,7 +83,7 @@ static int acpi_ec_state_wp_status(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     resp[2] = active_control_path; // 0x4F: Internal, 0x0F: External
 
     LOG_DBG("EC State: 0x%02X, Control Path: 0x%02X", resp[1], resp[2]);
-    return 0;
+    return 3; // Byte count + State + Path
 }
 
 /**
@@ -127,7 +127,7 @@ static int acpi_ec_spi_services(const acpi_cmd_t *cmd_info, uint8_t *cmd,
         return -EINVAL;
     }
 
-    return 0;
+    return 0; // Write only
 }
 
 // clang-format off

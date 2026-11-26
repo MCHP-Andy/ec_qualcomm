@@ -20,7 +20,7 @@ static int acpi_dev_fw_ver(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cm
     resp[2] = CONFIG_APP_FW_VERSION_MINOR; // Sub Version
     resp[3] = CONFIG_APP_FW_VERSION_MAJOR; // Major Version
 
-    return 0;
+    return 4; // Byte count + 3
 }
 
 static int acpi_dev_fw_ver_and_lowest_supported(const acpi_cmd_t *cmd_info,
@@ -42,7 +42,7 @@ static int acpi_dev_fw_ver_and_lowest_supported(const acpi_cmd_t *cmd_info,
     resp[7] =
         'A'; // Code Mirror Flag ('A' for Active, 'R' for Backup) (Offset 0x08)
 
-    return 0;
+    return 8; // Byte count + 7
 }
 
 static int acpi_dev_thermal_capabilities(const acpi_cmd_t *cmd_info, uint8_t *cmd,
@@ -69,7 +69,7 @@ static int acpi_dev_thermal_capabilities(const acpi_cmd_t *cmd_info, uint8_t *cm
     // e.g. if only Thermistor 0,1 exist, value is 0xFC (11111100)
     resp[2] = 0xFC;
 
-    return 0;
+    return 3; // Byte count + 2
 }
 
 static int acpi_dev_active_cooling_caps(const acpi_cmd_t *cmd_info, uint8_t *cmd,
@@ -93,7 +93,7 @@ static int acpi_dev_active_cooling_caps(const acpi_cmd_t *cmd_info, uint8_t *cmd
     // Bit 0-3: Lowest supported (1), Bit 4-7: Highest supported (1) -> 0x11
     resp[5] = 0x11;
 
-    return 0;
+    return 6; // Byte count + 5
 }
 
 static int acpi_who_am_i(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
@@ -107,7 +107,7 @@ static int acpi_who_am_i(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_
     // Byte Count)
     resp[0] = 0x01;
 
-    return 0;
+    return 1;
 }
 
 static int acpi_dev_id(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
@@ -124,7 +124,7 @@ static int acpi_dev_id(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_le
     resp[1] = 0x34; // Device ID LSB (Offset 0x02)
     resp[2] = 0x12; // Device ID MSB (Offset 0x03) - e.g. ID is 0x1234
 
-    return 0;
+    return 3; // Byte count + 2
 }
 
 // clang-format off

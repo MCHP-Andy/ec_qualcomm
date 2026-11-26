@@ -259,7 +259,8 @@ static int acpi_soc_to_ec_temp(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     LOG_DBG("Set temp from SOC: tmp_src=%d, tmp=%d.%d, ret=%d", tmp_src,
             tmp / 10, tmp % 10, ret);
 
-    return ret;
+    // Write only
+    return (ret < 0) ? ret : 0;
 }
 
 static int acpi_ec_fan_status(const acpi_cmd_t *cmd_info, uint8_t *cmd,
@@ -278,7 +279,7 @@ static int acpi_ec_fan_status(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     resp[0] = ctrl->state;
     LOG_DBG("Fan %d status query: %d", fan_id, resp[0]);
 
-    return 0;
+    return 1;
 }
 
 static int acpi_ec_fan_rpm(const acpi_cmd_t *cmd_info, uint8_t *cmd,
@@ -301,7 +302,7 @@ static int acpi_ec_fan_rpm(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     resp[2] = (rpm >> 8) & 0xFF; // Fan speed MSB
     LOG_DBG("Fan %d status rpm: %d", fan_id, rpm);
 
-    return 0;
+    return 3; // Byte count + RPM(2)
 }
 
 static int acpi_ec_fan_profile(const acpi_cmd_t *cmd_info, uint8_t *cmd,
@@ -311,11 +312,11 @@ static int acpi_ec_fan_profile(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     fan_id_t fan_id = FAN_ID_1; // Default fan ID
     fan_ctrl_t *ctrl;
 
-    ACPI_CHECK_IN(cmd_info, cmd, cmd_len);    // Check for write operation
-    ACPI_CHECK_OUT(cmd_info, resp, resp_len); // Check for read operation
+    ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
 
-    // If cmd_len is (mand + opt), it's a write operation (e.g., 1 + 1 = 2)
-    if (cmd_len == (cmd_info->mand + cmd_info->opt)) {
+    // Write: Cmd + FanProfileID
+    if (ACPI_IS_WRITE(cmd_info, cmd_len)) {
+        ACPI_CHECK_WRITE(cmd_info, cmd_len); // 1 + 1 = 2
         profile = cmd[1] & 0x0F;
         fan_id = (cmd[1] >> 4) & 0x0F;
 
@@ -334,8 +335,11 @@ static int acpi_ec_fan_profile(const acpi_cmd_t *cmd_info, uint8_t *cmd,
         k_event_post(&event, FAN_CFG_UPDATE);
 
         LOG_DBG("Fan %d profile set to %d", fan_id, profile);
+        return 0;
     }
 
+    // Read
+    ACPI_CHECK_OUT(cmd_info, resp, resp_len);
     ctrl = fan_blk_get(fan_id);
     if (ctrl == NULL) {
         LOG_ERR("[%d] Invalid fan_id=%d", __LINE__, fan_id);
@@ -347,22 +351,21 @@ static int acpi_ec_fan_profile(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     resp[0] = (profile & 0x0F);
     LOG_DBG("Fan %d profile: %d", fan_id, profile);
 
-    return 0;
+    return 1;
 }
 
 static int acpi_ec_fan_trip_point(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                   uint16_t cmd_len, uint8_t *resp,
                                   uint16_t resp_len) {
     ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
-    ACPI_CHECK_OUT(cmd_info, resp, resp_len); // Check for read operation
 
     fan_id_t fan_id = cmd[1];
     uint16_t trip_low, trip_high;
     fan_ctrl_t *ctrl;
 
-    // If cmd_len is 6, it's a write operation (FanID + ByteCount + Low(2) +
-    // High(2))
-    if (cmd_len == (cmd_info->mand + cmd_info->opt)) { // 2 + 5 = 7
+    // Write: Cmd + FanID + ByteCount + Low(2) + High(2)
+    if (ACPI_IS_WRITE(cmd_info, cmd_len)) {
+        ACPI_CHECK_WRITE(cmd_info, cmd_len); // 2 + 5 = 7
         trip_low = (cmd[4] << 8) | cmd[3];
         trip_high = (cmd[6] << 8) | cmd[5];
 
@@ -377,7 +380,11 @@ static int acpi_ec_fan_trip_point(const acpi_cmd_t *cmd_info, uint8_t *cmd,
         k_event_post(&event, FAN_CFG_UPDATE);
 
         LOG_DBG("Fan %d trip points set to %d-%d", fan_id, trip_low, trip_high);
+        return 0;
     }
+
+    // Read
+    ACPI_CHECK_OUT(cmd_info, resp, resp_len);
 
     ctrl = fan_blk_get(fan_id);
     if (ctrl == NULL) {
@@ -395,7 +402,7 @@ static int acpi_ec_fan_trip_point(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     resp[4] = (trip_high >> 8) & 0xFF;
     LOG_DBG("Fan %d trip points: %d-%d", fan_id, trip_low, trip_high);
 
-    return 0;
+    return 5; // Byte count + Low(2) + High(2)
 }
 
 static int acpi_ec_fan_profile_num(const acpi_cmd_t *cmd_info, uint8_t *cmd,
@@ -416,20 +423,20 @@ static int acpi_ec_fan_profile_num(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     resp[0] = FAN_PROFILE_BEST_PERFORMANCE_CHG_OUT;
     LOG_DBG("Fan %d profile: %d", fan_id, FAN_PROFILE_BEST_PERFORMANCE_CHG_OUT);
 
-    return 0;
+    return 1;
 }
 
 static int acpi_ec_fan_debug_ctrl(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                   uint16_t cmd_len, uint8_t *resp,
                                   uint16_t resp_len) {
     ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
-    ACPI_CHECK_OUT(cmd_info, resp, resp_len);
 
     fan_id_t fan_id = cmd[1];
     fan_ctrl_t *ctrl;
 
-    // If cmd_len is (mand + opt), it's a write operation
-    if (cmd_len == (cmd_info->mand + cmd_info->opt)) { // 2 + 5 = 7
+    // Write: Cmd + FanID + ByteCount + Mode + RPM(2) + PWM
+    if (ACPI_IS_WRITE(cmd_info, cmd_len)) {
+        ACPI_CHECK_WRITE(cmd_info, cmd_len); // 2 + 5 = 7
         uint8_t dbg_mode = cmd[3];
         uint16_t dbg_rpm = (cmd[5] << 8) | cmd[4];
         uint8_t dbg_pwm = cmd[6];
@@ -448,7 +455,11 @@ static int acpi_ec_fan_debug_ctrl(const acpi_cmd_t *cmd_info, uint8_t *cmd,
         LOG_DBG("Fan %d debug mode set to %d", fan_id, ctrl->dbg_mode);
         LOG_DBG("Fan %d debug RPM set to %d", fan_id, ctrl->dbg_rpm);
         LOG_DBG("Fan %d debug PWM set to %d", fan_id, ctrl->dbg_pwm);
+        return 0;
     }
+
+    // Read
+    ACPI_CHECK_OUT(cmd_info, resp, resp_len);
 
     ctrl = fan_blk_get(fan_id);
     if (ctrl == NULL) {
@@ -465,7 +476,7 @@ static int acpi_ec_fan_debug_ctrl(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     LOG_DBG("Fan %d debug RPM: %d", fan_id, ctrl->dbg_rpm);
     LOG_DBG("Fan %d debug PWM: %d", fan_id, ctrl->dbg_pwm);
 
-    return 0;
+    return 5; // Byte count + Mode + RPM(2) + PWM
 }
 
 static int acpi_ec_fan_lut_num(const acpi_cmd_t *cmd_info, uint8_t *cmd,
@@ -501,7 +512,7 @@ static int acpi_ec_fan_lut_num(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     resp[0] = lut_num;
     LOG_DBG("Fan %d profile %d LUT number: %d", fan_id, profile, lut_num);
 
-    return 0;
+    return 1;
 }
 
 static int acpi_ec_fan_lut(const acpi_cmd_t *cmd_info, uint8_t *cmd,
@@ -512,10 +523,11 @@ static int acpi_ec_fan_lut(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     fan_id_t profile = (cmd[1] >> 4) & 0x0f;
     fan_id_t tmp_src = cmd[2];
     fan_lut_t *lut = NULL;
-    uint8_t req_len = 0;
+    uint16_t req_len = 0;
 
-    // If cmd_len > mand, it's a write operation (ByteCount + LUTData present)
-    if (cmd_len > cmd_info->mand) { // mand is 3
+    // Write: Cmd + FanProfileID + TempSrc + ByteCount + LUTData (variable
+    // length, checked against ByteCount instead of mand + opt)
+    if (ACPI_IS_WRITE(cmd_info, cmd_len)) { // mand is 3
         // Check if enough data is provided for the ByteCount field
         if (cmd_len < (cmd_info->mand + 1)) {
             LOG_ERR("Invalid input length for LUT write operation: %u (min=%u)",
@@ -552,7 +564,10 @@ static int acpi_ec_fan_lut(const acpi_cmd_t *cmd_info, uint8_t *cmd,
         LOG_DBG("Fan %d, profile %d, source %d LUT updated with %u entries",
                 fan_id, profile, tmp_src,
                 entries_to_write); // Corrected to use cmd[3]
+        return 0;
     }
+
+    // Read
 
     ret = fan_lut_get(profile, fan_id, tmp_src, &lut);
     if (ret < 0) {
@@ -565,6 +580,10 @@ static int acpi_ec_fan_lut(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     ACPI_CHECK_OUT(
         cmd_info, resp,
         resp_len); // Check against max possible resp_len from cmd_info
+    if (req_len > resp_len) {
+        LOG_ERR("LUT response too long: %u > %u", req_len, resp_len);
+        return -EOVERFLOW;
+    }
 
     resp[0] = lut->tbl_size * 3; // N * 3 bytes
     memcpy(&resp[1], (uint8_t *)&lut->tbl, lut->tbl_size * 3);
@@ -576,7 +595,7 @@ static int acpi_ec_fan_lut(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                 lut->tbl[i].rpm, lut->tbl[i].temp_high, lut->tbl[i].temp_low);
     }
 
-    return 0;
+    return req_len; // Byte count + N * 3
 }
 
 // clang-format off

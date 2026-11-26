@@ -119,9 +119,8 @@ static int acpi_ec_fw_corruption_status(const acpi_cmd_t *cmd_info, uint8_t *cmd
     resp[0] = 1;                         // Byte count = 1
     resp[1] = ec_boot_info_get()->corruption_status; // Corruption status bitfield
 
-    acpi_resp_set(resp, cmd_info->resp_len);
     LOG_INF("EC FW Corruption Status query: 0x%02X", resp[1]);
-    return 0;
+    return 2; // Byte count + Status
 }
 
 /**
@@ -140,9 +139,8 @@ static int acpi_ec_state_wp_status(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     resp[1] = state;               // State of EC
     resp[2] = active_control_path; // 0x4F: Internal, 0x0F: External
 
-    acpi_resp_set(resp, cmd_info->resp_len);
     LOG_INF("EC State: 0x%02X, Control Path: 0x%02X", resp[1], resp[2]);
-    return 0;
+    return 3; // Byte count + State + Path
 }
 
 /**
@@ -166,9 +164,8 @@ static int acpi_ec_read_crc_result(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     resp[4] = (last_crc_value >> 16) & 0xFF;
     resp[5] = (last_crc_value >> 24) & 0xFF; // MSB (0 for CRC8)
 
-    acpi_resp_set(resp, cmd_info->resp_len);
     LOG_INF("Read CRC: Status=0x%02X, CRC=0x%08X", resp[1], last_crc_value);
-    return 0;
+    return 6; // Byte count + Status + CRC(4)
 }
 
 /**
@@ -388,10 +385,9 @@ static int acpi_ec_read_ram_buffer(const acpi_cmd_t *cmd_info, uint8_t *cmd,
 
     uint16_t copy_len = (resp_len < RAM_BUFFER_SIZE) ? resp_len : RAM_BUFFER_SIZE;
     memcpy(resp, ram_buffer, copy_len);
-    acpi_resp_set(resp, copy_len);
 
     LOG_INF("Read RAM Buffer: Returned %d bytes", copy_len);
-    return 0;
+    return copy_len;
 }
 
 /**
@@ -533,7 +529,8 @@ static int acpi_ec_spi_services(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     case SPI_SUBCMD_CRC_INT_ACT_MAIN:
         LOG_INF("Triggering Partition CRC Calculation: 0x%02X", sub_cmd);
         {
-            // set spi busy flag
+            // set spi busy flag: preload the 0xEC style status the host polls
+            // while CRC runs (not this write's response, which is none)
             uint8_t buf[] = {
                 0x02, 0xFF,
                 active_control_path}; // ByteCount=2, State=Busy, Path=Internal

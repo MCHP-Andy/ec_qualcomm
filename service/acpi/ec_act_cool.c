@@ -14,19 +14,21 @@ static int acpi_func_flag(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     uint64_t flags = 0;
     bool sci_en;
 
-    ACPI_CHECK_IN(cmd_info, cmd, cmd_len);    // Check for read operation
-    ACPI_CHECK_OUT(cmd_info, resp, resp_len); // Check for read operation
+    ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
 
-    // If cmd_len is mand + opt, it's a write operation
-    if (cmd_len == (cmd_info->mand + cmd_info->opt)) { // 1 + 9 = 10
-        ACPI_CHECK_IN(cmd_info, cmd, cmd_len); // Check for write operation
+    // Write: Cmd + ByteCount + Flag(8)
+    if (ACPI_IS_WRITE(cmd_info, cmd_len)) {
+        ACPI_CHECK_WRITE(cmd_info, cmd_len); // 1 + 9 = 10
         memcpy(&flags, &cmd[2], sizeof(flags));
 
         sci_en = flags & 0x01;
         acpi_sci_enable_set(sci_en);
         LOG_DBG("Set EC function flags: 0x%016llx", flags);
+        return 0;
     }
 
+    // Read
+    ACPI_CHECK_OUT(cmd_info, resp, resp_len);
     acpi_sci_enable_get(&sci_en);
     flags = sci_en;
 
@@ -34,7 +36,7 @@ static int acpi_func_flag(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     memcpy(&resp[1], &flags, sizeof(flags));
 
     LOG_DBG("Get EC function flags: 0x%016llx", flags);
-    return 0;
+    return 9; // Byte count + Flag(8)
 }
 
 // clang-format off

@@ -59,8 +59,17 @@ graph LR
    當 `cmd_len >= mand` 時呼叫 handler；長度不足時不會呼叫 handler。
    讀取時 I2C driver 會 stretch SCL `CONFIG_I2C_XEC_V2_CUSTOM_STRETCH_DELAY_MS` (預設 3ms)，
    讓 handler 在這段時間內寫好 response。
-5. App：handler 成功後由 service 呼叫 `acpi_resp_set(resp_buf, resp_len)`。
-   Bootloader：handler 自行呼叫 `acpi_resp_set` (response 長度可變)。
+5. Handler 以輸入長度判斷讀/寫，以回傳值決定寫回 ACPI buffer 的長度：
+
+   | 輸入長度 `cmd_len` | 動作 | 回傳值 |
+   |---|---|---|
+   | `== mand` | 讀取：把資料填入 `resp` | response 長度 (>0) |
+   | `== mand + opt` (`ACPI_IS_WRITE` / `ACPI_CHECK_WRITE`) | 寫入：只套用資料 | `0` |
+   | 錯誤 | — | 負的 errno |
+
+   Service 只在回傳值 > 0 時呼叫 `acpi_resp_set(resp_buf, ret)`；回傳 0 或錯誤時 ACPI buffer 不變。
+   `opt == 0` 的命令只會是純讀 (`resp_len > 0`) 或純寫 (`resp_len == 0`)。
+   Table 中的 `resp_len` 是 response 的最大長度 (給 `ACPI_CHECK_OUT` 檢查 buffer)。
 
 ### 新增命令
 在任一 service 中使用 [interface/acpi.h](../../interface/acpi.h) 的 macro：
@@ -73,15 +82,36 @@ ACPI_CMD_SUBSCRIBE(fan, EC_FAN_RPM, acpi_ec_fan_rpm, 2, 0, 3);
 | 參數 | 說明 |
 | --- | --- |
 | `mand` | 必要 byte 數，**包含 opcode** |
-| `opt` | opcode 之後的 optional byte 數；慣例上 `cmd_len == mand + opt` 視為寫入 (set)，否則為讀取 (get) |
-| `resp_len` | response 長度 (含 byte count，若有) |
+| `opt` | mand 之後的 optional (寫入) byte 數；`cmd_len == mand` 為讀取 (get)，`cmd_len == mand + opt` 為寫入 (set) |
+| `resp_len` | response 最大長度 (含 byte count，若有) |
 
-Handler 內使用 [acpi_tbl.h](acpi_tbl.h) 的 `ACPI_CHECK_IN` / `ACPI_CHECK_OUT` 檢查輸入/輸出長度。
+Handler 內使用 [acpi_tbl.h](acpi_tbl.h) 的 macro：
+- `ACPI_CHECK_IN` / `ACPI_CHECK_OUT`：檢查輸入長度 >= `mand`、`resp` buffer >= `resp_len`。
+- `ACPI_IS_WRITE`：輸入長度大於 `mand` (且 `opt > 0`) 即為寫入。
+- `ACPI_CHECK_WRITE`：寫入長度必須等於 `mand + opt`，不足或過長回傳 `-EINVAL`。
+
+```c
+static int acpi_xxx(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
+                    uint8_t *resp, uint16_t resp_len) {
+    ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
+
+    if (ACPI_IS_WRITE(cmd_info, cmd_len)) {
+        ACPI_CHECK_WRITE(cmd_info, cmd_len);
+        // 套用 cmd[mand..] 的資料
+        return 0;
+    }
+
+    ACPI_CHECK_OUT(cmd_info, resp, resp_len);
+    resp[0] = ...;
+    return 1; // response 長度
+}
+```
 命令 opcode 也統一定義在 `acpi_tbl.h`。
 
 ## 命令表
 
-`cmd` 欄位為 Host 寫入的完整 byte 序列 (`[]` 為 optional)，`resp` 為 Host 讀回的內容。
+`cmd` 欄位為 Host 寫入的完整 byte 序列 (`[]` 為 optional，帶上即為寫入)，`resp` 為讀取時 Host 讀回的內容；
+寫入不更新 response。
 
 ### App
 | Opcode | 名稱 | 檔案 | cmd | resp |

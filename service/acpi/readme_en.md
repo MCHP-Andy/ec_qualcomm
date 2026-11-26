@@ -63,8 +63,19 @@ graph LR
    `acpi_cmd_t` section and calls the handler when `cmd_len >= mand`. If the command is too short, the
    handler is not called. On a read the I2C driver stretches SCL for
    `CONFIG_I2C_XEC_V2_CUSTOM_STRETCH_DELAY_MS` (3 ms by default) so the handler can write the response.
-5. App: after the handler succeeds, the service calls `acpi_resp_set(resp_buf, resp_len)`.
-   Bootloader: handlers call `acpi_resp_set` themselves (the response length varies).
+5. The handler decides read or write from the input length, and its return value sets how many
+   bytes are written back to the ACPI buffer:
+
+   | Input length `cmd_len` | Action | Return |
+   |---|---|---|
+   | `== mand` | Read: fill `resp` | response length (>0) |
+   | `== mand + opt` (`ACPI_IS_WRITE` / `ACPI_CHECK_WRITE`) | Write: apply the data only | `0` |
+   | error | — | negative errno |
+
+   The service calls `acpi_resp_set(resp_buf, ret)` only when the return value is > 0; on 0 or an
+   error the ACPI buffer is left unchanged. Commands with `opt == 0` are either read only
+   (`resp_len > 0`) or write only (`resp_len == 0`). `resp_len` in the table is the maximum response
+   length (checked by `ACPI_CHECK_OUT`).
 
 ### Adding a command
 Use the macro from [interface/acpi.h](../../interface/acpi.h) in any service:
@@ -77,16 +88,36 @@ ACPI_CMD_SUBSCRIBE(fan, EC_FAN_RPM, acpi_ec_fan_rpm, 2, 0, 3);
 | Parameter | Description |
 | --- | --- |
 | `mand` | Number of mandatory bytes, **including the opcode** |
-| `opt` | Number of optional bytes after the opcode. By convention, `cmd_len == mand + opt` is a write (set), anything else is a read (get) |
-| `resp_len` | Response length (including the byte count, if any) |
+| `opt` | Number of optional (write) bytes after `mand`. `cmd_len == mand` is a read (get), `cmd_len == mand + opt` is a write (set) |
+| `resp_len` | Maximum response length (including the byte count, if any) |
 
-Inside a handler, use `ACPI_CHECK_IN` / `ACPI_CHECK_OUT` from [acpi_tbl.h](acpi_tbl.h) to validate
-input and output lengths. Command opcodes are also defined in `acpi_tbl.h`.
+Inside a handler, use the macros from [acpi_tbl.h](acpi_tbl.h):
+- `ACPI_CHECK_IN` / `ACPI_CHECK_OUT`: input length >= `mand`, `resp` buffer >= `resp_len`.
+- `ACPI_IS_WRITE`: the input is longer than `mand` (and `opt > 0`), so it is a write.
+- `ACPI_CHECK_WRITE`: a write must be exactly `mand + opt` bytes, otherwise `-EINVAL`.
+
+```c
+static int acpi_xxx(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
+                    uint8_t *resp, uint16_t resp_len) {
+    ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
+
+    if (ACPI_IS_WRITE(cmd_info, cmd_len)) {
+        ACPI_CHECK_WRITE(cmd_info, cmd_len);
+        // apply the data in cmd[mand..]
+        return 0;
+    }
+
+    ACPI_CHECK_OUT(cmd_info, resp, resp_len);
+    resp[0] = ...;
+    return 1; // response length
+}
+``` Command opcodes are also defined in `acpi_tbl.h`.
 
 ## Command table
 
-The `cmd` column is the full byte sequence written by the host (`[]` is optional), and `resp` is what
-the host reads back.
+The `cmd` column is the full byte sequence written by the host (`[]` is optional; sending it makes the
+command a write), and `resp` is what the host reads back for a read. A write does not update the
+response.
 
 ### App
 | Opcode | Name | File | cmd | resp |

@@ -29,9 +29,24 @@
 struct acpi_cmd_t; 
 typedef struct acpi_cmd_t acpi_cmd_t;
 
+/**
+ * @brief ACPI command handler.
+ *
+ * Read or write is decided by @p cmd_len: only the mandatory part (mand) is a
+ * read, mandatory + optional payload (mand + opt) is a write.
+ *
+ * @param cmd_info Command table entry.
+ * @param cmd      Command bytes, cmd[0] is the opcode.
+ * @param cmd_len  Number of command bytes.
+ * @param resp     Response buffer.
+ * @param resp_len Size of @p resp.
+ * @retval >0 read: number of response bytes written to @p resp.
+ * @retval 0  write done (no response data).
+ * @retval <0 error, the ACPI response buffer is left unchanged.
+ */
 typedef int (*acpi_cmd_hdl_t)(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                               uint16_t cmd_len, uint8_t *resp,
-                              uint16_t resp_len); // cmd now includes opcode
+                              uint16_t resp_len);
 
 typedef struct acpi_cmd_t {
     uint8_t cmd;
@@ -39,7 +54,7 @@ typedef struct acpi_cmd_t {
     uint16_t mand; // Number of mandatory arguments including the command opcode.
     uint16_t opt;  // Number of optional arguments *after* the command opcode.
     uint16_t
-        resp_len; // Expected response length (including byte count if present).
+        resp_len; // Max response length (including byte count if present).
     const char *name;
 } acpi_cmd_t;
 

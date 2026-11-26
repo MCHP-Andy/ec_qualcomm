@@ -81,7 +81,7 @@ The default profile at boot is `6` (best performance, charger in). Default trip 
 | Debug mode | bit0 debug ON, bit1 fan ON, bit2 type (0: RPM, 1: PWM) |
 
 ## ACPI commands
-Fields in `[]` are optional; including them makes the command a write, otherwise it is a read.
+Fields in `[]` are optional; including them makes the command a write, otherwise it is a read. A write does not update the response; `resp` is the reply to a read.
 
 | Opcode | Name | cmd | resp |
 | --- | --- | --- | --- |

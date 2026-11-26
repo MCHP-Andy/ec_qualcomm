@@ -16,6 +16,8 @@
 
 > 注意:**寫入指令後需再下 `acpi read`** 才能看到回應。
 > `0x24 / 0x25 / 0x28 / 0x30 / 0x32 / 0x34 / 0x35` 為讀寫共用同一 cmd,EC 以 payload 長度(是否帶 data)區分讀/寫。
+> 寫入(帶 data)只套用設定、**不更新 response**;要確認新值請再送一次讀取 cmd(不帶 data)。
+> 下方部分 log 是舊版行為(寫入後 `acpi read` 直接讀到新值),現在需先送讀取 cmd。
 > 16-bit 資料一律 **LSB 在前**。
 
 > `acpi write` 會把整包 bytes 以 `acpi_cmd_submit` 一次送出,與 I2C 的 stop condition 一致,

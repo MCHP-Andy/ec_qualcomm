@@ -143,7 +143,7 @@ static int acpi_active_cooling_sci_event(const acpi_cmd_t *cmd_info,
     }
 
     resp[0] = sci;
-    return 0;
+    return 1;
 }
 
 // clang-format off

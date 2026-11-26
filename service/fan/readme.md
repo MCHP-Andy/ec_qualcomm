@@ -76,7 +76,7 @@ Thread 在系統事件 (power state change)、`FAN_TEMP_CHG`、`FAN_CFG_UPDATE` 
 | Debug mode | bit0 debug ON、bit1 fan ON、bit2 type (0: RPM, 1: PWM) |
 
 ## ACPI 命令
-`[]` 內為 optional；帶 optional 欄位即為寫入，否則為讀取。
+`[]` 內為 optional；帶 optional 欄位即為寫入，否則為讀取。寫入不更新 response，`resp` 為讀取時的回應。
 
 | Opcode | 名稱 | cmd | resp |
 | --- | --- | --- | --- |
