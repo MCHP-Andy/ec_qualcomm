@@ -58,6 +58,11 @@ QC_GPIO_DEF(acpi_int);
 static uint8_t i2c_state = I2C_STATE_IDLE;
 static uint8_t resp_buf[ACPI_RESP_LEN] = {0};
 
+// Bytes written by the host to the ACPI address, submitted to the service as
+// one command at repeated start (read request) or stop
+static uint8_t wr_buf[ACPI_RECE_LEN];
+static uint16_t wr_len = 0;
+
 // Workaround for 2 slave address, check address to determine which command to process
 static uint8_t i2c_addr = 0;
 
@@ -102,12 +107,30 @@ int acpi_int_set(uint8_t val) {
 #endif
 
 /*
+ * @brief Submit the collected ACPI write data to the service, if any.
+ */
+static void acpi_wr_submit(void) {
+    if (wr_len == 0) {
+        return;
+    }
+
+    if (acpi_cmd_submit(wr_buf, wr_len) < 0) {
+        LOG_WRN("Failed to submit ACPI cmd 0x%02x, len %u", wr_buf[0], wr_len);
+    }
+
+    wr_len = 0;
+}
+
+/*
  * @brief Callback which is called when a write request is received from the
  * master.
  * @param config Pointer to the target configuration.
  */
 static int acpi_target_write_requested_cb(struct i2c_target_config *config) {
     LOG_DBG("acpi target write requested");
+
+    // Write after write with repeated start: previous command is complete
+    acpi_wr_submit();
 
     i2c_state = I2C_STATE_START_WRITE;
 
@@ -132,39 +155,37 @@ static int acpi_target_write_received_cb(struct i2c_target_config *config,
                                          uint8_t val) {
     LOG_DBG("acpi target write received: 0x%02x", val);
 
-    switch (i2c_state) {
-    case I2C_STATE_START_WRITE:
+    if ((i2c_state != I2C_STATE_START_WRITE) && (i2c_state != I2C_STATE_WRITE)) {
+        LOG_WRN("Unexpected I2C state: %d", i2c_state);
+        return 0;
+    }
+
 #if !defined(CONFIG_APP_BOOTLOADER)
-        if (i2c_addr == ACPI_ADDR) {
-            acpi_buf_set(ACPI_TYPE_CMD, val);
-        } else if (i2c_addr == SOCCP_ADDR) {
-            soccp_buf_set(SOCCP_TYPE_CMD, val);
-        } else {
-            LOG_WRN("Unknown I2C address: 0x%02x", i2c_addr);
-        }
-#else
-        acpi_buf_set(ACPI_TYPE_CMD, val);
+    if (i2c_addr == SOCCP_ADDR) {
+        soccp_buf_set((i2c_state == I2C_STATE_START_WRITE) ? SOCCP_TYPE_CMD
+                                                           : SOCCP_TYPE_DATA,
+                      val);
+        i2c_state = I2C_STATE_WRITE;
+        return 0;
+    } else if (i2c_addr != ACPI_ADDR) {
+        LOG_WRN("Unknown I2C address: 0x%02x", i2c_addr);
+        i2c_state = I2C_STATE_WRITE;
+        return 0;
+    }
 #endif
 
-        i2c_state = I2C_STATE_WRITE;
-        break;
-    case I2C_STATE_WRITE:
-#if !defined(CONFIG_APP_BOOTLOADER)
-        if (i2c_addr == ACPI_ADDR) {
-            acpi_buf_set(ACPI_TYPE_DATA, val);
-        } else if (i2c_addr == SOCCP_ADDR) {
-            soccp_buf_set(SOCCP_TYPE_DATA, val);
-        } else {
-            LOG_WRN("Unknown I2C address: 0x%02x", i2c_addr);
-        }
-#else
-        acpi_buf_set(ACPI_TYPE_DATA, val);
-#endif
-        break;
-    default:
-        LOG_WRN("Unexpected I2C state: %d", i2c_state);
-        break;
+    // ACPI: collect, submitted at read request or stop
+    if (i2c_state == I2C_STATE_START_WRITE) {
+        wr_len = 0;
     }
+    i2c_state = I2C_STATE_WRITE;
+
+    if (wr_len >= sizeof(wr_buf)) {
+        // Buffer full: NACK the next byte
+        LOG_WRN("ACPI write overflow, cmd 0x%02x", wr_buf[0]);
+        return -ENOMEM;
+    }
+    wr_buf[wr_len++] = val;
 
     return 0;
 }
@@ -172,7 +193,8 @@ static int acpi_target_write_received_cb(struct i2c_target_config *config,
 /*
  * @brief Callback which is called once when a read request is received from
  * the master (buffer mode). The driver sends the bytes straight from resp_buf.
- * Always return -EAGAIN: the driver stretches SCL so the service has
+ * The command written before the repeated start is submitted to the service
+ * here. Always return -EAGAIN: the driver stretches SCL so the service has
  * CONFIG_I2C_XEC_V2_CUSTOM_STRETCH_DELAY_MS to write the response, then sends
  * from resp_buf without calling this again.
  * @param config Pointer to the target configuration.
@@ -181,6 +203,8 @@ static int acpi_target_write_received_cb(struct i2c_target_config *config,
  */
 static int acpi_target_buf_read_requested_cb(struct i2c_target_config *config,
                                              uint8_t **ptr, uint32_t *len) {
+    acpi_wr_submit();
+
     i2c_state = I2C_STATE_READ;
 
     *ptr = resp_buf;
@@ -198,9 +222,7 @@ static int acpi_target_stop_cb(struct i2c_target_config *config) {
 
     i2c_state = I2C_STATE_IDLE;
 
-    if (i2c_addr == ACPI_ADDR) {
-        acpi_buf_set(ACPI_TYPE_PROCESS, 0);
-    }
+    acpi_wr_submit();
 
     return 0;
 }

@@ -6,6 +6,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
@@ -16,134 +17,89 @@
 
 LOG_MODULE_REGISTER(acpi, CONFIG_ACPI_LOG_LEVEL);
 
-enum {
-    ACPI_EVT_CMD = LOCAL_EVT_START,
-};
+// Number of commands that can wait for the service thread
+#define ACPI_CMD_QUEUE_LEN 2
 
-#define ACPI_CMD BIT(ACPI_EVT_CMD)
+// One complete command from the host: opcode followed by its arguments
+typedef struct acpi_cmd_pkt_t {
+    uint16_t len;
+    uint8_t data[ACPI_RECE_LEN];
+} acpi_cmd_pkt_t;
 
-static K_EVENT_DEFINE(event);
+// Packets live in the slab, only their pointers go through the queue, so the
+// I2C ISR does not copy a whole packet onto its stack
+K_MEM_SLAB_DEFINE_STATIC(acpi_cmd_slab, sizeof(acpi_cmd_pkt_t),
+                         ACPI_CMD_QUEUE_LEN, 4);
+K_MSGQ_DEFINE(acpi_cmd_queue, sizeof(acpi_cmd_pkt_t *), ACPI_CMD_QUEUE_LEN, 4);
 
-static uint16_t cmd_idx = 0;
-static uint8_t rece_cmd[ACPI_RECE_LEN];
 static uint8_t resp_buf[ACPI_RESP_LEN];
 
-#define ACPI_EVT_LEN 2
+int acpi_cmd_submit(const uint8_t *pdata, uint16_t len) {
+    acpi_cmd_pkt_t *pkt;
 
-typedef struct acpi_evt_t {
-    uint8_t *pdata;
-    uint16_t len;
-} acpi_evt_t ;
-
-K_MSGQ_DEFINE(acpi_evt_queue, sizeof(acpi_evt_t), ACPI_EVT_LEN, 4);
-
-int acpi_buf_set(acpi_type_t id, uint8_t data) {
-    static uint8_t mand = 0;
-    // Whether the mandatory argument dispatch already handled the command as
-    // it currently stands, so the end of transfer does not run it a second time
-    static bool dispatched = false;
-
-    if (cmd_idx >= sizeof(rece_cmd)) {
-        LOG_WRN("cmd_idx: %d", cmd_idx);
-        cmd_idx = 0;
+    if ((pdata == NULL) || (len == 0) || (len > ACPI_RECE_LEN)) {
+        return -EINVAL;
     }
 
-    switch (id) {
-    case ACPI_TYPE_CMD:
-        // Recieve cmd
-        cmd_idx = 0;
-        mand = 0;
-        dispatched = false;
-
-        // Store the opcode before the lookup, otherwise the previous command
-        // opcode is the one being searched for
-        rece_cmd[0] = data;
-
-        // Search for the mandatory argument count for the command
-        STRUCT_SECTION_FOREACH(acpi_cmd_t, p) {
-            if (rece_cmd[0] == p->cmd) {
-                mand = p->mand;
-                break;
-            }
-        }
-        __fallthrough;
-
-    case ACPI_TYPE_DATA:
-        rece_cmd[cmd_idx] = data;
-        cmd_idx++;
-
-        if (cmd_idx == mand) {
-            // Mandatory arguments complete, handle it now so the response is
-            // ready even when the host reads without ending the transfer
-            dispatched = true;
-            k_event_post(&event, ACPI_CMD);
-        } else if (cmd_idx > mand) {
-            // Optional payload arrived after that dispatch, the handler has to
-            // run again to see the complete command
-            dispatched = false;
-        }
-        break;
-
-    case ACPI_TYPE_PROCESS:
-        // End of transfer, only needed when the dispatch above did not already
-        // handle the command as received
-        if (dispatched == false) {
-            k_event_post(&event, ACPI_CMD);
-        }
-        break;
-
-    default:
-        LOG_WRN("Unknow ID: %d", id);
-        break;
+    if (k_mem_slab_alloc(&acpi_cmd_slab, (void **)&pkt, K_NO_WAIT) != 0) {
+        LOG_WRN("ACPI cmd queue full, drop cmd 0x%02x", pdata[0]);
+        return -ENOMEM;
     }
+
+    pkt->len = len;
+    memcpy(pkt->data, pdata, len);
+
+    // Cannot fail: the queue holds as many entries as the slab has blocks
+    (void)k_msgq_put(&acpi_cmd_queue, &pkt, K_NO_WAIT);
 
     return 0;
 }
 
-static int acpi_cmd_hdl(void) {
+static int acpi_cmd_hdl(uint8_t *cmd, uint16_t cmd_len) {
     int ret = 0;
 
     // Parse the cmd and call corresponding handler function, then copy response
     // to interface buffer
     STRUCT_SECTION_FOREACH(acpi_cmd_t, p) {
-        if (rece_cmd[0] == p->cmd) {
-            if ((cmd_idx >= p->mand) && (p->cmd_hdl != NULL)) {
+        if (cmd[0] == p->cmd) {
+            if ((cmd_len >= p->mand) && (p->cmd_hdl != NULL)) {
                 acpi_cmd_hdl_t cmd_hdl = p->cmd_hdl;
 
-                ret = cmd_hdl(p, rece_cmd, cmd_idx, resp_buf, sizeof(resp_buf));
+                ret = cmd_hdl(p, cmd, cmd_len, resp_buf, sizeof(resp_buf));
                 if (ret < 0) {
-                    LOG_ERR("Failed to handle ACPI cmd 0x%02x: %d", rece_cmd[0],
+                    LOG_ERR("Failed to handle ACPI cmd 0x%02x: %d", cmd[0],
                             ret);
                 } else {
 #if !defined(CONFIG_APP_BOOTLOADER)
                     // Bootloader handlers set their own response length
                     acpi_resp_set(resp_buf, p->resp_len);
 #endif
-                    LOG_DBG("Handled ACPI cmd 0x%02x successfully",
-                            rece_cmd[0]);
+                    LOG_DBG("Handled ACPI cmd 0x%02x successfully", cmd[0]);
                 }
             } else if (p->cmd_hdl == NULL) {
-                LOG_WRN("No handler for ACPI cmd 0x%02x", rece_cmd[0]);
+                LOG_WRN("No handler for ACPI cmd 0x%02x", cmd[0]);
+            } else {
+                LOG_WRN("ACPI cmd 0x%02x too short: %u < %u", cmd[0], cmd_len,
+                        p->mand);
             }
             return ret;
         }
     }
 
-    LOG_WRN("Unknown ACPI cmd 0x%02x", rece_cmd[0]);
+    LOG_WRN("Unknown ACPI cmd 0x%02x", cmd[0]);
 
     return -EINVAL;
 }
 
 static void service(void) {
-    uint32_t evt = 0;
+    acpi_cmd_pkt_t *pkt;
 
     while (1) {
-        evt = k_event_wait(&event, ACPI_CMD, false, K_FOREVER);
+        k_msgq_get(&acpi_cmd_queue, &pkt, K_FOREVER);
 
-        if (evt & ACPI_CMD) {
-            k_event_clear(&event, ACPI_CMD);
-            acpi_cmd_hdl();
-        }
+        acpi_cmd_hdl(pkt->data, pkt->len);
+
+        k_mem_slab_free(&acpi_cmd_slab, (void *)pkt);
     }
 }
 
@@ -155,21 +111,15 @@ K_THREAD_DEFINE(acpi_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_H,
 
 static int cmd_acpi_write(const struct shell *sh, size_t argc, char **argv) {
     int ret = 0;
-    uint8_t buff;
+    uint8_t buff[64];
+    uint16_t len = 0;
 
-    for (size_t i = 0; i < argc-1; i++) {
-        buff = strtoul(argv[i + 1], NULL, 16);
-
-        if (i == 0) {
-            acpi_buf_set(ACPI_TYPE_CMD, buff);
-        } else {
-            acpi_buf_set(ACPI_TYPE_DATA, buff);
-        }
+    for (size_t i = 1; (i < argc) && (len < sizeof(buff)); i++) {
+        buff[len++] = strtoul(argv[i], NULL, 16);
     }
 
-    // Align with the I2C path, where the stop condition ends the transfer and
-    // triggers the handler with the whole payload received
-    acpi_buf_set(ACPI_TYPE_PROCESS, 0);
+    // Same as the I2C path: the whole write is submitted as one command
+    ret = acpi_cmd_submit(buff, len);
 
     if (ret < 0) {
         shell_error(sh, "Failed to write ACPI CMD: %d", ret);

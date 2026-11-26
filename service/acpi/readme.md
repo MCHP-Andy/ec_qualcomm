@@ -25,12 +25,13 @@ Buffer 大小定義在 [interface/acpi.h](../../interface/acpi.h)：
 graph LR
     subgraph "Driver (driver/acpi.c)"
         I2C[I2C target 0x76]
+        WR[(wr_buf)]
         RESP[(resp_buf)]
     end
 
     subgraph "ACPI service"
-        BUF[acpi_buf_set<br/>rece_cmd]
-        EVT((ACPI_CMD event))
+        BUF[acpi_cmd_submit]
+        EVT((acpi_cmd_queue<br/>k_msgq + k_mem_slab))
         HDL[acpi_cmd_hdl<br/>查表分派]
     end
 
@@ -38,8 +39,9 @@ graph LR
         TBL[ACPI_CMD_SUBSCRIBE<br/>fan / thermal / power / sci / board / fw]
     end
 
-    I2C -->|start: ACPI_TYPE_CMD<br/>data: ACPI_TYPE_DATA<br/>stop: ACPI_TYPE_PROCESS| BUF
-    BUF -->|k_event_post| EVT
+    I2C -->|write_received| WR
+    WR -->|buf_read_requested / stop<br/>整包命令| BUF
+    BUF -->|k_msgq_put| EVT
     EVT --> HDL
     HDL --> TBL
     TBL -->|handler 填 resp| HDL
@@ -48,13 +50,15 @@ graph LR
 ```
 
 ### 接收與分派流程
-1. `ACPI_TYPE_CMD` (I2C 寫入的第一個 byte)：清空 index，存入 opcode，並從命令表查出該命令的 `mand`。
-2. `ACPI_TYPE_DATA`：依序存入 `rece_cmd`。收到的 byte 數 **等於 `mand`** 時立即觸發分派，
-   讓 Host 不送 stop 直接 repeated-start 讀取也能拿到 response。
-3. 若在提前分派後又收到 optional payload，會標記為未分派；
-   `ACPI_TYPE_PROCESS` (I2C stop) 時再分派一次，讓 handler 看到完整命令。
-4. Service thread (`APP_PRIO_H`) 在 `acpi_cmd_t` section 中找到 opcode，
+1. Driver (`driver/acpi.c`) 把 Host 寫到 0x76 的 byte 依序存進 `wr_buf`，此時不通知 service。
+2. Host repeated-start 讀取 (`buf_read_requested`) 或送出 stop 時，driver 呼叫
+   `acpi_cmd_submit(wr_buf, len)` 把整包命令 (opcode + 參數) 交給 service，每次 write 只送一次。
+3. `acpi_cmd_submit` 從 `k_mem_slab` 取一塊存放命令，把指標放進 `k_msgq` (深度 `ACPI_CMD_QUEUE_LEN`)，
+   可在 ISR 中呼叫；queue 滿時丟棄命令並回傳 `-ENOMEM`。
+4. Service thread (`APP_PRIO_H`) 從 queue 取出命令，在 `acpi_cmd_t` section 中找到 opcode，
    當 `cmd_len >= mand` 時呼叫 handler；長度不足時不會呼叫 handler。
+   讀取時 I2C driver 會 stretch SCL `CONFIG_I2C_XEC_V2_CUSTOM_STRETCH_DELAY_MS` (預設 3ms)，
+   讓 handler 在這段時間內寫好 response。
 5. App：handler 成功後由 service 呼叫 `acpi_resp_set(resp_buf, resp_len)`。
    Bootloader：handler 自行呼叫 `acpi_resp_set` (response 長度可變)。
 
@@ -151,7 +155,7 @@ BB 01 33                 # 離開 bootloader
 ## Shell
 | 命令 | 說明 |
 | --- | --- |
-| `acpi write <op> [data ...]` | 以 hex 模擬 Host 寫入命令，結束時送出 `ACPI_TYPE_PROCESS` (等同 I2C stop) |
+| `acpi write <op> [data ...]` | 以 hex 模擬 Host 寫入命令，整包以 `acpi_cmd_submit` 送出 (等同 I2C stop) |
 
 Shell 沒有讀取 response 的命令，需搭配 log 或由 Host 端讀回確認。
 `ec_fw_update_bootloader.c` 內的 `fw_update` shell 受 `CONFIG_FW_UPDATE_SHELL` 控制，
