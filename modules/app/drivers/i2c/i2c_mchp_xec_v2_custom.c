@@ -83,6 +83,16 @@ LOG_MODULE_REGISTER(i2c_mchp_custom, CONFIG_I2C_LOG_LEVEL);
 #define XEC_GPIO_CTRL_BASE	DT_REG_ADDR(DT_NODELABEL(gpio_000_036))
 
 /*
+ * Multi target (custom, ported from newer upstream i2c_mchp_xec_v2.c).
+ * OWN_ADDR holds two 7-bit target addresses: slot 0 in bits [6:0],
+ * slot 1 in bits [14:8].
+ */
+#define XEC_I2C_MAX_TARGETS	2
+#define XEC_I2C_TARGET_ADDR_MSK	0x7FU
+#define XEC_I2C_OA_SET(slot, addr) \
+	(((uint32_t)(addr) & XEC_I2C_TARGET_ADDR_MSK) << ((slot) * 8U))
+
+/*
  * Wake from sleep on I2C START (custom).
  * GIRQ22 source bit: bit 0 = SPI_ASYNC_WAKE, bits 1..5 = SMB controllers 0..4
  */
@@ -116,8 +126,13 @@ struct i2c_xec_data {
 	uint8_t state;
 	uint8_t read_discard;
 	uint8_t speed_id;
+	/* Target of the current transaction, selected by the address byte */
 	struct i2c_target_config *target_cfg;
 	bool target_attached;
+#ifdef CONFIG_I2C_TARGET
+	/* Registered targets, one per OWN_ADDR slot */
+	struct i2c_target_config *targets[XEC_I2C_MAX_TARGETS];
+#endif
 	bool target_read;
 	uint32_t i2c_compl;
 	uint8_t i2c_ctrl;
@@ -248,6 +263,54 @@ static uint32_t get_lines(const struct device *dev)
 	return lines;
 }
 
+#ifdef CONFIG_I2C_TARGET
+/* Find a free OWN_ADDR slot. Returns slot index or -1 if all occupied. */
+static int i2c_xec_find_free_slot(struct i2c_xec_data *data)
+{
+	for (int i = 0; i < XEC_I2C_MAX_TARGETS; i++) {
+		if (data->targets[i] == NULL) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+/* Find the target registered with 7-bit address addr7. Returns NULL if none. */
+static struct i2c_target_config *i2c_xec_find_target(struct i2c_xec_data *data,
+						     uint8_t addr7)
+{
+	for (int i = 0; i < XEC_I2C_MAX_TARGETS; i++) {
+		if ((data->targets[i] != NULL) &&
+		    (data->targets[i]->address == addr7)) {
+			return data->targets[i];
+		}
+	}
+	return NULL;
+}
+
+/*
+ * Program OWN_ADDR from the registered targets. An unused slot keeps
+ * EC_OWN_I2C_ADDR (0x7F) so it never matches the general call address.
+ * PCR reset clears OWN_ADDR, so this runs from reset_config and from
+ * target (un)register.
+ */
+static void i2c_xec_program_own_addr(const struct device *dev)
+{
+	const struct i2c_xec_config *cfg = dev->config;
+	struct i2c_xec_data *data = dev->data;
+	struct i2c_smb_regs *regs = (struct i2c_smb_regs *)cfg->base_addr;
+	uint32_t oa = 0;
+
+	for (int i = 0; i < XEC_I2C_MAX_TARGETS; i++) {
+		uint8_t addr = (data->targets[i] != NULL) ?
+			       (uint8_t)data->targets[i]->address : EC_OWN_I2C_ADDR;
+
+		oa |= XEC_I2C_OA_SET(i, addr);
+	}
+	regs->OWN_ADDR = oa;
+}
+#endif /* CONFIG_I2C_TARGET */
+
 static int i2c_xec_reset_config(const struct device *dev)
 {
 	const struct i2c_xec_config *cfg =
@@ -281,11 +344,10 @@ static int i2c_xec_reset_config(const struct device *dev)
 	 * general call address and disable the general call match
 	 * enable in the configuration register.
 	 */
-	regs->OWN_ADDR = EC_OWN_I2C_ADDR | (EC_OWN_I2C_ADDR << 8);
 #ifdef CONFIG_I2C_TARGET
-	if (data->target_cfg) {
-		regs->OWN_ADDR = data->target_cfg->address;
-	}
+	i2c_xec_program_own_addr(dev);
+#else
+	regs->OWN_ADDR = EC_OWN_I2C_ADDR | (EC_OWN_I2C_ADDR << 8);
 #endif
 	/* Port number and filter enable MUST be written before enabling */
 	regs->CFG |= BIT(14); /* disable general call */
@@ -879,9 +941,10 @@ static bool i2c_xec_target_use_buf_write(const struct i2c_target_callbacks *cb)
 /* Hand collected write data to buf_write_received */
 static void i2c_xec_target_buf_write_flush(struct i2c_xec_data *data)
 {
-	const struct i2c_target_callbacks *cb = data->target_cfg->callbacks;
+	if (data->wr_buf_mode && (data->wr_len > 0U) && data->target_cfg) {
+		const struct i2c_target_callbacks *cb =
+			data->target_cfg->callbacks;
 
-	if (data->wr_buf_mode && (data->wr_len > 0U)) {
 		cb->buf_write_received(data->target_cfg, data->wr_buf,
 				       data->wr_len);
 	}
@@ -950,14 +1013,26 @@ static void i2c_xec_target_stretch_work(struct k_work *work)
 }
 #endif /* CONFIG_I2C_TARGET */
 
+#ifdef CONFIG_I2C_TARGET
+/* Used when no registered target matches: dummy data, no callbacks */
+static const struct i2c_target_callbacks i2c_xec_no_target_cb;
+
+static const struct i2c_target_callbacks *
+i2c_xec_target_cb_get(struct i2c_xec_data *data)
+{
+	return (data->target_cfg != NULL) ? data->target_cfg->callbacks
+					  : &i2c_xec_no_target_cb;
+}
+#endif
+
 static void i2c_xec_bus_isr(const struct device *dev)
 {
 #ifdef CONFIG_I2C_TARGET
 	const struct i2c_xec_config *cfg =
 		(const struct i2c_xec_config *const) (dev->config);
 	struct i2c_xec_data *data = dev->data;
-	const struct i2c_target_callbacks *target_cb =
-		data->target_cfg->callbacks;
+	/* Active target of the ongoing transaction */
+	const struct i2c_target_callbacks *target_cb = i2c_xec_target_cb_get(data);
 	struct i2c_smb_regs *regs = (struct i2c_smb_regs *)cfg->base_addr;
 	int ret;
 	uint32_t status;
@@ -1018,9 +1093,16 @@ static void i2c_xec_bus_isr(const struct device *dev)
 		uint8_t rx_data = regs->I2CDATA;
 
 #ifdef CONFIG_I2C_TARGET_BUFFER_MODE
-		/* repeated START: previous write segment is complete */
+		/* repeated START: previous write segment is complete
+		 * (flush to the previous target before switching)
+		 */
 		i2c_xec_target_buf_write_flush(data);
 #endif
+
+		/* Select the target matching the received address */
+		data->target_cfg = i2c_xec_find_target(
+			data, (rx_data >> 1) & XEC_I2C_TARGET_ADDR_MSK);
+		target_cb = i2c_xec_target_cb_get(data);
 
 		if (rx_data & BIT(I2C_READ_WRITE_POS)) {
 			/* target transmitter mode */
@@ -1192,14 +1274,40 @@ static int i2c_xec_target_register(const struct device *dev,
 {
 	const struct i2c_xec_config *cfg = dev->config;
 	struct i2c_xec_data *data = dev->data;
+	unsigned int key;
+	int slot;
 	int ret;
 
-	if (!config) {
+	if ((config == NULL) || (config->callbacks == NULL)) {
 		return -EINVAL;
 	}
 
-	if (data->target_attached) {
+	if ((config->flags & I2C_TARGET_FLAGS_ADDR_10_BITS) != 0U) {
+		return -ENOTSUP;
+	}
+
+	if (config->address > XEC_I2C_TARGET_ADDR_MSK) {
+		return -EINVAL;
+	}
+
+	if (i2c_xec_find_target(data, config->address) != NULL) {
+		return -EADDRINUSE;
+	}
+
+	slot = i2c_xec_find_free_slot(data);
+	if (slot < 0) {
 		return -EBUSY;
+	}
+
+	if (data->target_attached) {
+		/* Controller already running: only add the address, under
+		 * irq_lock so the ISR sees a consistent view.
+		 */
+		key = irq_lock();
+		data->targets[slot] = config;
+		i2c_xec_program_own_addr(dev);
+		irq_unlock(key);
+		return 0;
 	}
 
 	/* Wait for any outstanding transactions to complete so that
@@ -1210,10 +1318,12 @@ static int i2c_xec_target_register(const struct device *dev,
 		return ret;
 	}
 
-	data->target_cfg = config;
+	data->targets[slot] = config;
+	data->target_cfg = NULL;
 
 	ret = i2c_xec_reset_config(dev);
 	if (ret) {
+		data->targets[slot] = NULL;
 		return ret;
 	}
 
@@ -1233,19 +1343,53 @@ static int i2c_xec_target_unregister(const struct device *dev,
 {
 	const struct i2c_xec_config *cfg = dev->config;
 	struct i2c_xec_data *data = dev->data;
+	bool was_active;
+	bool last;
+	unsigned int key;
+	int slot = -1;
 
-	if (!data->target_attached) {
+	if (!data->target_attached || (config == NULL)) {
 		return -EINVAL;
 	}
 
-	data->target_cfg = NULL;
-	data->target_attached = false;
+	key = irq_lock();
+	for (int i = 0; i < XEC_I2C_MAX_TARGETS; i++) {
+		if (data->targets[i] == config) {
+			slot = i;
+			data->targets[i] = NULL;
+			break;
+		}
+	}
+	if (slot < 0) {
+		irq_unlock(key);
+		return -EINVAL;
+	}
 
-	mchp_xec_ecia_girq_src_dis(cfg->girq, cfg->girq_pos);
+	/* Stop matching this target's address */
+	i2c_xec_program_own_addr(dev);
 
-	/* Release a pending SCL stretch immediately */
-	k_work_cancel_delayable(&data->stretch_work);
-	i2c_xec_target_stretch_release(data);
+	was_active = (data->target_cfg == config);
+	if (was_active) {
+		data->target_cfg = NULL;
+	}
+
+	last = true;
+	for (int i = 0; i < XEC_I2C_MAX_TARGETS; i++) {
+		if (data->targets[i] != NULL) {
+			last = false;
+		}
+	}
+	if (last) {
+		data->target_attached = false;
+		mchp_xec_ecia_girq_src_dis(cfg->girq, cfg->girq_pos);
+	}
+	irq_unlock(key);
+
+	/* Release a pending SCL stretch of the removed (active) target */
+	if (was_active || last) {
+		k_work_cancel_delayable(&data->stretch_work);
+		i2c_xec_target_stretch_release(data);
+	}
 
 	return 0;
 }
@@ -1272,6 +1416,9 @@ static int i2c_xec_init(const struct device *dev)
 	data->target_cfg = NULL;
 	data->target_attached = false;
 #ifdef CONFIG_I2C_TARGET
+	for (int i = 0; i < XEC_I2C_MAX_TARGETS; i++) {
+		data->targets[i] = NULL;
+	}
 	data->dev = dev;
 	data->stretching = false;
 	k_work_init_delayable(&data->stretch_work,

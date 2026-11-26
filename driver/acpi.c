@@ -63,7 +63,7 @@ static uint8_t resp_buf[ACPI_RESP_LEN] = {0};
 static uint8_t wr_buf[ACPI_RECE_LEN];
 static uint16_t wr_len = 0;
 
-// Workaround for 2 slave address, check address to determine which command to process
+// Address of the current transfer (ACPI or SoCCP target)
 static uint8_t i2c_addr = 0;
 
 int acpi_resp_set(uint8_t *pdata, uint16_t len) {
@@ -134,14 +134,9 @@ static int acpi_target_write_requested_cb(struct i2c_target_config *config) {
 
     i2c_state = I2C_STATE_START_WRITE;
 
-#if !defined(CONFIG_APP_BOOTLOADER)
-    // Workaround for 2 slave address, check address to determine which command to process
-    #define ACPI_I2C_REG_BASE (DT_REG_ADDR_BY_IDX(DT_ALIAS(acpi_i2c), 0))
-    #define I2C_DATA_REG_OFFSET 0x08
-    i2c_addr = (sys_read32(ACPI_I2C_REG_BASE + I2C_DATA_REG_OFFSET) >> 1) & 0x7F;
-#else
-    i2c_addr = ACPI_ADDR;
-#endif
+    // Each address is registered as its own target, the driver passes the
+    // matching config
+    i2c_addr = config->address;
 
     return 0;
 }
@@ -205,6 +200,8 @@ static int acpi_target_buf_read_requested_cb(struct i2c_target_config *config,
                                              uint8_t **ptr, uint32_t *len) {
     acpi_wr_submit();
 
+    i2c_addr = config->address;
+
     i2c_state = I2C_STATE_READ;
 
     *ptr = resp_buf;
@@ -234,24 +231,34 @@ static struct i2c_target_callbacks acpi_target_callbacks = {
     .stop = acpi_target_stop_cb,
 };
 
-static struct i2c_target_config target_cfg = {
-    // Workaround for 2 slave address
-#if !defined(CONFIG_APP_BOOTLOADER)
-    .address = ACPI_ADDR | (SOCCP_ADDR << 8),
-#else
+// Two targets on the same bus, the driver selects one by the address byte
+static struct i2c_target_config acpi_target_cfg = {
     .address = ACPI_ADDR,
-#endif
     .callbacks = &acpi_target_callbacks,
 };
+
+#if !defined(CONFIG_APP_BOOTLOADER)
+static struct i2c_target_config soccp_target_cfg = {
+    .address = SOCCP_ADDR,
+    .callbacks = &acpi_target_callbacks,
+};
+#endif
 
 #include <zephyr/init.h>
 
 static int init_config(void) {
 
-    if (i2c_target_register(bus, &target_cfg) < 0) {
-        LOG_ERR("Failed to register target");
+    if (i2c_target_register(bus, &acpi_target_cfg) < 0) {
+        LOG_ERR("Failed to register ACPI target 0x%02x", ACPI_ADDR);
         return -1;
     }
+
+#if !defined(CONFIG_APP_BOOTLOADER)
+    if (i2c_target_register(bus, &soccp_target_cfg) < 0) {
+        LOG_ERR("Failed to register SoCCP target 0x%02x", SOCCP_ADDR);
+        return -1;
+    }
+#endif
 
 #if !defined(CONFIG_APP_BOOTLOADER)
 #if ACPI_INT_AVAILABLE
