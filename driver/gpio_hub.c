@@ -28,6 +28,10 @@ static const gpio_lst_t gpio_lst[] = {
         GPIO_INPUT,
     },
     {
+        QC_GPIO_GET(thro_mira),
+        GPIO_INPUT,
+    },
+    {
         QC_GPIO_GET(fan_12v_enable),
         GPIO_OUTPUT_INACTIVE,
     },

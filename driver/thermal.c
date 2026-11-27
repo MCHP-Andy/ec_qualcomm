@@ -75,7 +75,7 @@ static int init_config(void) {
 
     LOG_INF("Initializing thermal sensor...");
 
-    for (size_t i = 0; i < ARRAY_SIZE(dev_list); i++) {
+    for (size_t i = THERM_DEV_1; i < ARRAY_SIZE(dev_list); i++) {
         if (!device_is_ready(dev_list[i].dev)) {
             LOG_ERR("ADC device for channel %d not ready", i);
             ret = -ENODEV;

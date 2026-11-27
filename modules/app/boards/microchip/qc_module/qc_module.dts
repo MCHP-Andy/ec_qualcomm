@@ -33,9 +33,6 @@
 		base-fan = &fan0;
 		base-tach = &tach1;
 
-		led0 = &led2;
-		wk-btn = &s2;
-
 		aoss-i2c = &i2c_smb_0;
 		acpi-i2c = &i2c_smb_1;
 		soccp-i2c = &i2c_smb_1; /* same controller as acpi-i2c */
@@ -43,45 +40,25 @@
 	};
 
 	zephyr,user {
-		himax-wk-gpios = <MCHP_GPIO_DECODE_140 GPIO_ACTIVE_HIGH>;
-
-		acpi-int-gpios = <MCHP_GPIO_DECODE_226 GPIO_ACTIVE_HIGH>;
-		sen-int-gpios = <MCHP_GPIO_DECODE_157 GPIO_ACTIVE_HIGH>;
+		acpi-int-gpios = <MCHP_GPIO_DECODE_061 GPIO_ACTIVE_HIGH>; /* EC_I2C_ACPI_INT_N */
+		sen-int-gpios = <MCHP_GPIO_DECODE_072 GPIO_ACTIVE_HIGH>; /* SENSORS_I2C6_INT */
 
 		board-id0-gpios = <MCHP_GPIO_DECODE_204 GPIO_ACTIVE_HIGH>;
 		board-id1-gpios = <MCHP_GPIO_DECODE_205 GPIO_ACTIVE_HIGH>;
 
 		io-channels =  <&adc0 0>, <&adc0 1>, <&adc0 2>;
 
-		thro-mira-gpios = <MCHP_GPIO_DECODE_164 GPIO_ACTIVE_HIGH>;
-		wk-en-gpios = <MCHP_GPIO_DECODE_221 GPIO_ACTIVE_HIGH>;
+		thro-mira-gpios = <MCHP_GPIO_DECODE_073 GPIO_ACTIVE_HIGH>; /* SYS_THROTTLE_MIRA_N */
+		wk-en-gpios = <MCHP_GPIO_DECODE_063 GPIO_ACTIVE_HIGH>; /* EC_WP_EN */
 		slp-indicator-gpios = <MCHP_GPIO_DECODE_011 GPIO_ACTIVE_HIGH>;
 		soc-rev-gpios = <MCHP_GPIO_DECODE_203 GPIO_ACTIVE_HIGH>;
 		resout-3p3-gpios = <MCHP_GPIO_DECODE_244 GPIO_ACTIVE_HIGH>;
-		misc-1p8-gpios = <MCHP_GPIO_DECODE_240 GPIO_ACTIVE_HIGH>;
+		misc-1p8-gpios = <MCHP_GPIO_DECODE_065 GPIO_ACTIVE_HIGH>; /* V_L15B0_MISC_1P8 */
 		ec-psl-gpios = <MCHP_GPIO_DECODE_243 GPIO_ACTIVE_HIGH>;
-		soc-pwr-status-gpios = <MCHP_GPIO_DECODE_242 GPIO_ACTIVE_HIGH>;
+		soc-pwr-status-gpios = <MCHP_GPIO_DECODE_066 GPIO_ACTIVE_HIGH>; /* EC_SOC_PWR_STATUS */
 
 		fan-max-rpm-gpios = <MCHP_GPIO_DECODE_206 GPIO_ACTIVE_HIGH>;
 		fan-12v-enable-gpios = <MCHP_GPIO_DECODE_242 GPIO_ACTIVE_HIGH>;
-	};
-
-	leds {
-        compatible = "gpio-leds";
-        led2: led_2 {
-            gpios = <MCHP_GPIO_DECODE_153 GPIO_ACTIVE_HIGH>;
-        };
-
-		led3: led_3 {
-            gpios = <MCHP_GPIO_DECODE_157 GPIO_ACTIVE_HIGH>;
-        };
-    };
-
-	btns {
-		compatible = "gpio-keys";
-		s2: btn_1 {
-			gpios = <MCHP_GPIO_DECODE_141 GPIO_ACTIVE_LOW>;
-		};
 	};
 
 	soc {
@@ -242,7 +219,7 @@
 	#size-cells = <0>;
 
     status = "okay";
-    pinctrl-0 = < &adc00_gpio200 &adc01_gpio201 &adc02_gpio202 &adc04_gpio204 &adc05_gpio205 >;
+    pinctrl-0 = < &adc00_gpio200 &adc01_gpio201 &adc02_gpio202 >;
 	pinctrl-names = "default";
 
     channel@0 {
@@ -261,20 +238,6 @@
 	};
 	channel@2 {
 		reg = <2>;
-		zephyr,gain = "ADC_GAIN_1";
-		zephyr,reference = "ADC_REF_INTERNAL";
-		zephyr,acquisition-time = <0>;
-		zephyr,resolution = <12>;
-	};
-    channel@4 {
-		reg = <4>;
-		zephyr,gain = "ADC_GAIN_1";
-		zephyr,reference = "ADC_REF_INTERNAL";
-		zephyr,acquisition-time = <0>;
-		zephyr,resolution = <12>;
-	};
-    channel@5 {
-		reg = <5>;
 		zephyr,gain = "ADC_GAIN_1";
 		zephyr,reference = "ADC_REF_INTERNAL";
 		zephyr,acquisition-time = <0>;

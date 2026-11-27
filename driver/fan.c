@@ -496,7 +496,7 @@ static int init_config(void) {
     
     fan_constraint_set(fan_allow_on);
 
-    for (size_t i = 0; i < ARRAY_SIZE(dev_list); i++) {
+    for (size_t i = FAN_ID_1; i < ARRAY_SIZE(dev_list); i++) {
 
         if (!pwm_is_ready_dt(&dev_list[i].fan)) {
             LOG_ERR("fan%d not ready", i);
