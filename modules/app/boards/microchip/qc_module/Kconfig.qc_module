@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 config BOARD_QC_MODULE
-	select SOC_MEC172X_NSZ
+	select SOC_DEC1557
 	select HAS_PM
 
 # For zephyr 3.7

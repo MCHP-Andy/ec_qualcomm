@@ -1,0 +1,11 @@
+# Copyright (c) 2025 Microchip Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+# SOC_MEC172X_NSZ (selected by SOC_DEC1557) also provides a SOC default.
+# Kconfig.defconfig is parsed before any Kconfig.soc, so this default wins.
+if SOC_DEC1557
+
+config SOC
+	default "DEC1557"
+
+endif # SOC_DEC1557

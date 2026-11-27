@@ -1,0 +1,10 @@
+# Copyright (c) 2025 Microchip Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+# DEC1557 is an alias of the in-tree MEC172x NSZ SoC. Selecting
+# SOC_MEC172X_NSZ reuses the Zephyr MEC172x Kconfig, sources and the
+# CONFIG_SOC_MEC172X_NSZ code paths in drivers unchanged.
+
+config SOC_DEC1557
+	bool
+	select SOC_MEC172X_NSZ

@@ -1,0 +1,6 @@
+family:
+- name: microchip_mec
+  series:
+  - name: mec172x
+    socs:
+    - name: DEC1557

@@ -5,4 +5,4 @@ board:
   # For zephyr 3.7 end
   vendor: microchip
   socs:
-  - name: mec172x_nsz
+  - name: DEC1557
