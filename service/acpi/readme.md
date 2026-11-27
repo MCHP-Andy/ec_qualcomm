@@ -136,7 +136,7 @@ App 端 0xBB 只支援：
 
 `0xB0` (flashing capabilities) 目前未支援。
 
-### Bootloader ([ec_fw_update_bootloader.c](ec_fw_update_bootloader.c))
+### Bootloader ([ec_fw_update.c](ec_fw_update.c)，`CONFIG_APP_BOOTLOADER`)
 | Opcode | 名稱 | cmd | resp |
 | --- | --- | --- | --- |
 | 0xEB | FW corruption status | `EB` | `01 status` |
@@ -192,7 +192,7 @@ BB 01 33                 # 離開 bootloader
 | `acpi write <op> [data ...]` | 以 hex 模擬 Host 寫入命令，整包以 `acpi_cmd_submit` 送出 (等同 I2C stop) |
 
 Shell 沒有讀取 response 的命令，需搭配 log 或由 Host 端讀回確認。
-`ec_fw_update_bootloader.c` 內的 `fw_update` shell 受 `CONFIG_FW_UPDATE_SHELL` 控制，
+`ec_fw_update.c` (bootloader) 內的 `fw_update` shell 受 `CONFIG_FW_UPDATE_SHELL` 控制，
 該 option 目前沒有在任何 Kconfig 中定義，因此不會編入。
 
 ## Test

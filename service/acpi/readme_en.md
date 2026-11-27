@@ -143,7 +143,7 @@ On the app side, 0xBB supports only:
 
 `0xB0` (flashing capabilities) is not supported yet.
 
-### Bootloader ([ec_fw_update_bootloader.c](ec_fw_update_bootloader.c))
+### Bootloader ([ec_fw_update.c](ec_fw_update.c), `CONFIG_APP_BOOTLOADER`)
 | Opcode | Name | cmd | resp |
 | --- | --- | --- | --- |
 | 0xEB | FW corruption status | `EB` | `01 status` |
@@ -205,7 +205,7 @@ BB 01 33                 # exit bootloader
 | `acpi write <op> [data ...]` | Simulate a host write in hex; submits the whole write with `acpi_cmd_submit` (same as an I2C stop) |
 
 The shell has no command to read the response; check the log or read it back from the host.
-The `fw_update` shell in `ec_fw_update_bootloader.c` is guarded by `CONFIG_FW_UPDATE_SHELL`, which is
+The `fw_update` shell in `ec_fw_update.c` (bootloader) is guarded by `CONFIG_FW_UPDATE_SHELL`, which is
 not defined in any Kconfig yet, so it is never compiled in.
 
 ## Test

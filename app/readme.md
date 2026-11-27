@@ -69,7 +69,7 @@ Driver 與 service 共用的 API 定義。`acpi.h`、`storage.h` 中 bootloader 
 部分 (buffer 大小、image header) 以 `CONFIG_APP_BOOTLOADER` 區分。
 
 ### 📂 `service/` (Core Logic Layer)
-ACPI service 由兩者共用；`ec_fw_update_bootloader.c` 與 `flash/` 僅 bootloader 使用，
+ACPI service 由兩者共用 (`ec_fw_update.c` 以 `CONFIG_APP_BOOTLOADER` 區分 app / bootloader 實作)；`flash/` 僅 bootloader 使用，
 SCI、Fan、Thermal、Power、SoCCP 等 service 僅 app 使用。
 
 ### 📂 `driver/` (Driver Layer / Infrastructure)

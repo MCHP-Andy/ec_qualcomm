@@ -91,7 +91,7 @@ BUILD_ASSERT(sizeof(fw_hdr_t) == EC_FW_HEADER_SIZE,
  *
  * @note Implemented in driver (driver/storage.c), called by
  *       bootloader (bootloader/main.c) and service
- *       (service/acpi/ec_fw_update_bootloader.c).
+ *       (service/acpi/ec_fw_update.c).
  *
  * @param hdr Pointer to the 32B header read from Flash.
  * @return false if the header or image is invalid, or when staying in
@@ -104,7 +104,7 @@ bool ec_validate_image_header(const fw_hdr_t *hdr);
  *
  * @note Implemented in driver (driver/storage.c), called by
  *       bootloader (bootloader/main.c) and service
- *       (service/acpi/ec_fw_update_bootloader.c).
+ *       (service/acpi/ec_fw_update.c).
  *
  * @param hdr Buffer to receive the 32B header
  * @return 0 on success, negative error code on failure

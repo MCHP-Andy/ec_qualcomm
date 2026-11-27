@@ -13,7 +13,7 @@ Bootloader 專用的 flash 操作 service。由單一 thread 依序執行 write 
 ```mermaid
 graph LR
     subgraph "Callers"
-        FW[ACPI FW update<br/>ec_fw_update_bootloader.c]
+        FW[ACPI FW update<br/>ec_fw_update.c]
         STO[driver/storage.c]
     end
 

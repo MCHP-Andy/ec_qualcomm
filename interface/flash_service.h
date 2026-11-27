@@ -54,7 +54,7 @@ typedef struct flash_service_msg_t {
  * set) is called when this one finished.
  *
  * @note Implemented in service (service/flash), called by service
- *       (service/acpi/ec_fw_update_bootloader.c).
+ *       (service/acpi/ec_fw_update.c).
  *
  * @param msg Request, copied into the queue.
  * @retval 0 queued.
@@ -83,7 +83,7 @@ int flash_service_request(const flash_service_msg_t *msg, uint32_t *crc_result);
  * @brief Whether a flash operation is queued or running.
  *
  * @note Implemented in service (service/flash), called by service
- *       (service/acpi/ec_fw_update_bootloader.c).
+ *       (service/acpi/ec_fw_update.c).
  *
  * @retval true  at least one operation has not finished yet.
  * @retval false the flash service is idle.

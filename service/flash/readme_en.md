@@ -15,7 +15,7 @@ Built only with `CONFIG_APP_BOOTLOADER=y`; there is no separate Kconfig or shell
 ```mermaid
 graph LR
     subgraph "Callers"
-        FW[ACPI FW update<br/>ec_fw_update_bootloader.c]
+        FW[ACPI FW update<br/>ec_fw_update.c]
         STO[driver/storage.c]
     end
 
