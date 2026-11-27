@@ -49,8 +49,9 @@ typedef struct flash_service_msg_t {
  *
  * Returns as soon as the request is queued. The EC status (boot info, read by
  * ACPI 0xEC) is EC_STATE_BUSY from this call until every queued operation has
- * finished, then EC_STATE_BOOTLOADER_IDLE_WP_OFF, or EC_STATE_SPI_OP_FAILED if
- * one of them failed. msg->done (if set) is called when this one finished.
+ * finished, then EC_STATE_BOOTLOADER_IDLE_WP_OFF, also when one of them
+ * failed (a failure is only logged and passed to msg->done). msg->done (if
+ * set) is called when this one finished.
  *
  * @note Implemented in service (service/flash), called by service
  *       (service/acpi/ec_fw_update_bootloader.c).

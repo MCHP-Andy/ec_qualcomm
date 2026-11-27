@@ -37,7 +37,7 @@ graph LR
     Q --> THR
     THR --> DRV
     THR -->|done callback| FW
-    THR -->|IDLE / SPI_OP_FAILED| INFO
+    THR -->|IDLE| INFO
 ```
 
 ### Flow
@@ -46,8 +46,8 @@ graph LR
    may live on the stack.
 2. The thread (stack 1024, priority 5) runs the requests in order. After each one it calls the `done`
    callback first (e.g. to store a CRC result), then updates the status: once every queued request
-   has finished it is `EC_STATE_BOOTLOADER_IDLE_WP_OFF`, or `EC_STATE_SPI_OP_FAILED` if one of them
-   failed (cleared by the next submit).
+   has finished it is `EC_STATE_BOOTLOADER_IDLE_WP_OFF`, also when one of them failed: a failure is
+   only logged and passed to the `done` callback (`EC_STATE_SPI_OP_FAILED` is not reported for now).
 3. The host polls the status with ACPI `0xEC` and waits for idle before the next step.
 4. `flash_service_request()` is built on submit plus a semaphore on the caller's stack; it returns the
    result once the callback gives the semaphore.

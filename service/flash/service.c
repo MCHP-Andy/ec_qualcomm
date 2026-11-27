@@ -27,7 +27,10 @@ K_MSGQ_DEFINE(flash_service_queue, sizeof(flash_service_msg_t),
  *   submit A, B, C : pending 1 -> 2 -> 3, status BUSY
  *   A done         : pending 2, status unchanged (BUSY)
  *   B done         : pending 1, status unchanged (BUSY)
- *   C done         : pending 0, status IDLE (or SPI_OP_FAILED)
+ *   C done         : pending 0, status IDLE
+ *
+ * A failed request is only logged (and passed to its done callback); the
+ * status still returns to IDLE, SPI_OP_FAILED is not reported for now.
  *
  * Counting at submit (not when the thread takes the request) keeps the status
  * BUSY in the window before the lower priority flash thread runs. Both sides
@@ -35,16 +38,11 @@ K_MSGQ_DEFINE(flash_service_queue, sizeof(flash_service_msg_t),
  */
 static struct k_spinlock status_lock;
 static uint32_t pending;  // Requests queued or running
-static bool op_failed;    // One of the outstanding requests failed
 
 // A request is submitted: count it and report BUSY
 static void flash_service_pending_inc(void) {
     k_spinlock_key_t key = k_spin_lock(&status_lock);
 
-    if (pending == 0) {
-        // First request of a new batch: forget the previous failure
-        op_failed = false;
-    }
     pending++;
     ec_boot_info_get()->status = EC_STATE_BUSY;
 
@@ -52,20 +50,15 @@ static void flash_service_pending_inc(void) {
 }
 
 // A request finished (or was not queued): only the last one updates the status
-static void flash_service_pending_dec(int result) {
+static void flash_service_pending_dec(void) {
     k_spinlock_key_t key = k_spin_lock(&status_lock);
 
-    if (result < 0) {
-        // Kept until the batch ends, a later success does not clear it
-        op_failed = true;
-    }
     if (pending > 0) {
         pending--;
     }
     if (pending == 0) {
-        // Last outstanding request finished: leave BUSY
-        ec_boot_info_get()->status = op_failed ? EC_STATE_SPI_OP_FAILED
-                                               : EC_STATE_BOOTLOADER_IDLE_WP_OFF;
+        // Last outstanding request finished: leave BUSY (also after a failure)
+        ec_boot_info_get()->status = EC_STATE_BOOTLOADER_IDLE_WP_OFF;
     }
     // pending > 0: other requests are still queued, status stays BUSY
 
@@ -136,7 +129,7 @@ static void flash_service(void) {
         if (msg.done != NULL) {
             msg.done(msg.command, ret, crc, msg.user_data);
         }
-        flash_service_pending_dec(ret);
+        flash_service_pending_dec();
     }
 }
 
@@ -176,7 +169,7 @@ static int flash_service_queue_put(const flash_service_msg_t *msg,
     if (ret < 0) {
         LOG_ERR("Failed to queue flash command %d: %d", msg->command, ret);
         // Not queued: undo its count (status IDLE again if it was the only one)
-        flash_service_pending_dec(0);
+        flash_service_pending_dec();
         return -ENOMEM;
     }
 

@@ -158,7 +158,8 @@ App 端 0xBB 只支援：
 - `0xA0` 的 `mand` 為 513，必須送滿 512 bytes 才會執行。
 - `0xAF` 目前只支援 `0x21` (erase backup main，`CONFIG_BOARD_QC_MODULE`)，其餘 sub-command 只印 log。
 - 所有 flash 操作透過 [flash service](../flash/readme.md) 非同步執行：`0xAE` / `0xAF` / `0xAA` / `0xA7` /
-  `0xBB F0` (Run CRC) 送出後立即返回，Host 以 `0xEC` poll，`0xFF` (busy) 結束後為 `0x0B` (idle)，失敗為 `0xFA`。
+  `0xBB F0` (Run CRC) 送出後立即返回，Host 以 `0xEC` poll，`0xFF` (busy) 結束後為 `0x0B` (idle)；
+  flash 操作失敗只印 log，status 一樣回到 idle (目前不回報 `0xFA`)。
 - Flash busy 時，上述 flash 命令與 `0xA0` / `0xA1` (與 0xAA / 0xA7 共用 RAM buffer) 回傳 `-EBUSY`，不更新 response。
 - `0xA7` 完成 (0xEC idle) 後才能用 `0xA1` 讀取；`0xBB F0` 完成後才能用 `0xA2` 讀取 CRC 結果。
 

@@ -169,7 +169,8 @@ Notes:
   sub-commands only log.
 - All flash operations run asynchronously in the [flash service](../flash/readme_en.md): `0xAE` / `0xAF` /
   `0xAA` / `0xA7` / `0xBB F0` (Run CRC) return as soon as they are queued, and the host polls `0xEC`:
-  `0xFF` (busy), then `0x0B` (idle), or `0xFA` on failure.
+  `0xFF` (busy), then `0x0B` (idle). A failed flash operation is only logged and the status still
+  returns to idle (`0xFA` is not reported for now).
 - While the flash is busy, these flash commands and `0xA0` / `0xA1` (which share the RAM buffer with
   0xAA / 0xA7) return `-EBUSY` and do not update the response.
 - Read with `0xA1` only after `0xA7` has finished (0xEC idle); read the CRC with `0xA2` only after

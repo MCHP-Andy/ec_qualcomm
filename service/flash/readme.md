@@ -35,7 +35,7 @@ graph LR
     Q --> THR
     THR --> DRV
     THR -->|done callback| FW
-    THR -->|IDLE / SPI_OP_FAILED| INFO
+    THR -->|IDLE| INFO
 ```
 
 ### 流程
@@ -43,7 +43,7 @@ graph LR
    (`K_NO_WAIT`，滿了回傳 `-ENOMEM`) 後立即返回，呼叫端的 msg 可以放在 stack。
 2. Thread (stack 1024，priority 5) 依序執行，完成後先呼叫 `done` callback (例如寫入 CRC 結果)，
    再更新 status：佇列中的請求全部完成後設為 `EC_STATE_BOOTLOADER_IDLE_WP_OFF`，
-   其中任一失敗則設為 `EC_STATE_SPI_OP_FAILED` (下一次 submit 時清除)。
+   即使有失敗也一樣回到 IDLE，失敗只印 log 並傳給 `done` callback (目前不回報 `EC_STATE_SPI_OP_FAILED`)。
 3. Host 以 ACPI `0xEC` poll status，等到 idle 才進行下一步。
 4. `flash_service_request()` 以 submit 加上 stack 上的 semaphore 實作，等 callback give 後返回結果。
 

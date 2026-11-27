@@ -104,7 +104,7 @@ static uint8_t  active_control_path = EC_FLASH_PATH_INT;
 /*
  * Flash commands (0xAE / 0xAF / 0xAA / 0xA7 / 0xBB Run CRC) are queued to the
  * flash service and return at once, so the ACPI thread stays free and 0xEC
- * reports the live flash status (BUSY / IDLE / SPI_OP_FAILED). The host polls
+ * reports the live flash status (BUSY / IDLE). The host polls
  * 0xEC until the flash is idle before the next step.
  *
  * While the flash is busy, flash commands and the RAM buffer commands
