@@ -12,7 +12,7 @@
 
 #include "acpi_tbl.h"
 
-LOG_MODULE_DECLARE(acpi);
+LOG_MODULE_DECLARE(acpi, CONFIG_ACPI_LOG_LEVEL);
 
 /* Image address (Get from DTS) */
 #if defined(CONFIG_BOARD_QEMU_CORTEX_M3)

@@ -5,7 +5,7 @@
 
 #include "acpi_tbl.h"
 
-LOG_MODULE_DECLARE(acpi);
+LOG_MODULE_DECLARE(acpi, CONFIG_ACPI_LOG_LEVEL);
 
 static int acpi_dev_fw_ver(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
                     uint8_t *resp, uint16_t resp_len) {

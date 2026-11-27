@@ -8,7 +8,7 @@
 
 #include "acpi_tbl.h"
 
-LOG_MODULE_DECLARE(acpi);
+LOG_MODULE_DECLARE(acpi, CONFIG_ACPI_LOG_LEVEL);
 
 /* 0xBB SPI Service Sub-commands (cmd) */
 #define SPI_SUBCMD_EXIT_BOOTLOADER          0x33
