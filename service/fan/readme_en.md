@@ -100,7 +100,7 @@ Notes:
   always reports the profile of fan 1.
 - A 0x28 write sends SCI `0x34`.
 - 0x23 (modern standby) is handled by the [power service](../power/readme_en.md); 0x05 / 0x35 are handled
-  by [SCI](../sci/readme_en.md) / [ACPI](../acpi/readme_en.md).
+  by [SCI](../sci/readme_en.md).
 
 ## SCI
 | SCI | Trigger |

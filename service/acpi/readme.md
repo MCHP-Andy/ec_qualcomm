@@ -126,7 +126,7 @@ static int acpi_xxx(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
 | 0x20 ~ 0x30 | Fan 相關 | [fan](../fan/readme.md) | | |
 | 0x23 | Modern standby notify | [power](../power/readme.md) | `23 status` | - |
 | 0x29 ~ 0x34 | Thermistor 相關 | [thermal](../thermal/readme.md) | | |
-| 0x35 | EC function flags | [ec_act_cool.c](ec_act_cool.c) | `35 [08 flags(8)]` | `08 flags(8)`；bit0 = SCI enable |
+| 0x35 | EC function flags | [sci](../sci/service.c) | `35 [08 flags(8)]` | `08 flags(8)`；bit0 = SCI enable |
 | 0xBB | SPI services | [ec_fw_update.c](ec_fw_update.c) | `BB 01 sub` | - |
 | 0xEC | EC state & WP status | ec_fw_update.c | `EC` | `02 state path` |
 

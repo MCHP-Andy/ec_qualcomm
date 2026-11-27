@@ -7,5 +7,4 @@ target_sources(app PRIVATE ec_fw_update.c)
 
 if(NOT CONFIG_APP_BOOTLOADER)
     target_sources(app PRIVATE ec_ver_and_cap.c)
-    target_sources(app PRIVATE ec_act_cool.c)
 endif()

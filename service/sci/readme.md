@@ -77,8 +77,9 @@ graph LR
 | Opcode | 名稱 | cmd | resp |
 | --- | --- | --- | --- |
 | 0x05 | Active cooling SCI event | `05` | `sci` (`00` 表示沒有 pending) |
+| 0x35 | EC function flags | `35 [08 flags(8)]` | `08 flags(8)` |
 
-SCI 開關由 `0x35` EC function flags 的 bit0 控制，見 [ACPI service](../acpi/readme.md)。
+SCI 開關由 `0x35` EC function flags 的 bit0 控制 (寫入 `35 08 flags(8)`，讀取 `35`)。
 
 ## Shell
 | 命令 | 說明 |

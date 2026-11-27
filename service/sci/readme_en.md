@@ -81,8 +81,9 @@ graph LR
 | Opcode | Name | cmd | resp |
 | --- | --- | --- | --- |
 | 0x05 | Active cooling SCI event | `05` | `sci` (`00` means nothing pending) |
+| 0x35 | EC function flags | `35 [08 flags(8)]` | `08 flags(8)` |
 
-SCI is switched on and off by bit0 of the `0x35` EC function flags; see the [ACPI service](../acpi/readme_en.md).
+SCI is switched on and off by bit0 of the `0x35` EC function flags (write `35 08 flags(8)`, read `35`).
 
 ## Shell
 | Command | Description |

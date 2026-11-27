@@ -93,7 +93,7 @@ Thread 在系統事件 (power state change)、`FAN_TEMP_CHG`、`FAN_CFG_UPDATE` 
 補充：
 - 0x24 寫入時 fan 為 0 視為 fan 1，會重新載入 LUT 並送 SCI `0x35`；讀取固定回報 fan 1 的 profile。
 - 0x28 寫入會送 SCI `0x34`。
-- 0x23 (modern standby) 由 [power service](../power/readme.md) 處理；0x05 / 0x35 由 [SCI](../sci/readme.md) / [ACPI](../acpi/readme.md) 處理。
+- 0x23 (modern standby) 由 [power service](../power/readme.md) 處理；0x05 / 0x35 由 [SCI](../sci/readme.md) 處理。
 
 ## SCI
 | SCI | 觸發條件 |

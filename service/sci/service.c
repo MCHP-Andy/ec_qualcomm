@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
@@ -146,8 +147,40 @@ static int acpi_active_cooling_sci_event(const acpi_cmd_t *cmd_info,
     return 1;
 }
 
+/* 0x35: EC functionality flags, bit0 = SCI event enable */
+static int acpi_func_flag(const acpi_cmd_t *cmd_info, uint8_t *cmd,
+                          uint16_t cmd_len, uint8_t *resp, uint16_t resp_len) {
+    uint64_t flags = 0;
+    bool sci_en;
+
+    ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
+
+    // Write: Cmd + ByteCount + Flag(8)
+    if (ACPI_IS_WRITE(cmd_info, cmd_len)) {
+        ACPI_CHECK_WRITE(cmd_info, cmd_len); // 1 + 9 = 10
+        memcpy(&flags, &cmd[2], sizeof(flags));
+
+        sci_en = flags & 0x01;
+        acpi_sci_enable_set(sci_en);
+        LOG_DBG("Set EC function flags: 0x%016llx", flags);
+        return 0;
+    }
+
+    // Read
+    ACPI_CHECK_OUT(cmd_info, resp, resp_len);
+    acpi_sci_enable_get(&sci_en);
+    flags = sci_en;
+
+    resp[0] = 0x08; // Byte count
+    memcpy(&resp[1], &flags, sizeof(flags));
+
+    LOG_DBG("Get EC function flags: 0x%016llx", flags);
+    return 9; // Byte count + Flag(8)
+}
+
 // clang-format off
 ACPI_CMD_SUBSCRIBE(sci, EC_ACTIVE_COOLING_SCI_EVENT, acpi_active_cooling_sci_event, 1, 0, 1); // Page 37
+ACPI_CMD_SUBSCRIBE(sci, EC_FUNC_FLAG,                acpi_func_flag,                1, 9, 9); // Page 35/36 (Optional ByteCount + Flag(8))
 // clang-format on
 
 static void sci_notify_hdl(void) {

@@ -132,7 +132,7 @@ response.
 | 0x20 ~ 0x30 | Fan commands | [fan](../fan/readme_en.md) | | |
 | 0x23 | Modern standby notify | [power](../power/readme_en.md) | `23 status` | - |
 | 0x29 ~ 0x34 | Thermistor commands | [thermal](../thermal/readme_en.md) | | |
-| 0x35 | EC function flags | [ec_act_cool.c](ec_act_cool.c) | `35 [08 flags(8)]` | `08 flags(8)`; bit0 = SCI enable |
+| 0x35 | EC function flags | [sci](../sci/service.c) | `35 [08 flags(8)]` | `08 flags(8)`; bit0 = SCI enable |
 | 0xBB | SPI services | [ec_fw_update.c](ec_fw_update.c) | `BB 01 sub` | - |
 | 0xEC | EC state & WP status | ec_fw_update.c | `EC` | `02 state path` |
 
