@@ -7,7 +7,7 @@ load-to-RAM in order, so flash accesses never overlap. Two ways to call it:
 - `flash_service_submit()`: asynchronous, returns as soon as the request is queued and calls a
   callback when done. Used by the ACPI FW update commands.
 - `flash_service_request()`: synchronous, returns when the operation is done. Used by the boot-time
-  image load / validation (`driver/storage_bootloader.c`).
+  image load / validation (`driver/storage.c`).
 
 Built only with `CONFIG_APP_BOOTLOADER=y`; there is no separate Kconfig or shell.
 
@@ -16,7 +16,7 @@ Built only with `CONFIG_APP_BOOTLOADER=y`; there is no separate Kconfig or shell
 graph LR
     subgraph "Callers"
         FW[ACPI FW update<br/>ec_fw_update_bootloader.c]
-        STO[driver/storage_bootloader.c]
+        STO[driver/storage.c]
     end
 
     subgraph "Flash service"

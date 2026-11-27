@@ -89,7 +89,7 @@ BUILD_ASSERT(sizeof(fw_hdr_t) == EC_FW_HEADER_SIZE,
  * function jumps to the App without returning. Each failure increments the
  * boot fail count.
  *
- * @note Implemented in driver (driver/storage_bootloader.c), called by
+ * @note Implemented in driver (driver/storage.c), called by
  *       bootloader (bootloader/main.c) and service
  *       (service/acpi/ec_fw_update_bootloader.c).
  *
@@ -102,7 +102,7 @@ bool ec_validate_image_header(const fw_hdr_t *hdr);
 /**
  * @brief Read the Active Main image header from Flash
  *
- * @note Implemented in driver (driver/storage_bootloader.c), called by
+ * @note Implemented in driver (driver/storage.c), called by
  *       bootloader (bootloader/main.c) and service
  *       (service/acpi/ec_fw_update_bootloader.c).
  *
@@ -114,8 +114,8 @@ int ec_get_image_header(fw_hdr_t *hdr);
 /**
  * @brief Calculate Checksum over the specified Flash region (byte-wise sum)
  *
- * @note Implemented in driver (driver/storage_bootloader.c), called by
- *       driver (driver/storage_bootloader.c).
+ * @note Implemented in driver (driver/storage.c), called by
+ *       driver (driver/storage.c).
  *
  * @param addr Flash start address
  * @param size Length to calculate (bytes)
@@ -182,7 +182,7 @@ BUILD_ASSERT(sizeof(ec_boot_info_t) == 12, "ec_boot_info_t layout changed!");
 /**
  * @brief Get the RAM copy of boot info (call ec_boot_info_save after modifying)
  *
- * @note Implemented in driver (driver/storage.c, driver/storage_bootloader.c),
+ * @note Implemented in driver (driver/storage.c),
  *       called by app (app/main.c) and service (service/acpi, service/flash).
  *
  * @return Pointer to the boot info RAM copy, never NULL.
@@ -192,7 +192,7 @@ ec_boot_info_t *ec_boot_info_get(void);
 /**
  * @brief Write the RAM copy back to retention
  *
- * @note Implemented in driver (driver/storage.c, driver/storage_bootloader.c),
+ * @note Implemented in driver (driver/storage.c),
  *       called by app (app/main.c) and service (service/acpi).
  *
  * @return 0 on success, negative error code on failure
@@ -202,7 +202,7 @@ int ec_boot_info_save(void);
 /**
  * @brief Record reset reason and write back to retention; call before triggering reset
  *
- * @note Implemented in driver (driver/storage.c, driver/storage_bootloader.c),
+ * @note Implemented in driver (driver/storage.c),
  *       called by service (service/acpi).
  *
  * @param reason Reset reason (EC_RESET_REASON_*).

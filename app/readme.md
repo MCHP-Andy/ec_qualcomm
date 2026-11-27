@@ -73,5 +73,5 @@ ACPI service 由兩者共用；`ec_fw_update_bootloader.c` 與 `flash/` 僅 boot
 SCI、Fan、Thermal、Power、SoCCP 等 service 僅 app 使用。
 
 ### 📂 `driver/` (Driver Layer / Infrastructure)
-`acpi.c` (I2C target) 與 QEMU 用的 `simulator.c` 由兩者共用；`flash.c` 與
-`storage_bootloader.c` 僅 bootloader 使用，其餘周邊 driver 僅 app 使用。
+`acpi.c` (I2C target)、`storage.c` (boot info；`CONFIG_APP_BOOTLOADER` 另含 image 驗證) 與 QEMU 用的
+`simulator.c` 由兩者共用；`flash.c` 僅 bootloader 使用，其餘周邊 driver 僅 app 使用。

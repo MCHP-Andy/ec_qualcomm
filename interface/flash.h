@@ -21,7 +21,7 @@ int qc_flash_write(off_t offset, const void *data, size_t len);
  * @brief Read Flash
  *
  * @note Implemented in driver (driver/flash.c), called by service (service/flash)
- *       and driver (driver/storage_bootloader.c).
+ *       and driver (driver/storage.c).
  *
  * @param offset Flash read offset
  * @param data Pointer to receive buffer (RAM)

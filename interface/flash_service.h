@@ -70,7 +70,7 @@ int flash_service_submit(const flash_service_msg_t *msg);
  * service thread (including a done callback).
  *
  * @note Implemented in service (service/flash), called by driver
- *       (driver/storage_bootloader.c).
+ *       (driver/storage.c).
  *
  * @param msg        Request.
  * @param crc_result Receives the CRC8 result (zero-extended) for

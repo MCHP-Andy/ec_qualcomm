@@ -5,7 +5,7 @@
 Bootloader 專用的 flash 操作 service。由單一 thread 依序執行 write / read / erase / CRC / load-to-RAM，
 確保 flash 存取不會同時發生。提供兩種呼叫方式：
 - `flash_service_submit()`：非同步，放進佇列後立即返回，完成時呼叫 callback。ACPI FW update 命令使用。
-- `flash_service_request()`：同步，等到完成才返回。開機時的 image 載入 / 驗證 (`driver/storage_bootloader.c`) 使用。
+- `flash_service_request()`：同步，等到完成才返回。開機時的 image 載入 / 驗證 (`driver/storage.c`) 使用。
 
 只在 `CONFIG_APP_BOOTLOADER=y` 時編入，沒有獨立的 Kconfig 與 shell。
 
@@ -14,7 +14,7 @@ Bootloader 專用的 flash 操作 service。由單一 thread 依序執行 write 
 graph LR
     subgraph "Callers"
         FW[ACPI FW update<br/>ec_fw_update_bootloader.c]
-        STO[driver/storage_bootloader.c]
+        STO[driver/storage.c]
     end
 
     subgraph "Flash service"

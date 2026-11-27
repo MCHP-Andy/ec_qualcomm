@@ -5,12 +5,13 @@ else()
     target_sources(app PRIVATE acpi.c)
 endif()
 
+# Boot info storage, CONFIG_APP_BOOTLOADER adds image validation
+target_sources(app PRIVATE storage.c)
+
 if(CONFIG_APP_BOOTLOADER)
     if(NOT CONFIG_QEMU_TARGET)
         target_sources(app PRIVATE flash.c)
     endif()
-
-    target_sources(app PRIVATE storage_bootloader.c)
 else()
     if(NOT CONFIG_QEMU_TARGET)
         target_sources(app PRIVATE gpio_hub.c)
@@ -22,6 +23,5 @@ else()
     endif()
 
     target_sources_ifdef(CONFIG_PM app PRIVATE power.c)
-    target_sources(app PRIVATE storage.c)
     target_sources_ifdef(CONFIG_SHELL app PRIVATE aoss_shell.c)
 endif()
