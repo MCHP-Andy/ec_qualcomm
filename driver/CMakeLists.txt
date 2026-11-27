@@ -18,7 +18,7 @@ else()
         target_sources(app PRIVATE fan.c)
         target_sources(app PRIVATE thermal.c)
         target_sources(app PRIVATE aoss.c)
-        target_sources_ifdef(CONFIG_PM app PRIVATE i2c_pm.c)
+        target_sources(app PRIVATE soccp.c)
     endif()
 
     target_sources_ifdef(CONFIG_PM app PRIVATE power.c)

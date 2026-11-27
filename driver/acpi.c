@@ -12,9 +12,6 @@
 
 #include <interface/system.h>
 #include <interface/acpi.h>
-#if !defined(CONFIG_APP_BOOTLOADER)
-#include <interface/soccp.h>
-#endif
 
 #include <zephyr/logging/log.h>
 
@@ -22,22 +19,17 @@
 
 LOG_MODULE_REGISTER(acpi_i2c, LOG_LEVEL_INF);
 
+// Read data is provided through buf_read_requested only
+BUILD_ASSERT(IS_ENABLED(CONFIG_I2C_TARGET_BUFFER_MODE),
+             "acpi.c requires CONFIG_I2C_TARGET_BUFFER_MODE=y");
+
 #define ACPI_ADDR  (0x76)
-#if !defined(CONFIG_APP_BOOTLOADER)
-#define SOCCP_ADDR (0x0C)
-#endif
 
 enum {
 	I2C_STATE_IDLE = 0,
 	I2C_STATE_START_WRITE,
 	I2C_STATE_WRITE,
 	I2C_STATE_READ,
-};
-
-enum {
-    CMD_UNKNOWN = 0,
-    CMD_ACPI,
-    CMD_SOCCP,
 };
 
 static const struct device *bus = DEVICE_DT_GET_OR_NULL(DT_ALIAS(acpi_i2c));
@@ -52,11 +44,12 @@ QC_GPIO_DEF(acpi_int);
 #endif
 
 static uint8_t i2c_state = I2C_STATE_IDLE;
-static uint16_t resp_idx = 0;
 static uint8_t resp_buf[ACPI_RESP_LEN] = {0};
 
-// Workaround for 2 slave address, check address to determine which command to process
-static uint8_t i2c_addr = 0;
+// Bytes written by the host to the ACPI address, submitted to the service as
+// one command at repeated start (read request) or stop
+static uint8_t wr_buf[ACPI_RECE_LEN];
+static uint16_t wr_len = 0;
 
 int acpi_resp_set(uint8_t *pdata, uint16_t len) {
     memcpy(resp_buf, pdata, (len <= sizeof(resp_buf)) ? len : sizeof(resp_buf));
@@ -64,11 +57,6 @@ int acpi_resp_set(uint8_t *pdata, uint16_t len) {
 }
 
 #if !defined(CONFIG_APP_BOOTLOADER)
-int soccp_resp_set(uint8_t *pdata, uint16_t len) {
-    memcpy(resp_buf, pdata, (len <= sizeof(resp_buf)) ? len : sizeof(resp_buf));
-    return 0;
-}
-
 int acpi_int_set(uint8_t val) {
 #if ACPI_INT_AVAILABLE
     int ret;
@@ -99,23 +87,33 @@ int acpi_int_set(uint8_t val) {
 #endif
 
 /*
+ * @brief Submit the collected ACPI write data to the service, if any.
+ */
+static void acpi_wr_submit(void) {
+    if (wr_len == 0) {
+        return;
+    }
+
+    if (acpi_cmd_submit(wr_buf, wr_len) < 0) {
+        LOG_WRN("Failed to submit ACPI cmd 0x%02x, len %u", wr_buf[0], wr_len);
+    }
+
+    wr_len = 0;
+}
+
+/*
  * @brief Callback which is called when a write request is received from the
  * master.
  * @param config Pointer to the target configuration.
  */
 static int acpi_target_write_requested_cb(struct i2c_target_config *config) {
+    ARG_UNUSED(config);
     LOG_DBG("acpi target write requested");
 
-    i2c_state = I2C_STATE_START_WRITE;
+    // Write after write with repeated start: previous command is complete
+    acpi_wr_submit();
 
-#if !defined(CONFIG_APP_BOOTLOADER)
-    // Workaround for 2 slave address, check address to determine which command to process
-    #define ACPI_I2C_REG_BASE (DT_REG_ADDR_BY_IDX(DT_ALIAS(acpi_i2c), 0))
-    #define I2C_DATA_REG_OFFSET 0x08
-    i2c_addr = (sys_read32(ACPI_I2C_REG_BASE + I2C_DATA_REG_OFFSET) >> 1) & 0x7F;
-#else
-    i2c_addr = ACPI_ADDR;
-#endif
+    i2c_state = I2C_STATE_START_WRITE;
 
     return 0;
 }
@@ -127,72 +125,52 @@ static int acpi_target_write_requested_cb(struct i2c_target_config *config) {
  */
 static int acpi_target_write_received_cb(struct i2c_target_config *config,
                                          uint8_t val) {
+    ARG_UNUSED(config);
     LOG_DBG("acpi target write received: 0x%02x", val);
 
-    switch (i2c_state) {
-    case I2C_STATE_START_WRITE:
-#if !defined(CONFIG_APP_BOOTLOADER)
-        if (i2c_addr == ACPI_ADDR) {
-            acpi_buf_set(ACPI_TYPE_CMD, val);
-        } else if (i2c_addr == SOCCP_ADDR) {
-            soccp_buf_set(SOCCP_TYPE_CMD, val);
-        } else {
-            LOG_WRN("Unknown I2C address: 0x%02x", i2c_addr);
-        }
-#else
-        acpi_buf_set(ACPI_TYPE_CMD, val);
-#endif
-
-        i2c_state = I2C_STATE_WRITE;
-        break;
-    case I2C_STATE_WRITE:
-#if !defined(CONFIG_APP_BOOTLOADER)
-        if (i2c_addr == ACPI_ADDR) {
-            acpi_buf_set(ACPI_TYPE_DATA, val);
-        } else if (i2c_addr == SOCCP_ADDR) {
-            soccp_buf_set(SOCCP_TYPE_DATA, val);
-        } else {
-            LOG_WRN("Unknown I2C address: 0x%02x", i2c_addr);
-        }
-#else
-        acpi_buf_set(ACPI_TYPE_DATA, val);
-#endif
-        break;
-    default:
+    if ((i2c_state != I2C_STATE_START_WRITE) && (i2c_state != I2C_STATE_WRITE)) {
         LOG_WRN("Unexpected I2C state: %d", i2c_state);
-        break;
+        return 0;
     }
+
+    // Collect, submitted at read request or stop
+    if (i2c_state == I2C_STATE_START_WRITE) {
+        wr_len = 0;
+    }
+    i2c_state = I2C_STATE_WRITE;
+
+    if (wr_len >= sizeof(wr_buf)) {
+        // Buffer full: NACK the next byte
+        LOG_WRN("ACPI write overflow, cmd 0x%02x", wr_buf[0]);
+        return -ENOMEM;
+    }
+    wr_buf[wr_len++] = val;
 
     return 0;
 }
 
 /*
- * @brief Callback which is called when a read request is received from the
- * master.
+ * @brief Callback which is called once when a read request is received from
+ * the master (buffer mode). The driver sends the bytes straight from resp_buf.
+ * The command written before the repeated start is submitted to the service
+ * here. Always return -EAGAIN: the driver stretches SCL so the service has
+ * CONFIG_I2C_XEC_V2_CUSTOM_STRETCH_DELAY_MS to write the response, then sends
+ * from resp_buf without calling this again.
  * @param config Pointer to the target configuration.
- * @param val Pointer to the byte to be sent to the master.
+ * @param ptr Set to the buffer to be sent to the master.
+ * @param len Set to the length of the buffer.
  */
-static int acpi_target_read_processed_cb(struct i2c_target_config *config, uint8_t *val) {
-    switch (i2c_state) {
-    case I2C_STATE_READ:
-        *val = resp_buf[resp_idx++];
-        LOG_DBG("acpi target read processed: 0x%02x", *val);
-        break;
-
-    default:
-        LOG_WRN("Unexpected I2C state: %d", i2c_state);
-        break;
-    }
-
-    return 0;
-}
-
-static int acpi_target_read_requested_cb(struct i2c_target_config *config, uint8_t *val) {
+static int acpi_target_buf_read_requested_cb(struct i2c_target_config *config,
+                                             uint8_t **ptr, uint32_t *len) {
+    ARG_UNUSED(config);
+    acpi_wr_submit();
 
     i2c_state = I2C_STATE_READ;
-    resp_idx = 0;
 
-    return acpi_target_read_processed_cb(config, val);
+    *ptr = resp_buf;
+    *len = sizeof(resp_buf);
+
+    return -EAGAIN;
 }
 
 /*
@@ -200,14 +178,12 @@ static int acpi_target_read_requested_cb(struct i2c_target_config *config, uint8
  * @param config Pointer to the target configuration.
  */
 static int acpi_target_stop_cb(struct i2c_target_config *config) {
+    ARG_UNUSED(config);
     LOG_DBG("acpi target stop callback");
 
-    resp_idx = 0;
     i2c_state = I2C_STATE_IDLE;
 
-    if (i2c_addr == ACPI_ADDR) {
-        acpi_buf_set(ACPI_TYPE_PROCESS, 0);
-    }
+    acpi_wr_submit();
 
     return 0;
 }
@@ -215,18 +191,13 @@ static int acpi_target_stop_cb(struct i2c_target_config *config) {
 static struct i2c_target_callbacks acpi_target_callbacks = {
     .write_requested = acpi_target_write_requested_cb,
     .write_received = acpi_target_write_received_cb,
-    .read_requested = acpi_target_read_requested_cb,
-    .read_processed = acpi_target_read_processed_cb,
+    .buf_read_requested = acpi_target_buf_read_requested_cb,
     .stop = acpi_target_stop_cb,
 };
 
-static struct i2c_target_config target_cfg = {
-    // Workaround for 2 slave address
-#if !defined(CONFIG_APP_BOOTLOADER)
-    .address = ACPI_ADDR | (SOCCP_ADDR << 8),
-#else
+// The SoC-CP target (driver/soccp.c) shares this I2C controller
+static struct i2c_target_config acpi_target_cfg = {
     .address = ACPI_ADDR,
-#endif
     .callbacks = &acpi_target_callbacks,
 };
 
@@ -234,8 +205,8 @@ static struct i2c_target_config target_cfg = {
 
 static int init_config(void) {
 
-    if (i2c_target_register(bus, &target_cfg) < 0) {
-        LOG_ERR("Failed to register target");
+    if (i2c_target_register(bus, &acpi_target_cfg) < 0) {
+        LOG_ERR("Failed to register ACPI target 0x%02x", ACPI_ADDR);
         return -1;
     }
 

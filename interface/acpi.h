@@ -29,9 +29,24 @@
 struct acpi_cmd_t; 
 typedef struct acpi_cmd_t acpi_cmd_t;
 
+/**
+ * @brief ACPI command handler.
+ *
+ * Read or write is decided by @p cmd_len: only the mandatory part (mand) is a
+ * read, mandatory + optional payload (mand + opt) is a write.
+ *
+ * @param cmd_info Command table entry.
+ * @param cmd      Command bytes, cmd[0] is the opcode.
+ * @param cmd_len  Number of command bytes.
+ * @param resp     Response buffer.
+ * @param resp_len Size of @p resp.
+ * @retval >0 read: number of response bytes written to @p resp.
+ * @retval 0  write done (no response data).
+ * @retval <0 error, the ACPI response buffer is left unchanged.
+ */
 typedef int (*acpi_cmd_hdl_t)(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                               uint16_t cmd_len, uint8_t *resp,
-                              uint16_t resp_len); // cmd now includes opcode
+                              uint16_t resp_len);
 
 typedef struct acpi_cmd_t {
     uint8_t cmd;
@@ -39,32 +54,28 @@ typedef struct acpi_cmd_t {
     uint16_t mand; // Number of mandatory arguments including the command opcode.
     uint16_t opt;  // Number of optional arguments *after* the command opcode.
     uint16_t
-        resp_len; // Expected response length (including byte count if present).
+        resp_len; // Max response length (including byte count if present).
     const char *name;
 } acpi_cmd_t;
 
-typedef enum {
-    ACPI_TYPE_CMD = 0,
-    ACPI_TYPE_DATA,
-    ACPI_TYPE_PROCESS,
-} acpi_type_t;
-
 /**
- * @brief Feed one byte received from the host into the ACPI command buffer.
+ * @brief Submit one complete ACPI command received from the host.
  *
- * ACPI_TYPE_CMD starts a new command with @p data as the opcode,
- * ACPI_TYPE_DATA appends an argument byte, and ACPI_TYPE_PROCESS marks the
- * end of the transfer. The command handler is dispatched as soon as all
- * mandatory arguments arrive, and again at the end of the transfer if
- * optional payload followed.
+ * The command (opcode followed by its arguments) is copied into the service
+ * command queue and dispatched by the service thread. The driver calls it
+ * once per write, when the host starts reading (repeated start) or sends a
+ * stop.
  *
  * @note Implemented in service (service/acpi), called by driver (driver/acpi.c).
+ *       Safe to call from ISR context.
  *
- * @param id   Byte type, see acpi_type_t.
- * @param data Received byte (ignored for ACPI_TYPE_PROCESS).
- * @retval 0 always.
+ * @param pdata Command bytes, pdata[0] is the opcode.
+ * @param len   Number of bytes, 1 .. ACPI_RECE_LEN.
+ * @retval 0 on success.
+ * @retval -EINVAL @p len is 0 or larger than ACPI_RECE_LEN.
+ * @retval -ENOMEM command queue is full, the command is dropped.
  */
-int acpi_buf_set(acpi_type_t id, uint8_t data);
+int acpi_cmd_submit(const uint8_t *pdata, uint16_t len);
 
 /**
  * @brief Load the response that the host reads back over I2C.

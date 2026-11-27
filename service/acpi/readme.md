@@ -25,12 +25,13 @@ Buffer 大小定義在 [interface/acpi.h](../../interface/acpi.h)：
 graph LR
     subgraph "Driver (driver/acpi.c)"
         I2C[I2C target 0x76]
+        WR[(wr_buf)]
         RESP[(resp_buf)]
     end
 
     subgraph "ACPI service"
-        BUF[acpi_buf_set<br/>rece_cmd]
-        EVT((ACPI_CMD event))
+        BUF[acpi_cmd_submit]
+        EVT((acpi_cmd_queue<br/>k_msgq + k_mem_slab))
         HDL[acpi_cmd_hdl<br/>查表分派]
     end
 
@@ -38,8 +39,9 @@ graph LR
         TBL[ACPI_CMD_SUBSCRIBE<br/>fan / thermal / power / sci / board / fw]
     end
 
-    I2C -->|start: ACPI_TYPE_CMD<br/>data: ACPI_TYPE_DATA<br/>stop: ACPI_TYPE_PROCESS| BUF
-    BUF -->|k_event_post| EVT
+    I2C -->|write_received| WR
+    WR -->|buf_read_requested / stop<br/>整包命令| BUF
+    BUF -->|k_msgq_put| EVT
     EVT --> HDL
     HDL --> TBL
     TBL -->|handler 填 resp| HDL
@@ -48,15 +50,26 @@ graph LR
 ```
 
 ### 接收與分派流程
-1. `ACPI_TYPE_CMD` (I2C 寫入的第一個 byte)：清空 index，存入 opcode，並從命令表查出該命令的 `mand`。
-2. `ACPI_TYPE_DATA`：依序存入 `rece_cmd`。收到的 byte 數 **等於 `mand`** 時立即觸發分派，
-   讓 Host 不送 stop 直接 repeated-start 讀取也能拿到 response。
-3. 若在提前分派後又收到 optional payload，會標記為未分派；
-   `ACPI_TYPE_PROCESS` (I2C stop) 時再分派一次，讓 handler 看到完整命令。
-4. Service thread (`APP_PRIO_H`) 在 `acpi_cmd_t` section 中找到 opcode，
+1. Driver (`driver/acpi.c`) 把 Host 寫到 0x76 的 byte 依序存進 `wr_buf`，此時不通知 service。
+2. Host repeated-start 讀取 (`buf_read_requested`) 或送出 stop 時，driver 呼叫
+   `acpi_cmd_submit(wr_buf, len)` 把整包命令 (opcode + 參數) 交給 service，每次 write 只送一次。
+3. `acpi_cmd_submit` 從 `k_mem_slab` 取一塊存放命令，把指標放進 `k_msgq` (深度 `ACPI_CMD_QUEUE_LEN`)，
+   可在 ISR 中呼叫；queue 滿時丟棄命令並回傳 `-ENOMEM`。
+4. Service thread (`APP_PRIO_H`) 從 queue 取出命令，在 `acpi_cmd_t` section 中找到 opcode，
    當 `cmd_len >= mand` 時呼叫 handler；長度不足時不會呼叫 handler。
-5. App：handler 成功後由 service 呼叫 `acpi_resp_set(resp_buf, resp_len)`。
-   Bootloader：handler 自行呼叫 `acpi_resp_set` (response 長度可變)。
+   讀取時 I2C driver 會 stretch SCL `CONFIG_I2C_XEC_V2_CUSTOM_STRETCH_DELAY_MS` (預設 3ms)，
+   讓 handler 在這段時間內寫好 response。
+5. Handler 以輸入長度判斷讀/寫，以回傳值決定寫回 ACPI buffer 的長度：
+
+   | 輸入長度 `cmd_len` | 動作 | 回傳值 |
+   |---|---|---|
+   | `== mand` | 讀取：把資料填入 `resp` | response 長度 (>0) |
+   | `== mand + opt` (`ACPI_IS_WRITE` / `ACPI_CHECK_WRITE`) | 寫入：只套用資料 | `0` |
+   | 錯誤 | — | 負的 errno |
+
+   Service 只在回傳值 > 0 時呼叫 `acpi_resp_set(resp_buf, ret)`；回傳 0 或錯誤時 ACPI buffer 不變。
+   `opt == 0` 的命令只會是純讀 (`resp_len > 0`) 或純寫 (`resp_len == 0`)。
+   Table 中的 `resp_len` 是 response 的最大長度 (給 `ACPI_CHECK_OUT` 檢查 buffer)。
 
 ### 新增命令
 在任一 service 中使用 [interface/acpi.h](../../interface/acpi.h) 的 macro：
@@ -69,15 +82,36 @@ ACPI_CMD_SUBSCRIBE(fan, EC_FAN_RPM, acpi_ec_fan_rpm, 2, 0, 3);
 | 參數 | 說明 |
 | --- | --- |
 | `mand` | 必要 byte 數，**包含 opcode** |
-| `opt` | opcode 之後的 optional byte 數；慣例上 `cmd_len == mand + opt` 視為寫入 (set)，否則為讀取 (get) |
-| `resp_len` | response 長度 (含 byte count，若有) |
+| `opt` | mand 之後的 optional (寫入) byte 數；`cmd_len == mand` 為讀取 (get)，`cmd_len == mand + opt` 為寫入 (set) |
+| `resp_len` | response 最大長度 (含 byte count，若有) |
 
-Handler 內使用 [acpi_tbl.h](acpi_tbl.h) 的 `ACPI_CHECK_IN` / `ACPI_CHECK_OUT` 檢查輸入/輸出長度。
+Handler 內使用 [acpi_tbl.h](acpi_tbl.h) 的 macro：
+- `ACPI_CHECK_IN` / `ACPI_CHECK_OUT`：檢查輸入長度 >= `mand`、`resp` buffer >= `resp_len`。
+- `ACPI_IS_WRITE`：輸入長度大於 `mand` (且 `opt > 0`) 即為寫入。
+- `ACPI_CHECK_WRITE`：寫入長度必須等於 `mand + opt`，不足或過長回傳 `-EINVAL`。
+
+```c
+static int acpi_xxx(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
+                    uint8_t *resp, uint16_t resp_len) {
+    ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
+
+    if (ACPI_IS_WRITE(cmd_info, cmd_len)) {
+        ACPI_CHECK_WRITE(cmd_info, cmd_len);
+        // 套用 cmd[mand..] 的資料
+        return 0;
+    }
+
+    ACPI_CHECK_OUT(cmd_info, resp, resp_len);
+    resp[0] = ...;
+    return 1; // response 長度
+}
+```
 命令 opcode 也統一定義在 `acpi_tbl.h`。
 
 ## 命令表
 
-`cmd` 欄位為 Host 寫入的完整 byte 序列 (`[]` 為 optional)，`resp` 為 Host 讀回的內容。
+`cmd` 欄位為 Host 寫入的完整 byte 序列 (`[]` 為 optional，帶上即為寫入)，`resp` 為讀取時 Host 讀回的內容；
+寫入不更新 response。
 
 ### App
 | Opcode | 名稱 | 檔案 | cmd | resp |
@@ -123,7 +157,11 @@ App 端 0xBB 只支援：
 - `0xAE` 的 `blk` 以 4 KB 為單位；`0xAA` 的 `size` 以 32 bytes 為單位，且不超過上次 0xA0 寫入的長度。
 - `0xA0` 的 `mand` 為 513，必須送滿 512 bytes 才會執行。
 - `0xAF` 目前只支援 `0x21` (erase backup main，`CONFIG_BOARD_QC_MODULE`)，其餘 sub-command 只印 log。
-- 所有 flash 操作透過 [flash service](../flash/readme.md) 執行。
+- 所有 flash 操作透過 [flash service](../flash/readme.md) 非同步執行：`0xAE` / `0xAF` / `0xAA` / `0xA7` /
+  `0xBB F0` (Run CRC) 送出後立即返回，Host 以 `0xEC` poll，`0xFF` (busy) 結束後為 `0x0B` (idle)；
+  flash 操作失敗只印 log，status 一樣回到 idle (目前不回報 `0xFA`)。
+- Flash busy 時，上述 flash 命令與 `0xA0` / `0xA1` (與 0xAA / 0xA7 共用 RAM buffer) 回傳 `-EBUSY`，不更新 response。
+- `0xA7` 完成 (0xEC idle) 後才能用 `0xA1` 讀取；`0xBB F0` 完成後才能用 `0xA2` 讀取 CRC 結果。
 
 0xBB sub-command：
 | Sub | 功能 |
@@ -151,7 +189,7 @@ BB 01 33                 # 離開 bootloader
 ## Shell
 | 命令 | 說明 |
 | --- | --- |
-| `acpi write <op> [data ...]` | 以 hex 模擬 Host 寫入命令，結束時送出 `ACPI_TYPE_PROCESS` (等同 I2C stop) |
+| `acpi write <op> [data ...]` | 以 hex 模擬 Host 寫入命令，整包以 `acpi_cmd_submit` 送出 (等同 I2C stop) |
 
 Shell 沒有讀取 response 的命令，需搭配 log 或由 Host 端讀回確認。
 `ec_fw_update_bootloader.c` 內的 `fw_update` shell 受 `CONFIG_FW_UPDATE_SHELL` 控制，

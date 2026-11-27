@@ -1,0 +1,34 @@
+# Copyright (c) 2025 Microchip Technology Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+config I2C_XEC_V2_CUSTOM
+	bool "Customized XEC Microchip I2C V2 driver"
+	default y
+	depends on I2C
+	depends on DT_HAS_MICROCHIP_XEC_I2C_V2_CUSTOM_ENABLED
+	help
+	  Enable the customized Microchip XEC I2C V2 driver located in
+	  modules/app/drivers/i2c (compatible "microchip,xec-i2c-v2-custom").
+
+config I2C_XEC_V2_CUSTOM_STRETCH_DELAY_MS
+	int "Target transmit SCL stretch time (ms)"
+	default 3
+	depends on I2C_XEC_V2_CUSTOM && I2C_TARGET
+	help
+	  When the target buf_read_requested (or read_requested /
+	  read_processed) callback returns a negative value, I2CDATA is not
+	  written so SCL is held low (clock stretch). After this time a
+	  delayed work writes I2CDATA to release SCL. In buffer mode the
+	  byte is read from the returned buffer at release time, so the
+	  application can fill it while SCL is stretched.
+
+config I2C_XEC_V2_CUSTOM_TARGET_WR_BUF_SIZE
+	int "Target receive buffer size for buf_write_received (bytes)"
+	default 256
+	depends on I2C_XEC_V2_CUSTOM && I2C_TARGET_BUFFER_MODE
+	help
+	  Size of the per-controller buffer that collects data written by the
+	  external controller when the target registers buf_write_received
+	  but not write_received. Bytes beyond this size are NACKed.

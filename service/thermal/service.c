@@ -164,7 +164,7 @@ static int acpi_ec_thermistors(therm_id_t idx, uint8_t *resp, uint16_t resp_len,
 
     LOG_DBG("Thermistor %d temp: %d.%d deg C (Report: 0x%04x)", idx,
             therm_dev->temp / 10, abs(therm_dev->temp % 10), report_val);
-    return 0;
+    return 3; // Byte count + Temp(2)
 }
 
 static int acpi_ec_thermistor1(const acpi_cmd_t *cmd_info, uint8_t *cmd,
@@ -195,7 +195,6 @@ static int acpi_ec_thermistor_temp_thre(const acpi_cmd_t *cmd_info,
                                         uint8_t *cmd, uint16_t cmd_len,
                                         uint8_t *resp, uint16_t resp_len) {
     ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
-    ACPI_CHECK_OUT(cmd_info, resp, resp_len);
 
     therm_id_t idx = cmd[1] & 0x0f;
     therm_dev_t *therm_dev = therm_blk_get(idx);
@@ -204,13 +203,23 @@ static int acpi_ec_thermistor_temp_thre(const acpi_cmd_t *cmd_info,
         return -EINVAL;
     }
 
-    // If cmd_len is (mand + opt), it's a write operation
-    if (cmd_len == (cmd_info->mand + cmd_info->opt)) { // 2 + 5 = 7
+    // Write: Cmd + ThermID + ByteCount + PSV + CR3 + HOT + CRT
+    if (ACPI_IS_WRITE(cmd_info, cmd_len)) {
+        ACPI_CHECK_WRITE(cmd_info, cmd_len); // 2 + 5 = 7
         therm_dev->psv = cmd[3];
         therm_dev->cr3 = cmd[4];
         therm_dev->hot = cmd[5];
         therm_dev->crt = cmd[6];
+
+        LOG_DBG("Thermistor %d set psv: %d", idx, therm_dev->psv);
+        LOG_DBG("Thermistor %d set cr3: %d", idx, therm_dev->cr3);
+        LOG_DBG("Thermistor %d set hot: %d", idx, therm_dev->hot);
+        LOG_DBG("Thermistor %d set crt: %d", idx, therm_dev->crt);
+        return 0;
     }
+
+    // Read
+    ACPI_CHECK_OUT(cmd_info, resp, resp_len);
 
     resp[0] = 0x04; // Byte count
     resp[1] = therm_dev->psv;
@@ -218,12 +227,12 @@ static int acpi_ec_thermistor_temp_thre(const acpi_cmd_t *cmd_info,
     resp[3] = therm_dev->hot;
     resp[4] = therm_dev->crt;
 
-    LOG_DBG("Thermistor %d set psv: %d", idx, therm_dev->psv);
-    LOG_DBG("Thermistor %d set cr3: %d", idx, therm_dev->cr3);
-    LOG_DBG("Thermistor %d set hot: %d", idx, therm_dev->hot);
-    LOG_DBG("Thermistor %d set crt: %d", idx, therm_dev->crt);
+    LOG_DBG("Thermistor %d psv: %d", idx, therm_dev->psv);
+    LOG_DBG("Thermistor %d cr3: %d", idx, therm_dev->cr3);
+    LOG_DBG("Thermistor %d hot: %d", idx, therm_dev->hot);
+    LOG_DBG("Thermistor %d crt: %d", idx, therm_dev->crt);
 
-    return 0;
+    return 5; // Byte count + PSV + CR3 + HOT + CRT
 }
 
 static int acpi_ec_thermistor_sampling_rate(const acpi_cmd_t *cmd_info,
@@ -231,11 +240,11 @@ static int acpi_ec_thermistor_sampling_rate(const acpi_cmd_t *cmd_info,
                                             uint8_t *resp, uint16_t resp_len) {
     uint16_t sample_rate_ms = 0;
 
-    ACPI_CHECK_IN(cmd_info, cmd, cmd_len);    // Check for read operation
-    ACPI_CHECK_OUT(cmd_info, resp, resp_len); // Check for read operation
+    ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
 
-    // If cmd_len is mand + opt, it's a write operation
-    if (cmd_len == (cmd_info->mand + cmd_info->opt)) { // 1 + 2 = 3
+    // Write: Cmd + SampleRate(2)
+    if (ACPI_IS_WRITE(cmd_info, cmd_len)) {
+        ACPI_CHECK_WRITE(cmd_info, cmd_len); // 1 + 2 = 3
         sample_rate_ms = (cmd[2] << 8) | cmd[1];
 
         if (sample_rate_ms < 100) {
@@ -246,14 +255,18 @@ static int acpi_ec_thermistor_sampling_rate(const acpi_cmd_t *cmd_info,
 
         therm_ctrl.sample_ms = sample_rate_ms;
         LOG_DBG("Set ADC sample rate to %d ms", sample_rate_ms);
+        return 0;
     }
+
+    // Read
+    ACPI_CHECK_OUT(cmd_info, resp, resp_len);
 
     sample_rate_ms = therm_ctrl.sample_ms;
     resp[0] = sample_rate_ms & 0xff;
     resp[1] = (sample_rate_ms >> 8) & 0xff;
 
     LOG_DBG("Get ADC sample rate %d ms", sample_rate_ms);
-    return 0;
+    return 2; // SampleRate(2)
 }
 
 // clang-format off

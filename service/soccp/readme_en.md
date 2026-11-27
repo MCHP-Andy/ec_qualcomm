@@ -4,8 +4,9 @@
 
 Handles commands sent by the SoC-CP (SoC Control Processor) through the I2C target (address `0x0C`):
 who-am-i and the power state feature (SoC power state, fan constraint, Off mode / OOB state).
-It shares the I2C controller and response buffer with ACPI; [driver/acpi.c](../../driver/acpi.c) routes
-traffic by address. App only.
+The I2C target lives in [driver/soccp.c](../../driver/soccp.c) and shares the I2C controller with the ACPI
+target ([driver/acpi.c](../../driver/acpi.c)); the I2C driver selects the target by address, and each has its
+own response buffer. App only.
 
 ## Kconfig
 | Option | Default | Description |
@@ -19,7 +20,7 @@ Buffer sizes: `SOCCP_RECE_LEN` / `SOCCP_RESP_LEN` are both 8 ([interface/soccp.h
 ## Architecture
 ```mermaid
 graph LR
-    subgraph "Driver (driver/acpi.c)"
+    subgraph "Driver (driver/soccp.c)"
         I2C[I2C target 0x0C]
         RESP[(resp_buf)]
     end

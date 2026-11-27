@@ -16,13 +16,14 @@
 
 > 注意:**寫入指令後需再下 `acpi read`** 才能看到回應。
 > `0x24 / 0x25 / 0x28 / 0x30 / 0x32 / 0x34 / 0x35` 為讀寫共用同一 cmd,EC 以 payload 長度(是否帶 data)區分讀/寫。
+> 寫入(帶 data)只套用設定、**不更新 response**;要確認新值請再送一次讀取 cmd(不帶 data)。
+> 下方部分 log 是舊版行為(寫入後 `acpi read` 直接讀到新值),現在需先送讀取 cmd。
 > 16-bit 資料一律 **LSB 在前**。
 
-> `acpi write` 結尾會送 `ACPI_TYPE_PROCESS`,與 I2C 的 stop condition 一致,
+> `acpi write` 會把整包 bytes 以 `acpi_cmd_submit` 一次送出,與 I2C 的 stop condition 一致,
 > 所以上面那些讀寫共用的 cmd 用 shell 也能測到 write path。
-> Dispatch 規則:mand 收滿時處理一次(讓 host 不下 stop 直接 read 也拿得到回應);
-> 之後若還有 optional payload 進來,才會在結束時再處理一次。
-> 因此純讀取的 cmd(如 `0x05`)一個 transaction 只會被處理**一次**。
+> Dispatch 規則:I2C 在 repeated-start 讀取或 stop 時才把整包命令送給 service,
+> 每個 write 只處理**一次**,handler 一定看到完整 payload。
 
 ---
 

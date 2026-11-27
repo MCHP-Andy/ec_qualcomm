@@ -16,6 +16,31 @@
 #include <zephyr/logging/log.h>
 
 
+/*
+ * ACPI command handler contract
+ *
+ * Read or write is decided by the input length (opcode included):
+ *   read : cmd_len == mand        -> fill resp, return the response length
+ *   write: cmd_len == mand + opt  -> apply the data, return 0
+ * A negative return is an error; nothing is written to the ACPI buffer.
+ * Commands with opt == 0 are either read only (resp_len > 0) or write only
+ * (resp_len == 0).
+ */
+#define ACPI_IS_WRITE(cmd_info_ptr, cl)                                        \
+    (((cmd_info_ptr)->opt > 0) && ((cl) > (cmd_info_ptr)->mand))
+
+// Write payload must be complete: cmd_len == mand + opt
+#define ACPI_CHECK_WRITE(cmd_info_ptr, cl)                                     \
+    do {                                                                       \
+        if ((cl) != ((cmd_info_ptr)->mand + (cmd_info_ptr)->opt)) {            \
+            LOG_ERR("Invalid write length for cmd 0x%02x: %u (expected %u)",   \
+                    (cmd_info_ptr)->cmd, (unsigned int)(cl),                   \
+                    (unsigned int)((cmd_info_ptr)->mand +                      \
+                                   (cmd_info_ptr)->opt));                      \
+            return -EINVAL;                                                    \
+        }                                                                      \
+    } while (0)
+
 #define ACPI_CHECK_IN(cmd_info_ptr, c, cl)                                     \
     do {                                                                       \
         if (!(cmd_info_ptr)) {                                                 \

@@ -53,7 +53,7 @@ graph LR
 門檻單位為 1 °C，預設全部為 80 °C。新的取樣週期在目前這次等待結束後生效。
 
 ## ACPI 命令
-`[]` 內為 optional；帶 optional 欄位即為寫入，否則為讀取。
+`[]` 內為 optional；帶 optional 欄位即為寫入，否則為讀取。寫入不更新 response，`resp` 為讀取時的回應。
 
 | Opcode | 名稱 | cmd | resp |
 | --- | --- | --- | --- |

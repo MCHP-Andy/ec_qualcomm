@@ -12,7 +12,7 @@
 
 #include "acpi_tbl.h"
 
-LOG_MODULE_DECLARE(acpi);
+LOG_MODULE_DECLARE(acpi, CONFIG_ACPI_LOG_LEVEL);
 
 /* Image address (Get from DTS) */
 #if defined(CONFIG_BOARD_QEMU_CORTEX_M3)
@@ -101,6 +101,24 @@ static uint8_t  active_control_path = EC_FLASH_PATH_INT;
 // extern int hal_fw_run_crc(uint8_t partition_id, uint32_t *out_crc, uint8_t *out_status);
 // extern int hal_fw_sync(uint8_t sync_cmd);
 
+/*
+ * Flash commands (0xAE / 0xAF / 0xAA / 0xA7 / 0xBB Run CRC) are queued to the
+ * flash service and return at once, so the ACPI thread stays free and 0xEC
+ * reports the live flash status (BUSY / IDLE). The host polls
+ * 0xEC until the flash is idle before the next step.
+ *
+ * While the flash is busy, flash commands and the RAM buffer commands
+ * (0xA0 / 0xA1, ram_buffer is shared with 0xAA / 0xA7) are rejected with
+ * -EBUSY.
+ */
+#define ACPI_CHECK_FLASH_IDLE(cmd_info_ptr)                                    \
+    do {                                                                       \
+        if (flash_service_busy()) {                                            \
+            LOG_WRN("Flash busy, reject cmd 0x%02x", (cmd_info_ptr)->cmd);    \
+            return -EBUSY;                                                     \
+        }                                                                      \
+    } while (0)
+
 
 /* =========================================================================
  * ACPI Command Handler implementation
@@ -119,9 +137,8 @@ static int acpi_ec_fw_corruption_status(const acpi_cmd_t *cmd_info, uint8_t *cmd
     resp[0] = 1;                         // Byte count = 1
     resp[1] = ec_boot_info_get()->corruption_status; // Corruption status bitfield
 
-    acpi_resp_set(resp, cmd_info->resp_len);
     LOG_INF("EC FW Corruption Status query: 0x%02X", resp[1]);
-    return 0;
+    return 2; // Byte count + Status
 }
 
 /**
@@ -140,9 +157,8 @@ static int acpi_ec_state_wp_status(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     resp[1] = state;               // State of EC
     resp[2] = active_control_path; // 0x4F: Internal, 0x0F: External
 
-    acpi_resp_set(resp, cmd_info->resp_len);
     LOG_INF("EC State: 0x%02X, Control Path: 0x%02X", resp[1], resp[2]);
-    return 0;
+    return 3; // Byte count + State + Path
 }
 
 /**
@@ -166,9 +182,8 @@ static int acpi_ec_read_crc_result(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     resp[4] = (last_crc_value >> 16) & 0xFF;
     resp[5] = (last_crc_value >> 24) & 0xFF; // MSB (0 for CRC8)
 
-    acpi_resp_set(resp, cmd_info->resp_len);
     LOG_INF("Read CRC: Status=0x%02X, CRC=0x%08X", resp[1], last_crc_value);
-    return 0;
+    return 6; // Byte count + Status + CRC(4)
 }
 
 /**
@@ -181,6 +196,7 @@ static int acpi_ec_erase_designated_region(const acpi_cmd_t *cmd_info, uint8_t *
     ARG_UNUSED(resp);
     ARG_UNUSED(resp_len);
     ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
+    ACPI_CHECK_FLASH_IDLE(cmd_info);
 
     uint8_t  path        = cmd[2];
     uint32_t block_count = (uint32_t)cmd[3] * 4096; // 4K
@@ -189,10 +205,14 @@ static int acpi_ec_erase_designated_region(const acpi_cmd_t *cmd_info, uint8_t *
     address += 0x9000; // Host lock to 0x8000, so add 0x9000 to align with actual flash address
     LOG_INF("Erase Region: Path=0x%02X, StartAddr=0x%06X, Blocks=%d", path, address, block_count);
 
-    int ret = flash_service_request(FLASH_SERVICE_ERASE, address, block_count,
-                                    NULL, NULL, NULL);
+    flash_service_msg_t msg = {
+        .command = FLASH_SERVICE_ERASE,
+        .flash_address = address,
+        .size = block_count,
+    };
+    int ret = flash_service_submit(&msg);
     if (ret < 0) {
-        LOG_ERR("Failed to erase flash region: %d", ret);
+        LOG_ERR("Failed to queue flash erase: %d", ret);
         return ret;
     }
 
@@ -211,6 +231,7 @@ static int acpi_ec_erase_partition(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     ARG_UNUSED(resp);
     ARG_UNUSED(resp_len);
     ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
+    ACPI_CHECK_FLASH_IDLE(cmd_info);
 
     uint8_t quick_erase_cmd = cmd[2];
     LOG_INF("Quick Erase Partition Command: 0x%02X", quick_erase_cmd);
@@ -230,15 +251,16 @@ static int acpi_ec_erase_partition(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                         DT_REG_ADDR(DT_NODELABEL(hdr_partition)),
                     DT_REG_SIZE(DT_NODELABEL(hdr_partition)) +
                         DT_REG_SIZE(DT_NODELABEL(img_partition)));
-            ret = flash_service_request(
-                FLASH_SERVICE_ERASE,
-                DT_REG_ADDR(DT_NODELABEL(int_flash)) +
-                    DT_REG_ADDR(DT_NODELABEL(hdr_partition)),
-                DT_REG_SIZE(DT_NODELABEL(hdr_partition)) +
-                    DT_REG_SIZE(DT_NODELABEL(img_partition)),
-                NULL, NULL, NULL);
+            flash_service_msg_t msg = {
+                .command = FLASH_SERVICE_ERASE,
+                .flash_address = DT_REG_ADDR(DT_NODELABEL(int_flash)) +
+                                 DT_REG_ADDR(DT_NODELABEL(hdr_partition)),
+                .size = DT_REG_SIZE(DT_NODELABEL(hdr_partition)) +
+                        DT_REG_SIZE(DT_NODELABEL(img_partition)),
+            };
+            ret = flash_service_submit(&msg);
             if (ret < 0) {
-                LOG_ERR("Failed to erase APP Main partition : %d", ret);
+                LOG_ERR("Failed to queue APP Main partition erase: %d", ret);
             }
             flash_wr_addr = DT_REG_ADDR(DT_NODELABEL(int_flash)) +
                          DT_REG_ADDR(DT_NODELABEL(hdr_partition));
@@ -284,6 +306,7 @@ static int acpi_ec_write_ram_buffer(const acpi_cmd_t *cmd_info, uint8_t *cmd,
     ARG_UNUSED(resp);
     ARG_UNUSED(resp_len);
     ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
+    ACPI_CHECK_FLASH_IDLE(cmd_info); // ram_buffer may be in use by 0xAA / 0xA7
 
     uint16_t payload_len = cmd_len - 1; // Exclude cmd byte
     if (payload_len > 512) {
@@ -308,6 +331,7 @@ static int acpi_ec_write_designated_region(const acpi_cmd_t *cmd_info, uint8_t *
     ARG_UNUSED(resp);
     ARG_UNUSED(resp_len);
     ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
+    ACPI_CHECK_FLASH_IDLE(cmd_info);
 
     uint8_t  path       = cmd[2];
     uint8_t  size_unit  = cmd[3]; // In units of 32 bytes
@@ -338,10 +362,17 @@ static int acpi_ec_write_designated_region(const acpi_cmd_t *cmd_info, uint8_t *
     LOG_INF("Commit RAM buffer to Flash: Path=0x%02X, Addr=0x%06X, Len=%d bytes",
             path, address, bytes_to_program);
 
-    int ret = flash_service_request(FLASH_SERVICE_WRITE, address,
-                                    bytes_to_program, NULL, ram_buffer, NULL);
+    // ram_buffer stays untouched until the write is done (0xA0 is rejected
+    // while the flash is busy)
+    flash_service_msg_t msg = {
+        .command = FLASH_SERVICE_WRITE,
+        .flash_address = address,
+        .size = bytes_to_program,
+        .data_pointer = ram_buffer,
+    };
+    int ret = flash_service_submit(&msg);
     if (ret < 0) {
-        LOG_ERR("Failed to program Flash: %d", ret);
+        LOG_ERR("Failed to queue flash write: %d", ret);
         return ret;
     }
     flash_wr_addr += bytes_to_program; // Update the write address for next commit
@@ -359,17 +390,23 @@ static int acpi_ec_read_designated_region_setup(const acpi_cmd_t *cmd_info, uint
     ARG_UNUSED(resp);
     ARG_UNUSED(resp_len);
     ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
+    ACPI_CHECK_FLASH_IDLE(cmd_info);
 
     uint8_t  path    = cmd[2];
     uint32_t address = cmd[3] | ((uint32_t)cmd[4] << 8) | ((uint32_t)cmd[5] << 16);
 
     LOG_INF("Setup Read Flash: Path=0x%02X, Addr=0x%06X", path, address);
 
-    /* Read 512 bytes into ram_buffer by default */
-    int ret = flash_service_request(FLASH_SERVICE_READ, address,
-                                    RAM_BUFFER_SIZE, NULL, ram_buffer, NULL);
+    /* Read 512 bytes into ram_buffer by default, 0xA1 after the flash is idle */
+    flash_service_msg_t msg = {
+        .command = FLASH_SERVICE_READ,
+        .flash_address = address,
+        .size = RAM_BUFFER_SIZE,
+        .data_pointer = ram_buffer,
+    };
+    int ret = flash_service_submit(&msg);
     if (ret < 0) {
-        LOG_ERR("Failed to read flash into buffer: %d", ret);
+        LOG_ERR("Failed to queue flash read: %d", ret);
         return ret;
     }
 
@@ -385,45 +422,26 @@ static int acpi_ec_read_ram_buffer(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                    uint16_t resp_len) {
     ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
     ACPI_CHECK_OUT(cmd_info, resp, resp_len);
+    ACPI_CHECK_FLASH_IDLE(cmd_info); // ram_buffer may still be loaded by 0xA7
 
     uint16_t copy_len = (resp_len < RAM_BUFFER_SIZE) ? resp_len : RAM_BUFFER_SIZE;
     memcpy(resp, ram_buffer, copy_len);
-    acpi_resp_set(resp, copy_len);
 
     LOG_INF("Read RAM Buffer: Returned %d bytes", copy_len);
-    return 0;
+    return copy_len;
 }
 
-/**
- * @brief 0xBB 0xF0: Run CRC on Internal Active Main
- * Read header to get image size, calculate CRC8 and store it in boot info for 0xA2 Read CRC
- */
-static void ec_run_crc_int_act_main(void) {
+/* Expected CRC of the image being checked by 0xBB 0xF0 */
+static uint32_t crc_expected;
+
+/* Store the CRC result in boot info for 0xA2 / 0xEB */
+static void ec_run_crc_store(int result, uint32_t crc) {
     ec_boot_info_t *info = ec_boot_info_get();
-    fw_hdr_t hdr = {0};
-    uint32_t crc = 0;
 
-    info->last_crc_value = 0;
-    info->last_crc_status = EC_CRC_STATUS_FAILED;
-
-    if (ec_get_image_header(&hdr) < 0) {
-        LOG_ERR("Failed to read EC FW header");
-    } else if (hdr.fw_size == 0 || hdr.fw_size > EC_FW_IMAGE_MAX_SIZE) {
-        LOG_ERR("Invalid EC FW Image Size: %u bytes", hdr.fw_size);
-    } else {
-        int ret = flash_service_request(FLASH_SERVICE_CRC, (off_t)IMG_ADDR,
-                                        hdr.fw_size, NULL, NULL, &crc);
-        if (ret < 0) {
-            LOG_ERR("Failed to calculate EC FW CRC: %d", ret);
-        } else {
-            info->last_crc_value = crc;
-            info->last_crc_status =
-                (crc == hdr.check.crc) ? EC_CRC_STATUS_PASSED
-                                         : EC_CRC_STATUS_FAILED;
-            LOG_INF("Run CRC: Size=%u, Calculated 0x%08X, Expected 0x%08X",
-                    hdr.fw_size, crc, hdr.check.crc);
-        }
-    }
+    info->last_crc_value = (result == 0) ? crc : 0;
+    info->last_crc_status = ((result == 0) && (crc == crc_expected))
+                                ? EC_CRC_STATUS_PASSED
+                                : EC_CRC_STATUS_FAILED;
 
     if (info->last_crc_status == EC_CRC_STATUS_PASSED) {
         info->corruption_status |= FW_CORRUPT_ACT_MAIN_INTACT;
@@ -431,6 +449,59 @@ static void ec_run_crc_int_act_main(void) {
         info->corruption_status &= ~FW_CORRUPT_ACT_MAIN_INTACT;
     }
     ec_boot_info_save();
+}
+
+/* Flash service callback: runs before the status leaves BUSY */
+static void ec_run_crc_done(flash_service_command_t command, int result,
+                            uint32_t crc, void *user_data) {
+    ARG_UNUSED(command);
+    ARG_UNUSED(user_data);
+
+    if (result < 0) {
+        LOG_ERR("Failed to calculate EC FW CRC: %d", result);
+    } else {
+        LOG_INF("Run CRC: Calculated 0x%08X, Expected 0x%08X", crc,
+                crc_expected);
+    }
+    ec_run_crc_store(result, crc);
+}
+
+/**
+ * @brief 0xBB 0xF0: Run CRC on Internal Active Main
+ * Read header to get image size and queue the CRC8 calculation; the result is
+ * stored in boot info for 0xA2 Read CRC when the flash service finishes
+ */
+static int ec_run_crc_int_act_main(void) {
+    fw_hdr_t hdr = {0};
+
+    if (ec_get_image_header(&hdr) < 0) {
+        LOG_ERR("Failed to read EC FW header");
+        ec_run_crc_store(-EIO, 0);
+        return -EIO;
+    }
+
+    if (hdr.fw_size == 0 || hdr.fw_size > EC_FW_IMAGE_MAX_SIZE) {
+        LOG_ERR("Invalid EC FW Image Size: %u bytes", hdr.fw_size);
+        ec_run_crc_store(-EINVAL, 0);
+        return -EINVAL;
+    }
+
+    crc_expected = hdr.check.crc;
+    LOG_INF("Run CRC: Size=%u", hdr.fw_size);
+
+    flash_service_msg_t msg = {
+        .command = FLASH_SERVICE_CRC,
+        .flash_address = (off_t)IMG_ADDR,
+        .size = hdr.fw_size,
+        .done = ec_run_crc_done,
+    };
+    int ret = flash_service_submit(&msg);
+    if (ret < 0) {
+        LOG_ERR("Failed to queue EC FW CRC: %d", ret);
+        ec_run_crc_store(ret, 0);
+    }
+
+    return ret;
 }
 
 static void exit_bootloader_work_hdl(struct k_work *work) {
@@ -530,24 +601,16 @@ static int acpi_ec_spi_services(const acpi_cmd_t *cmd_info, uint8_t *cmd,
         break;
 
     /* 6. Run CRC */
-    case SPI_SUBCMD_CRC_INT_ACT_MAIN:
+    case SPI_SUBCMD_CRC_INT_ACT_MAIN: {
         LOG_INF("Triggering Partition CRC Calculation: 0x%02X", sub_cmd);
-        {
-            // set spi busy flag
-            uint8_t buf[] = {
-                0x02, 0xFF,
-                active_control_path}; // ByteCount=2, State=Busy, Path=Internal
-            acpi_resp_set(buf, sizeof(buf));
+        ACPI_CHECK_FLASH_IDLE(cmd_info);
+        // Queued: 0xEC reports BUSY until the CRC is done, then 0xA2 reads it
+        int ret = ec_run_crc_int_act_main();
+        if (ret < 0) {
+            return ret;
         }
-        ec_run_crc_int_act_main();
-        // {
-        //     // set spi idle flag
-        //     uint8_t buf[] = {
-        //         0x02, EC_STATE_BOOTLOADER_IDLE_WP_OFF,
-        //         active_control_path}; // ByteCount=2, State=idle, Path=Internal
-        //     acpi_resp_set(buf, sizeof(buf));
-        // }
         break;
+    }
     case SPI_SUBCMD_CRC_INT_BK_MAIN:
     case SPI_SUBCMD_CRC_INT_ACT_ODM:
     case SPI_SUBCMD_CRC_INT_BK_ODM:

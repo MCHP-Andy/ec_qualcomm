@@ -26,12 +26,13 @@ Buffer sizes are defined in [interface/acpi.h](../../interface/acpi.h):
 graph LR
     subgraph "Driver (driver/acpi.c)"
         I2C[I2C target 0x76]
+        WR[(wr_buf)]
         RESP[(resp_buf)]
     end
 
     subgraph "ACPI service"
-        BUF[acpi_buf_set<br/>rece_cmd]
-        EVT((ACPI_CMD event))
+        BUF[acpi_cmd_submit]
+        EVT((acpi_cmd_queue<br/>k_msgq + k_mem_slab))
         HDL[acpi_cmd_hdl<br/>table lookup]
     end
 
@@ -39,8 +40,9 @@ graph LR
         TBL[ACPI_CMD_SUBSCRIBE<br/>fan / thermal / power / sci / board / fw]
     end
 
-    I2C -->|start: ACPI_TYPE_CMD<br/>data: ACPI_TYPE_DATA<br/>stop: ACPI_TYPE_PROCESS| BUF
-    BUF -->|k_event_post| EVT
+    I2C -->|write_received| WR
+    WR -->|buf_read_requested / stop<br/>whole command| BUF
+    BUF -->|k_msgq_put| EVT
     EVT --> HDL
     HDL --> TBL
     TBL -->|handler fills resp| HDL
@@ -49,17 +51,31 @@ graph LR
 ```
 
 ### Receive and dispatch flow
-1. `ACPI_TYPE_CMD` (first byte of an I2C write): resets the index, stores the opcode, and looks up the
-   command's `mand` in the command table.
-2. `ACPI_TYPE_DATA`: bytes are appended to `rece_cmd`. As soon as the byte count **equals `mand`**, the
-   command is dispatched, so the response is ready even if the host reads with a repeated start instead
-   of sending a stop.
-3. If optional payload arrives after that early dispatch, the command is marked as not dispatched, and
-   `ACPI_TYPE_PROCESS` (I2C stop) dispatches it again so the handler sees the complete command.
-4. The service thread (`APP_PRIO_H`) looks up the opcode in the `acpi_cmd_t` section and calls the
-   handler when `cmd_len >= mand`. If the command is too short, the handler is not called.
-5. App: after the handler succeeds, the service calls `acpi_resp_set(resp_buf, resp_len)`.
-   Bootloader: handlers call `acpi_resp_set` themselves (the response length varies).
+1. The driver (`driver/acpi.c`) stores the bytes the host writes to 0x76 in `wr_buf`. The service is not
+   notified yet.
+2. When the host reads with a repeated start (`buf_read_requested`) or sends a stop, the driver calls
+   `acpi_cmd_submit(wr_buf, len)` to hand the whole command (opcode + arguments) to the service, once
+   per write.
+3. `acpi_cmd_submit` takes a block from a `k_mem_slab`, copies the command into it and puts the pointer
+   on a `k_msgq` (depth `ACPI_CMD_QUEUE_LEN`). It is ISR safe; when the queue is full the command is
+   dropped and `-ENOMEM` is returned.
+4. The service thread (`APP_PRIO_H`) takes the command from the queue, looks up the opcode in the
+   `acpi_cmd_t` section and calls the handler when `cmd_len >= mand`. If the command is too short, the
+   handler is not called. On a read the I2C driver stretches SCL for
+   `CONFIG_I2C_XEC_V2_CUSTOM_STRETCH_DELAY_MS` (3 ms by default) so the handler can write the response.
+5. The handler decides read or write from the input length, and its return value sets how many
+   bytes are written back to the ACPI buffer:
+
+   | Input length `cmd_len` | Action | Return |
+   |---|---|---|
+   | `== mand` | Read: fill `resp` | response length (>0) |
+   | `== mand + opt` (`ACPI_IS_WRITE` / `ACPI_CHECK_WRITE`) | Write: apply the data only | `0` |
+   | error | — | negative errno |
+
+   The service calls `acpi_resp_set(resp_buf, ret)` only when the return value is > 0; on 0 or an
+   error the ACPI buffer is left unchanged. Commands with `opt == 0` are either read only
+   (`resp_len > 0`) or write only (`resp_len == 0`). `resp_len` in the table is the maximum response
+   length (checked by `ACPI_CHECK_OUT`).
 
 ### Adding a command
 Use the macro from [interface/acpi.h](../../interface/acpi.h) in any service:
@@ -72,16 +88,36 @@ ACPI_CMD_SUBSCRIBE(fan, EC_FAN_RPM, acpi_ec_fan_rpm, 2, 0, 3);
 | Parameter | Description |
 | --- | --- |
 | `mand` | Number of mandatory bytes, **including the opcode** |
-| `opt` | Number of optional bytes after the opcode. By convention, `cmd_len == mand + opt` is a write (set), anything else is a read (get) |
-| `resp_len` | Response length (including the byte count, if any) |
+| `opt` | Number of optional (write) bytes after `mand`. `cmd_len == mand` is a read (get), `cmd_len == mand + opt` is a write (set) |
+| `resp_len` | Maximum response length (including the byte count, if any) |
 
-Inside a handler, use `ACPI_CHECK_IN` / `ACPI_CHECK_OUT` from [acpi_tbl.h](acpi_tbl.h) to validate
-input and output lengths. Command opcodes are also defined in `acpi_tbl.h`.
+Inside a handler, use the macros from [acpi_tbl.h](acpi_tbl.h):
+- `ACPI_CHECK_IN` / `ACPI_CHECK_OUT`: input length >= `mand`, `resp` buffer >= `resp_len`.
+- `ACPI_IS_WRITE`: the input is longer than `mand` (and `opt > 0`), so it is a write.
+- `ACPI_CHECK_WRITE`: a write must be exactly `mand + opt` bytes, otherwise `-EINVAL`.
+
+```c
+static int acpi_xxx(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
+                    uint8_t *resp, uint16_t resp_len) {
+    ACPI_CHECK_IN(cmd_info, cmd, cmd_len);
+
+    if (ACPI_IS_WRITE(cmd_info, cmd_len)) {
+        ACPI_CHECK_WRITE(cmd_info, cmd_len);
+        // apply the data in cmd[mand..]
+        return 0;
+    }
+
+    ACPI_CHECK_OUT(cmd_info, resp, resp_len);
+    resp[0] = ...;
+    return 1; // response length
+}
+``` Command opcodes are also defined in `acpi_tbl.h`.
 
 ## Command table
 
-The `cmd` column is the full byte sequence written by the host (`[]` is optional), and `resp` is what
-the host reads back.
+The `cmd` column is the full byte sequence written by the host (`[]` is optional; sending it makes the
+command a write), and `resp` is what the host reads back for a read. A write does not update the
+response.
 
 ### App
 | Opcode | Name | File | cmd | resp |
@@ -131,7 +167,14 @@ Notes:
 - `0xA0` has `mand` = 513, so it only runs once the full 512 bytes are received.
 - `0xAF` currently supports only `0x21` (erase backup main, `CONFIG_BOARD_QC_MODULE`); other
   sub-commands only log.
-- All flash operations go through the [flash service](../flash/readme_en.md).
+- All flash operations run asynchronously in the [flash service](../flash/readme_en.md): `0xAE` / `0xAF` /
+  `0xAA` / `0xA7` / `0xBB F0` (Run CRC) return as soon as they are queued, and the host polls `0xEC`:
+  `0xFF` (busy), then `0x0B` (idle). A failed flash operation is only logged and the status still
+  returns to idle (`0xFA` is not reported for now).
+- While the flash is busy, these flash commands and `0xA0` / `0xA1` (which share the RAM buffer with
+  0xAA / 0xA7) return `-EBUSY` and do not update the response.
+- Read with `0xA1` only after `0xA7` has finished (0xEC idle); read the CRC with `0xA2` only after
+  `0xBB F0` has finished.
 
 0xBB sub-commands:
 | Sub | Function |
@@ -159,7 +202,7 @@ BB 01 33                 # exit bootloader
 ## Shell
 | Command | Description |
 | --- | --- |
-| `acpi write <op> [data ...]` | Simulate a host write in hex; sends `ACPI_TYPE_PROCESS` at the end (same as an I2C stop) |
+| `acpi write <op> [data ...]` | Simulate a host write in hex; submits the whole write with `acpi_cmd_submit` (same as an I2C stop) |
 
 The shell has no command to read the response; check the log or read it back from the host.
 The `fw_update` shell in `ec_fw_update_bootloader.c` is guarded by `CONFIG_FW_UPDATE_SHELL`, which is

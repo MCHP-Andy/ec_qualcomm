@@ -4,7 +4,8 @@
 
 處理 SoC-CP (SoC Control Processor) 經 I2C target (位址 `0x0C`) 送來的命令，
 包含 who-am-i 與 power state feature (SoC power state、fan constraint、Off mode / OOB 狀態)。
-與 ACPI 共用同一個 I2C controller 與 response buffer，由 [driver/acpi.c](../../driver/acpi.c) 依位址分流。僅編入 app。
+I2C target 在 [driver/soccp.c](../../driver/soccp.c)，與 ACPI target ([driver/acpi.c](../../driver/acpi.c)) 共用同一個 I2C controller，
+由 I2C driver 依位址選擇 target；response buffer 各自獨立。僅編入 app。
 
 ## Kconfig
 | Option | Default | 說明 |
@@ -18,7 +19,7 @@ Buffer 大小：`SOCCP_RECE_LEN` / `SOCCP_RESP_LEN` 皆為 8 ([interface/soccp.h
 ## Architecture
 ```mermaid
 graph LR
-    subgraph "Driver (driver/acpi.c)"
+    subgraph "Driver (driver/soccp.c)"
         I2C[I2C target 0x0C]
         RESP[(resp_buf)]
     end

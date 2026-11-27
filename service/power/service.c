@@ -119,7 +119,7 @@ static int acpi_soc_to_ec_modern_standby_notifi(const acpi_cmd_t *cmd_info,
     LOG_DBG("SoC Modern Standby notification: %d", standby_status);
     // Handling for modern standby notification
     pwr_state_set((standby_status) ? PWR_STA_MS : PWR_STA_S0);
-    return 0;
+    return 0; // Write only
 }
 
 // clang-format off

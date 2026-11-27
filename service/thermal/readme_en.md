@@ -55,7 +55,7 @@ Thresholds are in 1 °C and all default to 80 °C. A new sampling period takes e
 wait ends.
 
 ## ACPI commands
-Fields in `[]` are optional; including them makes the command a write, otherwise it is a read.
+Fields in `[]` are optional; including them makes the command a write, otherwise it is a read. A write does not update the response; `resp` is the reply to a read.
 
 | Opcode | Name | cmd | resp |
 | --- | --- | --- | --- |
