@@ -102,9 +102,8 @@ static void service(void) {
 K_THREAD_DEFINE(pwr_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M, 0,
                 0);
 
-#ifdef CONFIG_ACPI_SERVICE
+#if defined(CONFIG_ACPI_SERVICE)
 #include <interface/acpi.h>
-#include <service/acpi/acpi_tbl.h> // ACPI_CHECK_IN/OUT macros for fan handlers
 
 static int acpi_soc_to_ec_modern_standby_notifi(const acpi_cmd_t *cmd_info,
                                                 uint8_t *cmd, uint16_t cmd_len,
@@ -125,7 +124,7 @@ static int acpi_soc_to_ec_modern_standby_notifi(const acpi_cmd_t *cmd_info,
 // clang-format off
 ACPI_CMD_SUBSCRIBE(fan, SOC_TO_EC_MODERN_STANDBY_NOTIFI,           acpi_soc_to_ec_modern_standby_notifi, 2, 0, 0); // Page 19 (Status)
 // clang-format on
-#endif // CONFIG_ACPI_SERVICE
+#endif /* CONFIG_ACPI_SERVICE */
 
 #ifdef CONFIG_POWER_SHELL
 #include <zephyr/shell/shell.h>

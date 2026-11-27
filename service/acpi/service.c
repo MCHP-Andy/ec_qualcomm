@@ -13,7 +13,6 @@
 #include <interface/system.h>
 #include <interface/acpi.h>
 
-#include "acpi_tbl.h"
 
 LOG_MODULE_REGISTER(acpi, CONFIG_ACPI_LOG_LEVEL);
 

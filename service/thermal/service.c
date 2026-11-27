@@ -13,10 +13,7 @@
 #include <interface/system.h>
 #include <interface/power.h>
 #include <interface/thermal.h>
-#include <interface/acpi.h>
 #include <interface/sci.h>
-
-#include <service/acpi/acpi_tbl.h> // ACPI_CHECK_IN/OUT macros for therm handlers
 
 LOG_MODULE_REGISTER(thermal, CONFIG_THERMAL_LOG_LEVEL);
 
@@ -135,6 +132,9 @@ static void service(void) {
 
 K_THREAD_DEFINE(therm_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M,
                 0, 0);
+
+#if defined(CONFIG_ACPI_SERVICE)
+#include <interface/acpi.h>
 
 static int acpi_ec_thermistors(therm_id_t idx, uint8_t *resp, uint16_t resp_len,
                                const acpi_cmd_t *cmd_info) {
@@ -276,6 +276,7 @@ ACPI_CMD_SUBSCRIBE(fan, EC_THERMISTOR3,                            acpi_ec_therm
 ACPI_CMD_SUBSCRIBE(fan, EC_THERMISTOR_TEMP_THRE,                   acpi_ec_thermistor_temp_thre, 2, 5, 5); // Page 31/32 (ThermID + Optional ByteCount + PSV + CR3 + HOT + CRT)
 ACPI_CMD_SUBSCRIBE(fan, EC_THERMISTOR_SAMPLING_RATE,               acpi_ec_thermistor_sampling_rate, 1, 2, 2); // Page 33/34 (Optional SampleRate(2))
 // clang-format on
+#endif /* CONFIG_ACPI_SERVICE */
 
 #ifdef CONFIG_THERMAL_SHELL
 #include <zephyr/shell/shell.h>

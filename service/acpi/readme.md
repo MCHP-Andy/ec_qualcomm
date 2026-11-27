@@ -72,11 +72,19 @@ graph LR
    Table 中的 `resp_len` 是 response 的最大長度 (給 `ACPI_CHECK_OUT` 檢查 buffer)。
 
 ### 新增命令
-在任一 service 中使用 [interface/acpi.h](../../interface/acpi.h) 的 macro：
+在任一 service 中使用 [interface/acpi.h](../../interface/acpi.h) 的 macro。命令 opcode 一律定義在 `interface/acpi.h`；
+service 內的 ACPI handler、註冊與 `#include <interface/acpi.h>` 都放在 `#if defined(CONFIG_ACPI_SERVICE)` 內：
 
 ```c
+#if defined(CONFIG_ACPI_SERVICE)
+#include <interface/acpi.h>
+
+static int acpi_ec_fan_rpm(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
+                           uint8_t *resp, uint16_t resp_len) { ... }
+
 // ACPI_CMD_SUBSCRIBE(name, opcode, handler, mand, opt, resp_len)
 ACPI_CMD_SUBSCRIBE(fan, EC_FAN_RPM, acpi_ec_fan_rpm, 2, 0, 3);
+#endif /* CONFIG_ACPI_SERVICE */
 ```
 
 | 參數 | 說明 |
@@ -85,7 +93,7 @@ ACPI_CMD_SUBSCRIBE(fan, EC_FAN_RPM, acpi_ec_fan_rpm, 2, 0, 3);
 | `opt` | mand 之後的 optional (寫入) byte 數；`cmd_len == mand` 為讀取 (get)，`cmd_len == mand + opt` 為寫入 (set) |
 | `resp_len` | response 最大長度 (含 byte count，若有) |
 
-Handler 內使用 [acpi_tbl.h](acpi_tbl.h) 的 macro：
+Handler 內使用 [interface/acpi.h](../../interface/acpi.h) 的 macro：
 - `ACPI_CHECK_IN` / `ACPI_CHECK_OUT`：檢查輸入長度 >= `mand`、`resp` buffer >= `resp_len`。
 - `ACPI_IS_WRITE`：輸入長度大於 `mand` (且 `opt > 0`) 即為寫入。
 - `ACPI_CHECK_WRITE`：寫入長度必須等於 `mand + opt`，不足或過長回傳 `-EINVAL`。
@@ -106,7 +114,7 @@ static int acpi_xxx(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
     return 1; // response 長度
 }
 ```
-命令 opcode 也統一定義在 `acpi_tbl.h`。
+命令 opcode 也統一定義在 `interface/acpi.h`。
 
 ## 命令表
 

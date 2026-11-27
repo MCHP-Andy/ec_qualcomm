@@ -3,12 +3,10 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#include <interface/acpi.h>
+#include <interface/acpi.h> // acpi_int_set(): ACPI INT pin for the SCI notify
 #include <interface/power.h>
 #include <interface/sci.h>
 #include <interface/system.h>
-
-#include "../acpi/acpi_tbl.h"
 
 LOG_MODULE_REGISTER(sci, CONFIG_SCI_LOG_LEVEL);
 
@@ -128,6 +126,9 @@ static int acpi_sci_get(sci_t *psci) {
     return 0;
 }
 
+#if defined(CONFIG_ACPI_SERVICE)
+#include <interface/acpi.h>
+
 static int acpi_active_cooling_sci_event(const acpi_cmd_t *cmd_info,
                                          uint8_t *cmd, uint16_t cmd_len,
                                          uint8_t *resp, uint16_t resp_len) {
@@ -182,6 +183,7 @@ static int acpi_func_flag(const acpi_cmd_t *cmd_info, uint8_t *cmd,
 ACPI_CMD_SUBSCRIBE(sci, EC_ACTIVE_COOLING_SCI_EVENT, acpi_active_cooling_sci_event, 1, 0, 1); // Page 37
 ACPI_CMD_SUBSCRIBE(sci, EC_FUNC_FLAG,                acpi_func_flag,                1, 9, 9); // Page 35/36 (Optional ByteCount + Flag(8))
 // clang-format on
+#endif /* CONFIG_ACPI_SERVICE */
 
 static void sci_notify_hdl(void) {
     sci_t sci;

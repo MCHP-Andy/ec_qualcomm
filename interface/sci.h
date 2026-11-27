@@ -22,8 +22,6 @@ typedef enum {
     SCI_EC_RST = 0x3D,
 } sci_t;
 
-#define EC_ACTIVE_COOLING_SCI_EVENT 0x05
-
 /**
  * @brief Enable or disable SCI notification to the host (cmd 0x35 bit 0).
  *

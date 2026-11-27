@@ -19,7 +19,7 @@
 #include <cmsis_core.h>
 #endif
 
-#include "acpi_tbl.h"
+#include <interface/acpi.h>
 
 LOG_MODULE_DECLARE(acpi, CONFIG_ACPI_LOG_LEVEL);
 
@@ -85,19 +85,7 @@ static uint8_t  active_control_path = EC_FLASH_PATH_INT;
 #define EC_EXIT_BBK_JUMP_DELAY_MS           (100)
 // LOG_MODULE_REGISTER(fw_update, CONFIG_FW_UPDATE_LOG_LEVEL);
 
-/* =========================================================================
- * 80-35782-87 Rev. AC - EC Firmware Update ACPI Commands
- * ========================================================================= */
-#define EC_FW_VERSION              0x0E
-#define EC_FW_VERSION_LOWEST       0x0F
-#define EC_FLASH_WRITE_BUF         0xA0
-#define EC_FLASH_READ_BUF          0xA1
-#define EC_READ_CRC_RESULT         0xA2
-#define EC_FLASH_READ_SETUP        0xA7
-#define EC_FLASH_WRITE_COMMIT      0xAA
-#define EC_FLASH_ERASE_REGION      0xAE
-#define EC_FLASH_ERASE_PARTITION   0xAF
-#define EC_FW_CORRUPTION_STATUS    0xEB
+/* 80-35782-87 Rev. AC - EC Firmware Update ACPI Commands, opcodes in interface/acpi.h */
 
 /* Read/write staging buffer (A0h writes up to 256B, A1h reads up to 512B) */
 #define RAM_BUFFER_SIZE         512

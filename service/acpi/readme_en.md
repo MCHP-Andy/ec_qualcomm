@@ -78,11 +78,20 @@ graph LR
    length (checked by `ACPI_CHECK_OUT`).
 
 ### Adding a command
-Use the macro from [interface/acpi.h](../../interface/acpi.h) in any service:
+Use the macro from [interface/acpi.h](../../interface/acpi.h) in any service. All command opcodes are
+defined in `interface/acpi.h`; keep a service's ACPI handlers, registrations and the
+`#include <interface/acpi.h>` inside `#if defined(CONFIG_ACPI_SERVICE)`:
 
 ```c
+#if defined(CONFIG_ACPI_SERVICE)
+#include <interface/acpi.h>
+
+static int acpi_ec_fan_rpm(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
+                           uint8_t *resp, uint16_t resp_len) { ... }
+
 // ACPI_CMD_SUBSCRIBE(name, opcode, handler, mand, opt, resp_len)
 ACPI_CMD_SUBSCRIBE(fan, EC_FAN_RPM, acpi_ec_fan_rpm, 2, 0, 3);
+#endif /* CONFIG_ACPI_SERVICE */
 ```
 
 | Parameter | Description |
@@ -91,7 +100,7 @@ ACPI_CMD_SUBSCRIBE(fan, EC_FAN_RPM, acpi_ec_fan_rpm, 2, 0, 3);
 | `opt` | Number of optional (write) bytes after `mand`. `cmd_len == mand` is a read (get), `cmd_len == mand + opt` is a write (set) |
 | `resp_len` | Maximum response length (including the byte count, if any) |
 
-Inside a handler, use the macros from [acpi_tbl.h](acpi_tbl.h):
+Inside a handler, use the macros from [interface/acpi.h](../../interface/acpi.h):
 - `ACPI_CHECK_IN` / `ACPI_CHECK_OUT`: input length >= `mand`, `resp` buffer >= `resp_len`.
 - `ACPI_IS_WRITE`: the input is longer than `mand` (and `opt > 0`), so it is a write.
 - `ACPI_CHECK_WRITE`: a write must be exactly `mand + opt` bytes, otherwise `-EINVAL`.
@@ -111,7 +120,8 @@ static int acpi_xxx(const acpi_cmd_t *cmd_info, uint8_t *cmd, uint16_t cmd_len,
     resp[0] = ...;
     return 1; // response length
 }
-``` Command opcodes are also defined in `acpi_tbl.h`.
+```
+Command opcodes are also defined in `interface/acpi.h`.
 
 ## Command table
 

@@ -3,7 +3,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#include "acpi_tbl.h"
+#include <interface/acpi.h>
 
 LOG_MODULE_DECLARE(acpi, CONFIG_ACPI_LOG_LEVEL);
 

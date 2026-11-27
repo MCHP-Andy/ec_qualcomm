@@ -13,10 +13,7 @@
 #include <interface/system.h>
 #include <interface/power.h>
 #include <interface/fan.h>
-#include <interface/acpi.h>
 #include <interface/sci.h>
-
-#include <service/acpi/acpi_tbl.h> // ACPI_CHECK_IN/OUT macros for fan handlers
 
 LOG_MODULE_REGISTER(fan, CONFIG_FAN_LOG_LEVEL);
 
@@ -245,6 +242,9 @@ static void service(void) {
 
 K_THREAD_DEFINE(fan_id, APP_STACK_MIN, service, NULL, NULL, NULL, APP_PRIO_M, 0,
                 0);
+
+#if defined(CONFIG_ACPI_SERVICE)
+#include <interface/acpi.h>
 
 static int acpi_soc_to_ec_temp(const acpi_cmd_t *cmd_info, uint8_t *cmd,
                                uint16_t cmd_len, uint8_t *resp,
@@ -619,6 +619,7 @@ ACPI_CMD_SUBSCRIBE(fan, EC_FAN_DEBUG_CTRL,                         acpi_ec_fan_d
 // ACPI_CMD_SUBSCRIBE(fan, EC_FUNC_FLAG,                              acpi_func_flag, 1, 9, 9); // Page 35/36 (Optional ByteCount + Flag(8))
 // ACPI_CMD_SUBSCRIBE(fan, EC_ACTIVE_COOLING_SCI_EVENT,               acpi_active_cooling_sci_event, 1, 0, 1); // Page 37
 // clang-format on
+#endif /* CONFIG_ACPI_SERVICE */
 
 #ifdef CONFIG_FAN_SHELL
 #include <zephyr/shell/shell.h>
