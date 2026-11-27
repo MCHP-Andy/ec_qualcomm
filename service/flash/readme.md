@@ -24,7 +24,7 @@ graph LR
         THR[flash_service thread]
     end
 
-    DRV[qc_flash_write / read / erase<br/>ec_cal_image_crc]
+    DRV[qc_flash_write / read / erase<br/>flash_service_cal_crc]
     INFO[(boot info status)]
 
     FW --> SUB

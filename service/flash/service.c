@@ -1,6 +1,8 @@
 #include <errno.h>
+#include <string.h>
 
 #include <zephyr/kernel.h>
+#include <zephyr/sys/crc.h>
 #include <zephyr/logging/log.h>
 
 #include <interface/flash.h>
@@ -70,6 +72,53 @@ bool flash_service_busy(void) {
     return pending > 0;
 }
 
+/* CRC calculation read buffer */
+static uint8_t crc_buf[512];
+
+/* Read a block of data from Flash */
+static int flash_service_read(off_t addr, uint8_t *data, size_t len) {
+#if defined(CONFIG_BOARD_QEMU_CORTEX_M3)
+    // QEMU: the image is in the memory mapped flash
+    memcpy(data, (const uint8_t *)addr, len);
+    return 0;
+#elif defined(CONFIG_BOARD_QC_MODULE)
+    int ret = qc_flash_read(addr, data, len);
+    if (ret < 0) {
+        LOG_ERR("Flash read failed at 0x%08X: %d", (uint32_t)addr, ret);
+    }
+    return ret;
+#else
+#error "Unsupported board"
+#endif
+}
+
+/* CRC8 (CCITT, poly 0x07, init 0x00) over a Flash region, zero-extended to
+ * 32 bits as stored in the image header
+ */
+static int flash_service_cal_crc(off_t addr, size_t size, uint32_t *crc) {
+    uint8_t crc8 = 0;
+
+    if (crc == NULL) {
+        return -EINVAL;
+    }
+
+    *crc = 0;
+
+    for (size_t a = 0; a < size; a += sizeof(crc_buf)) {
+        size_t chunk_size = MIN(size - a, sizeof(crc_buf));
+        int ret = flash_service_read(addr + a, crc_buf, chunk_size);
+        if (ret < 0) {
+            return ret;
+        }
+
+        crc8 = crc8_ccitt(crc8, crc_buf, chunk_size);
+    }
+
+    *crc = crc8;
+
+    return 0;
+}
+
 static int flash_service_execute(const flash_service_msg_t *msg,
                                  uint32_t *crc) {
     if (msg->flash_address < 0 || msg->size == 0) {
@@ -93,7 +142,7 @@ static int flash_service_execute(const flash_service_msg_t *msg,
         return qc_flash_erase(msg->flash_address, msg->size);
 
     case FLASH_SERVICE_CRC:
-        return ec_cal_image_crc(msg->flash_address, msg->size, crc);
+        return flash_service_cal_crc(msg->flash_address, msg->size, crc);
 
     case FLASH_SERVICE_LOAD_TO_RAM:
         if (msg->ram_address == NULL) {

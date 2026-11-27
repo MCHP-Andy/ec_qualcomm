@@ -9,7 +9,6 @@
 #include <interface/flash_service.h>
 #include <interface/storage.h>
 #include <zephyr/retention/retention.h>
-#include <zephyr/sys/crc.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(header, LOG_LEVEL_INF);
@@ -40,8 +39,7 @@ LOG_MODULE_REGISTER(header, LOG_LEVEL_INF);
 
 static const struct device *boot_info = DEVICE_DT_GET(DT_NODELABEL(boot_info0));
 static ec_boot_info_t info = {0};
-/* Buffer for loading image into RAM */
-/* ec_cal_image_crc / ec_cal_image_checksum temporary buffer */
+/* ec_cal_image_checksum temporary buffer */
 static uint8_t crc_buf[512] = {0};
 
 static uint32_t cal_checksum(uint32_t checksum, const uint8_t *const buffer,
@@ -75,31 +73,6 @@ int ec_get_image_header(fw_hdr_t *hdr) {
 
     // Read header from flash
     return read_flash((off_t)HDR_ADDR, (uint8_t *)hdr, sizeof(fw_hdr_t));
-}
-
-int ec_cal_image_crc(off_t addr, size_t size, uint32_t *crc) {
-    if (crc == NULL) {
-        return -EINVAL;
-    }
-
-    *crc = 0;
-
-    // Read image and calculate CRC8 (CCITT, poly 0x07, init 0x00)
-    uint8_t crc8 = 0;
-    for (size_t a = 0; a < size; a += sizeof(crc_buf)) {
-        size_t chunk_size = MIN(size - a, sizeof(crc_buf));
-        int ret = read_flash(addr + a, crc_buf, chunk_size);
-        if (ret < 0) {
-            return ret;
-        }
-
-        crc8 = crc8_ccitt(crc8, crc_buf, chunk_size);
-    }
-
-    // CRC8 is stored zero-extended in the 4-byte field
-    *crc = crc8;
-
-    return 0;
 }
 
 int ec_cal_image_checksum(off_t addr, size_t size, uint32_t *checksum) {

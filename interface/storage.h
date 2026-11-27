@@ -112,19 +112,6 @@ bool ec_validate_image_header(const fw_hdr_t *hdr);
 int ec_get_image_header(fw_hdr_t *hdr);
 
 /**
- * @brief Calculate CRC8 (CCITT, poly 0x07, init 0x00) over the specified Flash region
- *
- * @note Implemented in driver (driver/storage_bootloader.c), called by
- *       service (service/flash).
- *
- * @param addr Flash start address
- * @param size Length to calculate (bytes)
- * @param crc Output CRC8 value, zero-extended to 32 bits
- * @return 0 on success, negative error code on failure
- */
-int ec_cal_image_crc(off_t addr, size_t size, uint32_t *crc);
-
-/**
  * @brief Calculate Checksum over the specified Flash region (byte-wise sum)
  *
  * @note Implemented in driver (driver/storage_bootloader.c), called by
